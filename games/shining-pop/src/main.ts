@@ -14,6 +14,7 @@
 import * as PIXI from 'pixi.js';
 import { gsap } from 'gsap';
 import { SymbolRigPool } from './spine/SymbolRigPool.js';
+import { makeSkin } from './ui/betting-bar-skin.js';
 
 (globalThis as Record<string, unknown>).PIXI = PIXI;
 // SPINE-04/05: expose the Crown rig pool BEFORE the game module runs so game.js
@@ -25,6 +26,11 @@ import { SymbolRigPool } from './spine/SymbolRigPool.js';
 // after a stalled frame (Slow-3G). (Single-clock app.ticker drive is a tracked follow-up.)
 (globalThis as Record<string, unknown>).gsap = gsap;
 gsap.ticker.lagSmoothing(500, 33);
+// BAR-SKIN: expose the delivered betting-panel skin factory globally (like PIXI/gsap)
+// BEFORE the game module runs, so game.js can build the skin once (window.__makeSkin(PIXI))
+// and conform the bottom bar to the delivered gold panel in place. Falls back gracefully
+// (game guards every use with `if (skin)`) if the module is ever absent.
+(globalThis as Record<string, unknown>).__makeSkin = makeSkin;
 
 // Spine + GSAP are installed and ready for the next phase (see docs/10_…BLUEPRINT.md).
 // They are intentionally NOT imported yet — wrapper-first keeps the approved game

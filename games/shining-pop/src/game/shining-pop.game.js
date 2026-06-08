@@ -2161,6 +2161,57 @@
   // bottom-bar layout draws into this in a follow-up step.
   const bottomBar = new PIXI.Container(); hud.addChild(bottomBar);
   const bottomBarBg = new PIXI.Graphics(); bottomBar.addChild(bottomBarBg);
+
+  // ── DELIVERED BETTING-PANEL SKIN (conform-in-place) ───────────────────────
+  // The delivered design panel's gold gradient system + element drawers, built
+  // ONCE here (gradients cached). Pure presentation: the game's responsive
+  // layout() skeleton + all spin/bet/state wiring stay intact — we only change
+  // the VISUAL DRAW and element POSITIONS, guarded by `if (skin)` everywhere so
+  // the game still runs if the module is absent (the procedural draw is kept as
+  // the fallback). See src/ui/betting-bar-skin.js for the API.
+  const skin = (typeof window !== 'undefined' && window.__makeSkin) ? window.__makeSkin(PIXI) : null;
+  // Inter font chain from the delivered palette (graceful fallback if Inter
+  // isn't bundled — only glyph shapes differ; spacing is measured at runtime).
+  const BAR_FONT = (skin && skin.BAR && skin.BAR.FONT) || "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
+  // SPIN HERO — regenerate the 'spin' / 'stop' textures to the delivered panel
+  // face (ring + radial center + circular arrow) by rendering skin.buildSpinFace()
+  // to a texture. We keep the SAME 360×360 canvas footprint as the original
+  // spinTex() so fitW(spinBtn) math + positions are byte-identical, and spinBtn
+  // stays a plain sprite the ticker animates (press/commit/breathe) and whose
+  // texture is swapped to 'stop' during a manual spin. The 'stop' face reuses the
+  // same ring+center but overlays a gold rounded-square so the swap still reads as
+  // a clear STOP state. Least-invasive: no child face, no double-scaling.
+  if (skin) {
+    try {
+      const SS = 360, SR = SS * 0.42;   // match spinTex(): visible disc radius
+      const frame = new PIXI.Rectangle(-SS / 2, -SS / 2, SS, SS);
+      // soft warm glow disc behind the ring (panel spec: e8b94a α0.12)
+      const mkFace = (stop) => {
+        const wrap = new PIXI.Container();
+        const glow = new PIXI.Graphics();
+        skin.spinGlowInto(glow, 0, 0, SR * 1.18);
+        wrap.addChild(glow);
+        const { face } = skin.buildSpinFace(SR);
+        wrap.addChild(face);
+        if (stop) {
+          // STOP affordance — gold rounded square centered over the panel face.
+          const sq = new PIXI.Graphics();
+          const u = SR * 0.34;
+          sq.roundRect(-u, -u, 2 * u, 2 * u, u * 0.32)
+            .fill({ color: 0xf6f1e6, alpha: 0.98 })
+            .stroke({ color: 0xba852d, width: SR * 0.03, alpha: 0.9 });
+          wrap.addChild(sq);
+        }
+        const t = app.renderer.generateTexture({ target: wrap, resolution: 2, frame });
+        wrap.destroy({ children: true });
+        return t;
+      };
+      const spinFaceTex = mkFace(false);
+      const stopFaceTex = mkFace(true);
+      if (spinFaceTex) { try { TEX.spin.destroy(true); } catch (e) {} TEX.spin = spinFaceTex; }
+      if (stopFaceTex) { try { TEX.stop.destroy(true); } catch (e) {} TEX.stop = stopFaceTex; }
+    } catch (e) { /* keep the procedural spinTex() faces on any failure */ }
+  }
   // Per-frame breathing-aura layer for active buttons (turbo MAX, autoplay
   // active, BUY BONUS affordable). Drawn between bg + icon buttons so the
   // glow sits under the icon but on top of the chip. Cleared each frame.
@@ -6708,7 +6759,21 @@
     // for the AAA depth: shadow → obsidian → cybernetic purple wash →
     // toxic magenta core glow → emerald hairline → SMOKE_W gloss stripe →
     // neon pink outer ring → black inner contour.
-    bottomBarBg.clear()
+    bottomBarBg.clear();
+    if (skin) {
+      // ── DELIVERED PANEL BAR ─────────────────────────────────────────────
+      // The bar is the delivered design's "panel": vertical gold gradient body
+      // (#2d2822→#1e1914→#120e09) + gold edge (#b88e40) + 6%-white inner gloss.
+      // We add the panel's signature soft drop shadow underneath and the gold
+      // accent hairline across the top (goldLine gradient), matching the spec.
+      bottomBarBg
+        .roundRect(barX - 1, barY + 3, barW + 2, barH + 4, barR + 1)
+        .fill({ color: 0x000000, alpha: 0.55 });
+      skin.panelInto(bottomBarBg, barX, barY, barW, barH, barR, { edge: 1.8 });
+      // signature thin gold accent line across the very top of the panel
+      skin.goldLineInto(bottomBarBg, barX + barR * 0.6, barY + 1, barW - barR * 1.2, 1.4);
+    } else {
+      bottomBarBg
       // (1) drop shadow
       .roundRect(barX-1, barY+3, barW+2, barH+4, barR+1)
       .fill({ color:0x000000, alpha:0.65 })
@@ -6734,6 +6799,7 @@
       // (8) PURE-BLACK INNER CONTOUR — depth hairline
       .roundRect(barX+2, barY+2, barW-4, barH-4, barR-2)
       .stroke({ color:0x000000, width:0.8, alpha:0.65 });
+    }
 
     // ── BAL / BET TYPOGRAPHY — per pro UX evaluation
     // Labels lifted to #BDC5D6 (5.8:1 contrast — WCAG AA pass).
@@ -6757,6 +6823,17 @@
       t.style.fill = 0xf6f1e6;
       t.style.letterSpacing = 0;   // back to default (Luckiest Guy kerning OK)
     });
+    // ── DELIVERED-PANEL TYPOGRAPHY — Inter chain (BAR.FONT), bold weight, clean
+    // (no heavy outline). Spacing is measured at runtime so swapping the family
+    // never breaks the layout; Inter falls back gracefully (do NOT bundle woff2).
+    if (skin) {
+      [balLabel, winLabel, betLabel].forEach(t => {
+        t.style.fontFamily = BAR_FONT; t.style.fontWeight = '700'; t.style.stroke = null;
+      });
+      [balValue, betValue, winValue].forEach(t => {
+        t.style.fontFamily = BAR_FONT; t.style.fontWeight = '700'; t.style.stroke = null;
+      });
+    }
 
     // ── LEFT UTILITY COLUMN — info / settings / sound (vertical stack)
     // outside the bar so the bar itself stays clean. On tiny landscape we
@@ -6993,6 +7070,29 @@
       } else {
         btnTurbo.visible = false; btnTurbo.eventMode = 'none'; State.turboMode = 0;
       }
+
+      // ── DELIVERED-PANEL DECORATIONS (portrait) ──────────────────────────
+      // Row 2 bet stepper pill around − [value] +, a stadium banner behind the
+      // row-1 WIN (LAST WIN) readout, and gold circle bodies under the autoplay
+      // + turbo icons (which live in the top rail on portrait). The rail icons
+      // were already positioned above, so we read their live x/y here.
+      if (skin) {
+        const stPadX = stepSz * 0.5 + 8;
+        const stLeft = minusBtn.x - stPadX;
+        const stRight = plusBtn.x + stPadX;
+        const stH = Math.min(barH * 0.40, 54);
+        skin.stepperInto(bottomBarBg, stLeft, rowY2 - stH / 2, stRight - stLeft, stH);
+        if (winLabel.alpha > 0 && winValue._maxW) {
+          const wbW = winValue._maxW + 18;
+          const wbH = Math.min(barH * 0.42, 46);
+          const wbCx = winValue.x;
+          const wbCy = (winLabel.y + winValue.y) / 2;
+          skin.bannerInto(bottomBarBg, wbCx - wbW / 2, wbCy - wbH / 2, wbW, wbH);
+        }
+        const railR = Math.max(20, utilSz * 0.62 * 0.82);
+        if (btnAutoplay.visible) skin.circleInto(bottomBarBg, btnAutoplay.x, btnAutoplay.y, railR);
+        if (btnTurbo.visible) skin.circleInto(bottomBarBg, btnTurbo.x, btnTurbo.y, railR);
+      }
     } else {
       // ── LANDSCAPE: existing single-row layout ─────────────────────
       // Tiny landscape (Popout S 400×225) goes EXTRA compact:
@@ -7142,6 +7242,33 @@
       } else {
         btnTurbo.visible = false; btnTurbo.eventMode = 'none';
         State.turboMode = 0;
+      }
+
+      // ── DELIVERED-PANEL DECORATIONS (landscape) ─────────────────────────
+      // Draw the design's component bodies into bottomBarBg at the computed
+      // positions: stadium banner behind the WIN (LAST WIN) readout, the bet
+      // stepper pill flanking − value +, and gold circle bodies under the
+      // autoplay (play-triangle) + turbo (lightning) icons. All purely visual;
+      // the live text + icon handles (already positioned) sit on top.
+      if (skin) {
+        // WIN stadium banner (only when the WIN slot is showing)
+        if (winLabel.alpha > 0) {
+          const segWin = Math.min(barW * 0.14, 110);
+          const wbH = Math.min(barH * 0.62, 56);
+          skin.bannerInto(bottomBarBg, winValue.x - segWin / 2, barY + barH * 0.5 - wbH / 2, segWin, wbH);
+        }
+        // BET stepper pill around the − [value] + cluster
+        if (minusBtn.visible && betValue.alpha > 0) {
+          const stPadX = stepSz * 0.5 + 8;
+          const stLeft = minusBtn.x - stPadX;
+          const stRight = plusBtn.x + stPadX;
+          const stH = Math.min(barH * 0.62, 56);
+          skin.stepperInto(bottomBarBg, stLeft, barY + barH * 0.5 - stH / 2, stRight - stLeft, stH);
+        }
+        // Gold circle bodies under the autoplay + turbo icons
+        const circR = utilSz * 0.62;
+        skin.circleInto(bottomBarBg, btnAutoplay.x, btnAutoplay.y, circR);
+        if (btnTurbo.visible) skin.circleInto(bottomBarBg, btnTurbo.x, btnTurbo.y, circR);
       }
     }
 
