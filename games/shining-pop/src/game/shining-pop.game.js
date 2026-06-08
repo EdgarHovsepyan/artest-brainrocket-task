@@ -6261,6 +6261,70 @@
     },
   };
 
+  // ── ELEVENLABS SAMPLE LAYER (2026-06-08) ──────────────────────────────────
+  // The synth above stays the Stake-safe fallback. When the shipped ElevenLabs
+  // clips are loaded into Sound.buffers, the core event methods play the SAMPLE
+  // instead (richer "master" audio). Loading is lazy (first gesture via ensure())
+  // and never blocks. NOTE: for the single-file Stake build these mp3s must be
+  // inlined (base64) by the packager (tracked follow-up); in dev they load from
+  // /assets/audio/. Anything not wired here keeps its tuned procedural voice.
+  Sound._playSample = function (id, busName, vol) {
+    if (State.muted || !this.ctx) return false;
+    const buf = this.buffers[id];
+    if (!buf) return false;
+    try {
+      const src = this.ctx.createBufferSource(); src.buffer = buf;
+      const g = this.ctx.createGain(); g.gain.value = vol == null ? 0.9 : vol;
+      src.connect(g); g.connect(this[busName] || this.busSfx);
+      src.start();
+      src.onended = () => { try { src.disconnect(); g.disconnect(); } catch (e) {} };
+      return true;
+    } catch (e) { return false; }
+  };
+  Sound.loadSamples = function () {
+    if (this._samplesReq || !this.ctx) return;
+    this._samplesReq = true;
+    const decode = (ab) => new Promise((res, rej) => { try { this.ctx.decodeAudioData(ab, res, rej); } catch (e) { rej(e); } });
+    fetch('assets/audio/manifest.json').then((r) => r.json()).then(async (m) => {
+      for (const clip of (m.clips || [])) {
+        try {
+          const r = await fetch('assets/audio/' + clip.file);
+          if (!r.ok) continue;
+          this.buffers[clip.id] = await decode(await r.arrayBuffer());
+        } catch (e) { /* keep the synth fallback for this id */ }
+      }
+    }).catch(() => { /* single-file / offline → synth fallback stays */ });
+  };
+  const _soundEnsure = Sound.ensure.bind(Sound);
+  Sound.ensure = function () { _soundEnsure(); this.loadSamples(); };
+  const _wrapSample = (name, id, bus, vol) => {
+    if (typeof Sound[name] !== 'function') return;
+    const orig = Sound[name].bind(Sound);
+    Sound[name] = function (...a) {
+      this.ensure();
+      if (this._playSample(id, bus, vol)) {
+        // preserve the synth's non-audio side-effects (the reel-rush loop)
+        if (name === 'spinStart') this._startRush();
+        if (name === 'reelStop' && a[0] === REELS - 1) this._stopRush();
+        return;
+      }
+      return orig(...a);
+    };
+  };
+  _wrapSample('click', 'ui_click', 'busSfx', 0.7);
+  _wrapSample('spinStart', 'spin_start', 'busSfx', 0.8);
+  _wrapSample('reelStop', 'reel_stop', 'busSfx', 0.7);
+  _wrapSample('feature', 'bonus_intro', 'busWin', 0.95);
+  _wrapSample('retrigger', 'retrigger', 'busWin', 0.9);
+  if (typeof Sound.win === 'function') {
+    const _win = Sound.win.bind(Sound);
+    Sound.win = function (tier) {
+      this.ensure();
+      const id = ['', 'win_small', 'win_small', 'win_nice', 'win_big', 'win_mega', 'win_epic'][Math.min(6, tier | 0)] || 'win_small';
+      if (this._playSample(id, 'busWin', 0.95)) { this._duckMusic(tier | 0); return; }
+      return _win(tier);
+    };
+  }
 
   // ── BET LOGIC ─────────────────────────────────────────────────
   function bumpBet(dir){
