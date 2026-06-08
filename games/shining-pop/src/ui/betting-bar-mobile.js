@@ -119,7 +119,13 @@ export class BettingBarMobile extends PIXI.Container {
     const p = panel(w, h, h / 2, G.banner, 1.8, true, h / 2 - 2); setF(p, fSh()); c.addChild(p);
     const l = T(label, 13, 0xd9a8f2, 700, 0, true, 1.5);
     const v = T(value, 17, 0xf3ecff, 700, 0, true);
-    c.relayout = () => { const tot = l.width + 10 + v.width; l.position.set(w / 2 - tot / 2, h / 2); v.position.set(w / 2 - tot / 2 + l.width + 10, h / 2); };
+    c.relayout = () => {
+      v.scale.set(1);
+      const maxV = w - 20 - l.width - 10;            // keep label + value inside the banner
+      if (v.width > maxV && maxV > 10) v.scale.set(maxV / v.width);
+      const tot = l.width + 10 + v.width;
+      l.position.set(w / 2 - tot / 2, h / 2); v.position.set(w / 2 - tot / 2 + l.width + 10, h / 2);
+    };
     c.addChild(l, v); c.label = l; c.value = v; c.relayout(); return c;
   }
   _spin(cx, cy, R) {
@@ -201,8 +207,11 @@ export class BettingBarMobile extends PIXI.Container {
     const betlbl = T('BET', 12, 0xd9a8f2, 700, 0, true, 1.2);
     const betval = T('0', 15, 0xf3ecff, 700, 0, true);
     bb.relayout = () => {
+      bval.scale.set(1); betval.scale.set(1);              // scale-to-fit so long values don't crush
+      if (bval.width > 120) bval.scale.set(120 / bval.width);
       bval.position.set(22 + blbl.width + 8, 22);
       bcur.position.set(22 + blbl.width + 8 + bval.width + 5, 22);
+      if (betval.width > 90) betval.scale.set(90 / betval.width);
       const tot = betlbl.width + 7 + betval.width, cx = 256;
       betlbl.position.set(cx - tot / 2, 22); betval.position.set(cx - tot / 2 + betlbl.width + 7, 22);
     };

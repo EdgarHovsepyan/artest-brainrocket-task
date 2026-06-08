@@ -141,7 +141,13 @@ export class BettingBarWeb extends PIXI.Container {
       const c = new PIXI.Container(); c.position.set(x, 148); this.addChild(c);
       c.addChild(panel(w, 76, 38, G.banner, 2, true));
       const l = T(label, 19, COL.label, 700, 0, true, 2); const v = T(value, 28, COL.value, 700, 0, true);
-      c.relayout = () => { const tot = l.width + 16 + v.width; l.position.set(w / 2 - tot / 2, 38); v.position.set(w / 2 - tot / 2 + l.width + 16, 38); };
+      c.relayout = () => {
+        v.scale.set(1);
+        const maxV = w - 26 - l.width - 16;           // keep label + value inside the banner
+        if (v.width > maxV && maxV > 12) v.scale.set(maxV / v.width);
+        const tot = l.width + 16 + v.width;
+        l.position.set(w / 2 - tot / 2, 38); v.position.set(w / 2 - tot / 2 + l.width + 16, 38);
+      };
       c.addChild(l, v); c.label = l; c.value = v; c.relayout(); return c;
     };
     E.lastWin = sibling(612, 420, 'LAST WIN', '0.00');
@@ -201,7 +207,12 @@ export class BettingBarWeb extends PIXI.Container {
     return { scale: s, barTopY: this.y + 118 * s }; // 118 = scrim top in design space
   }
   _fmt(n) { return Number(n).toLocaleString('en-US'); }
-  setBalance(n) { const a = this.elements.account; a._bval.text = this._fmt(n); a._bcur.position.set(218 + a._bval.width + 12, 40); }
+  setBalance(n) {
+    const a = this.elements.account; a._bval.text = this._fmt(n);
+    a._bval.scale.set(1);                                  // scale long balances to fit the panel
+    if (a._bval.width > 250) a._bval.scale.set(250 / a._bval.width);
+    a._bcur.position.set(218 + a._bval.width + 12, 40);
+  }
   setCurrency(c) { const a = this.elements.account; a._bcur.text = c; a._bcur.position.set(218 + a._bval.width + 12, 40); }
   setLastWin(n) { const p = this.elements.lastWin; p.value.text = this._fmt(n); p.relayout(); }
   setBet(n) { const p = this.elements.totalBet; p.value.text = this._fmt(n); p.relayout(); }
