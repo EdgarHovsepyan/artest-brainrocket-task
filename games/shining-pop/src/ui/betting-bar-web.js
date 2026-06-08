@@ -162,27 +162,27 @@ export class BettingBarWeb extends PIXI.Container {
     }
     this._betCells = cells; E.selector = sel;
 
-    // COINS (buy) + GAMBLE (disabled)
-    const coins = this._circleBtn(2134, 186, 38, (c) => {
+    // COINS (buy) + ×2 (double-bet) — compact right cluster, no spin overlap
+    const coins = this._circleBtn(2056, 186, 38, (c) => {
       const mk = (yc, fill) => c.addChild(new PIXI.Graphics().ellipse(0, yc - 186, 19, 6.5).fill(fill).ellipse(0, yc - 186, 19, 6.5).stroke({ width: 1, color: COL.activeEdge }));
       mk(197, 0x9a4bd0); mk(189, 0xc06fda);
       c.addChild(new PIXI.Graphics().ellipse(0, 181 - 186, 19, 6.5).fill(0xe0a0ff));
     });
     hit(coins, new PIXI.Circle(0, 0, 38), () => this._emit('buy')); this.addChild(coins); E.coins = coins;
     // ×2 — ENABLED quick "double bet" (was a dead disabled gamble button).
-    const gamble = this._circleBtn(2222, 186, 38, null);
+    const gamble = this._circleBtn(2144, 186, 38, null);
     const gx2 = T('×2', 25, COL.value, 700, 0.5, true); gx2.position.set(0, 0); gamble.addChild(gx2);
     hit(gamble, new PIXI.Circle(0, 0, 38), () => this._emit('bet:double'));
     this.addChild(gamble); E.gamble = gamble;
 
-    // TURBO (top) + AUTOPLAY (bottom), stacked at x2302
-    const turbo = this._circleBtn(2302, 150, 30, (c) => {
+    // TURBO (top) + AUTOPLAY (bottom), stacked at x2224 — clear left of the SPIN
+    const turbo = this._circleBtn(2224, 150, 30, (c) => {
       const gl = gs(20, 30, G.active); gl.position.set(-10, -15);
       const m = new PIXI.Graphics().moveTo(4, -12).lineTo(-9, 3).lineTo(-1, 3).lineTo(-5, 14).lineTo(8, -2).lineTo(0, -2).fill(0xffffff); gl.mask = m; c.addChild(gl, m); c._glyph = gl;
       const pip = new PIXI.Graphics(); pip.visible = false; c.addChild(pip); c._pip = pip;
     });
     hit(turbo, new PIXI.Circle(0, 0, 30), () => this._emit('turbo')); this.addChild(turbo); E.turbo = turbo;
-    const auto = this._circleBtn(2302, 222, 30, (c) => {
+    const auto = this._circleBtn(2224, 222, 30, (c) => {
       const ar = new PIXI.Graphics().arc(0, 0, 12, -1.231, -1.9106 + 2 * Math.PI).stroke({ width: 3, color: 0xe0a0ff, cap: 'round' });
       ar.moveTo(2, -13).lineTo(-3, -7).lineTo(-5, -15).fill(0xe0a0ff); c.addChild(ar); c._glyph = ar;
       const cnt = T('', 22, COL.value, 700, 0.5, true); cnt.visible = false; c.addChild(cnt); c._count = cnt;
