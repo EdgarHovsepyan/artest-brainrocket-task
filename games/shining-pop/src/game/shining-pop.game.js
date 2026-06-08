@@ -2212,6 +2212,77 @@
       if (stopFaceTex) { try { TEX.stop.destroy(true); } catch (e) {} TEX.stop = stopFaceTex; }
     } catch (e) { /* keep the procedural spinTex() faces on any failure */ }
   }
+  // ── DELIVERED BETTING-PANEL COMPONENT (PORTRAIT ONLY) ─────────────────────
+  // The studio's delivered BettingBarMobile (window.BettingBarMobile, the v8 port
+  // exposed by main.ts). On PORTRAIT we mount THIS as the entire bottom bar; on
+  // landscape it stays hidden and the existing conformed native bar renders as
+  // now. Built once here, added to `hud`, and guarded with `if (deliveredBar)`
+  // everywhere so the game still runs if the component is ever absent.
+  const deliveredBar = (typeof window !== 'undefined' && window.BettingBarMobile)
+    ? new window.BettingBarMobile({ bare:true })
+    : null;
+  if(deliveredBar){
+    deliveredBar.visible = false;            // landscape default; layout() flips it on in portrait
+    hud.addChild(deliveredBar);
+    // Wire the component's events to the SAME game logic the native controls use.
+    // SPIN — mirror the native spinBtn click handler exactly (replay lock,
+    // skip-celebration, quick-stop, else start when idle).
+    deliveredBar.on2('spin', () => {
+      if(STAKE.replay) return;
+      if(winFx.on){ winFx.fastFwd = true; return; }
+      if(allReelsSpinning){ quickStopReels(); return; }
+      if(State.phase === Phase.IDLE) startSpin();
+    });
+    deliveredBar.on2('bet:dec', () => bumpBet(-1));
+    deliveredBar.on2('bet:inc', () => bumpBet(1));
+    deliveredBar.on2('betmenu', () => { if(typeof showBetMenu === 'function') showBetMenu(); });
+    deliveredBar.on2('autoplay', () => {
+      if(State.autoplay.active){ stopAutoplay(); try { Sound.click(); } catch(e){} }
+      else { openDrawer('autoplay'); }
+      syncDeliveredBar();
+    });
+    deliveredBar.on2('turbo', () => {
+      if(!turboAllowed()) return;   // UKGC etc. — turbo is illegal; ignore the tap
+      State.turboMode = (State.turboMode + 1) % 3;
+      refreshTurboBtn();
+      try { Sound.click(); } catch(e){}
+      persistSave();
+      syncDeliveredBar();
+      if(typeof layout === 'function') layout();
+    });
+    deliveredBar.on2('sound', () => {
+      if(STAKE.replay) return;
+      State.muted = !State.muted;
+      Sound.setMuted(State.muted);
+      btnSound._icon.texture = tex(State.muted ? 'icMute' : 'icSound');
+      btnSound._setActive(!State.muted);
+      persistSave();
+      syncDeliveredBar();
+    });
+    deliveredBar.on2('menu', () => openDrawer('settings'));
+  }
+  // Push current game state → the delivered component (display + control states).
+  // All values are passed in DISPLAY units (micro ÷ API_AMOUNT_MULTIPLIER); the
+  // component formats with toLocaleString. Called from updateHUD(), flashWinValue(),
+  // bumpBet/turbo/sound/autoplay changes, and once per portrait layout().
+  function syncDeliveredBar(){
+    if(!deliveredBar) return;
+    try {
+      const D = API_AMOUNT_MULTIPLIER;
+      deliveredBar.setBalance(State.balanceX6 / D);
+      deliveredBar.setBet(State.betX6 / D);
+      deliveredBar.setLastWin((State.lastWinX6 || 0) / D);
+      // Currency prefix — CUR.s is the symbol/code ('$', 'SOL ', …); social mode
+      // hides fiat symbols but keeps social-coin codes (matches fmtMoney()).
+      deliveredBar.setCurrency(STAKE.social ? (CUR.social ? CUR.s.trim() : '') : CUR.s.trim());
+      deliveredBar.setDemo(/^mock:\/\//.test(_normRgs));   // mock RGS = demo session
+      deliveredBar.setAffordable(State.balanceX6 >= State.betX6);
+      deliveredBar.setSteppers(State.betIdx > 0, State.betIdx < State.betLevels.length - 1);
+      deliveredBar.setTurbo(State.turboMode);
+      deliveredBar.setAutoplay(State.autoplay.active ? State.autoplay.remaining : null);
+      deliveredBar.setSoundOn(!State.muted);
+    } catch(e){ /* never let a HUD push break the round */ }
+  }
   // Per-frame breathing-aura layer for active buttons (turbo MAX, autoplay
   // active, BUY BONUS affordable). Drawn between bg + icon buttons so the
   // glow sits under the icon but on top of the chip. Cleared each frame.
@@ -2608,6 +2679,45 @@
   buyBar.addChild(buyTitle,buyCost);
   buyBar._baseScale = 1; buyBar._pulse = 0;
   if(!COMPLY.allow_buy_bonus || STAKE.replay) buyBar.visible = false;
+
+  // ── NATIVE-BAR OBJECT SET TOGGLE ─────────────────────────────────────────
+  // When the delivered component is mounted (portrait), ALL native bar visuals +
+  // controls are hidden and made non-interactive; in landscape they are restored
+  // so the existing conformed bar renders/handles EXACTLY as before. The objects
+  // are NEVER removed/renamed — the ticker + updateHUD still write to them — we
+  // only flip .visible/.eventMode. `bottomBarBg` (the drawn bar surface) is the
+  // bar's whole visual, so it toggles too.
+  //
+  // IMPORTANT (landscape parity): the conformed bar keeps the legacy PLAQUE
+  // sprites (balPlaque/betPlaque/winPlaque) + chip/halo Graphics HIDDEN and the
+  // native layout() itself sets their .visible every call. So on RESTORE we do
+  // NOT force those visible (let native layout own them); we only restore the
+  // live TEXT handles + interactive controls. On HIDE (portrait) we force the
+  // whole set off so nothing peeks behind the delivered bar.
+  const NATIVE_BAR_INTERACTIVE = [spinBtn, minusBtn, plusBtn, btnSound, btnTurbo, btnAutoplay, btnInfo, btnSettings, buyBar];
+  const NATIVE_BAR_TEXT = [balLabel, balValue, betLabel, betValue, winLabel, winValue];
+  const NATIVE_BAR_LEGACY = [balPlaque, betPlaque, winPlaque, betChipG, spinHalo];
+  // BUY visibility is also gated by compliance/replay — remember that so portrait
+  // restore can't un-hide a buy bar that policy says must stay hidden.
+  const _buyAllowed = () => COMPLY.allow_buy_bonus && !STAKE.replay;
+  function setNativeBarVisible(on){
+    NATIVE_BAR_TEXT.forEach(o => { if(o) o.visible = on; });
+    NATIVE_BAR_INTERACTIVE.forEach(o => {
+      if(!o) return;
+      if(o === buyBar){ o.visible = on && _buyAllowed(); }
+      else o.visible = on;
+      o.eventMode = (o.visible && on) ? 'static' : 'none';
+    });
+    bottomBarBg.visible = on;
+    // Legacy plaques/graphics: hide them in portrait; in landscape leave them to
+    // the native layout (which manages their .visible itself, keeping them off).
+    if(!on) NATIVE_BAR_LEGACY.forEach(o => { if(o) o.visible = false; });
+    // betValue/betLabel are tap-to-open-bet-menu text handles → restore 'static'.
+    if(on){ betValue.eventMode = 'static'; betLabel.eventMode = 'static'; }
+    else  { betValue.eventMode = 'none';   betLabel.eventMode = 'none'; }
+    // turbo/fullscreen/history stay hidden regardless (existing rules).
+    btnHistory.visible = false; btnFullscreen.visible = false;
+  }
 
   // ── BONUS MODE FX LAYER — persistent overlays during free spins.
   // Drawn ABOVE reels but BELOW the BUY BONUS modal. Holds the wild-reel
@@ -4354,6 +4464,7 @@
         State.muted=!State.muted;
         btnSound._icon.texture=tex(State.muted?'icMute':'icSound');
         btnSound._setActive(!State.muted); Sound.setMuted(State.muted); persistSave();
+        syncDeliveredBar();   // reflect sound state on the delivered portrait bar
       });
 
       // ── TURBO — 3-state segmented control (OFF / TURBO / MAX) ──
@@ -4389,6 +4500,7 @@
         hit.on('pointertap', () => {
           State.turboMode = i; persistSave();
           refreshTurboBtn();   // keep the bar button in sync
+          syncDeliveredBar();  // reflect turbo mode on the delivered portrait bar
           closeDrawer(); openDrawer('settings');
         });
         segG.addChild(hit);
@@ -6263,6 +6375,7 @@
       const canBuy = State.balanceX6 >= buyCostX6();
       buyBar.alpha = canBuy ? 1.0 : 0.45;
     }
+    syncDeliveredBar();   // mirror balance/bet/affordability/steppers to the delivered portrait bar
   }
   // Animate balance count-up + pop (called from main ticker)
   function tickBalanceCoinUp(now){
@@ -6559,6 +6672,21 @@
     const padL = hudPad + INS.l, padR = hudPad + INS.r;
     const padB = hudBot + INS.b, padT = (tiny?4:25) + INS.t;
 
+    // ── DELIVERED BAR (PORTRAIT) — dock + measure FIRST ──────────────────────
+    // In portrait the delivered component IS the bottom bar. We dock it now (it
+    // depends only on W/H) so its on-screen top (barTopY) is known BEFORE the
+    // reel board is sized — the board's bottom is then clamped above it so
+    // symbols never overlap the mounted bar. A small pad keeps a visible gutter.
+    // Replay mode locks ALL controls via runReplay() (which disables the NATIVE
+    // bar objects); use the native bar there so the lock stays authoritative.
+    const usingDeliveredBar = !!(portrait && deliveredBar && !STAKE.replay);
+    let deliveredBarTopY = 0;
+    if(usingDeliveredBar){
+      const fb = deliveredBar.fitBottom(W, H);
+      deliveredBarTopY = fb.barTopY;
+    }
+    const DELIVERED_BAR_PAD = tiny ? 8 : 14;   // gutter between reels and the mounted bar
+
     bg.position.set(W/2,H/2); coverFit(bg,W,H);
     frostBg.position.set(W/2,H/2); coverFit(frostBg,W,H);
     // Cache the base scale set by coverFit() so the modal-open zoom push
@@ -6584,7 +6712,12 @@
     // bar). Also cap CELL at 180 (was 210) so reels don't max out and
     // visually overflow on tall web viewports.
     const topRes = portrait ? (tiny?56:140) : (tiny?40:100);
-    const botRes = portrait ? (tiny?160:220) : (tiny?80:140);
+    // Portrait with the delivered bar: reserve the bottom region from the bar's
+    // measured on-screen top (+ a gutter) so the reel board sits cleanly ABOVE
+    // the mounted bar. Otherwise use the original native-bar reservations.
+    const botRes = usingDeliveredBar
+      ? Math.max(tiny?160:220, (H - deliveredBarTopY) + DELIVERED_BAR_PAD)
+      : (portrait ? (tiny?160:220) : (tiny?80:140));
     // Landscape grid widens too — 0.78 → 0.88 — reels feel more present.
     const gridMaxW = W * (portrait ? 0.96 : (tiny?0.72:0.88));
     // tiny: reserve a 10 px gap so the grid can NEVER touch/overlap the bar
@@ -6601,6 +6734,13 @@
     GX = (W-GW)/2;
     GY = topRes + (H-topRes-botRes-GH)/2;
     if(GY < topRes*0.5) GY = topRes*0.5;
+    // Hard clamp: with the delivered portrait bar, never let the board's BOTTOM
+    // edge cross into the mounted bar — push the board up if re-centering placed
+    // it too low (belt-and-suspenders alongside the botRes reservation above).
+    if(usingDeliveredBar){
+      const maxBottom = deliveredBarTopY - DELIVERED_BAR_PAD;
+      if(GY + GH > maxBottom) GY = Math.max(topRes*0.5, maxBottom - GH);
+    }
 
     reelMask.clear().rect(GX,GY,GW,GH).fill(0xffffff);
     drawReelFrame();
@@ -6699,6 +6839,22 @@
       winLabel.text = socialFilter((State.lastWinX6 || 0) > 0 ? 'LAST WIN' : 'WIN');
     }
     winLabel.alpha = 1; winValue.alpha = 1;
+
+    // ── BAR MOUNT BRANCH ─────────────────────────────────────────────────────
+    // PORTRAIT (with the delivered component): the delivered BettingBarMobile IS
+    // the bar. Hide ALL native bar visuals + controls, dock + show the component
+    // (already fitBottom()-measured above), push state to it, and SKIP the entire
+    // native bar draw/positioning below. LANDSCAPE (or no component): restore the
+    // native bar object set and run the existing conformed layout EXACTLY as before.
+    if(usingDeliveredBar){
+      setNativeBarVisible(false);     // hide+disable every native bar object
+      bottomBarBg.clear();            // wipe any stale native bar surface
+      deliveredBar.visible = true;
+      deliveredBar.fitBottom(W, H);   // dock to screen bottom (width-fit)
+      syncDeliveredBar();             // push balance/bet/win/states once per layout
+    } else {
+    if(deliveredBar) deliveredBar.visible = false;   // landscape: component hidden
+    setNativeBarVisible(true);        // restore native bar (visibility + eventMode)
 
     // ── BAR SIZING — portrait gets TWO ROWS (top: text, bottom: buttons)
     // so 320-425px wide viewports stop overlapping. Landscape stays 1 row.
@@ -7476,6 +7632,7 @@
       buyTitle.position.set(0,-buyBg.height*0.22);
       buyCost.position.set(0,-buyBg.height*0.03);
     }
+    }   // ── end native-bar branch (else of `if(usingDeliveredBar)`)
 
     // win celebration popup — centred in the reel matrix, ~2× larger
     winDisplay.position.set(W/2, GY+GH*0.5);
@@ -8887,6 +9044,7 @@
       // autoplay button with its count + STOP glyph is the stop control. The
       // stop-texture quick-stop affordance stays for manual single spins.
       if(!State.autoplay.active) spinBtn.texture=tex('stop');
+      if(deliveredBar) deliveredBar.setSpinning(true);   // delivered bar: SPIN → stop affordance
 
       // anticipation if the round will trigger free spins via scatters on early reels
       let anticipate=false;
@@ -8899,6 +9057,7 @@
 
       await reelsSpinPromise(result.grid, anticipate);
       spinBtn.texture=tex('spin');
+      if(deliveredBar) deliveredBar.setSpinning(false);   // reels stopped → restore SPIN glyph
       await settleRound(result,mode);
     } catch(err){
       // A throw anywhere in the settle/ceremony chain would otherwise leave
@@ -8910,6 +9069,7 @@
       try { await RGS.endRound(); } catch(e){}
       if(typeof stopAutoplay === 'function') stopAutoplay();
       State.phase = Phase.IDLE;
+      if(deliveredBar) deliveredBar.setSpinning(false);   // never leave the delivered bar stuck in stop state on error
       try { winFx.on=false; winDisplay.alpha=0; winCells=[]; winLines=[]; lineG.clear(); updateHUD(); } catch(e){}
       showError('Round interrupted', 'That round could not be completed. Your balance is safe — please spin again.', false);
     } finally {
@@ -9132,7 +9292,7 @@
     // KB ref: project_picker_visual_polish.md AnimatedAmount.svelte
     const startX6 = 0;                  // always count from 0 for clarity
     const targetX6 = amountX6;
-    if(amountX6 > 0) State.lastWinX6 = amountX6;
+    if(amountX6 > 0){ State.lastWinX6 = amountX6; syncDeliveredBar(); }   // push the fresh LAST WIN to the delivered portrait bar
 
     // ── LABEL CROSSFADE — Emil "blur as bridge" / soft state change ─
     // The label switches "LAST WIN" → "WIN" on every winning round. A

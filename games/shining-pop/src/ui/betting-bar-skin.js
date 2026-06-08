@@ -23,29 +23,31 @@
 // Delivered-panel palette (exact hex from the spec). Single source of truth so
 // every game reads the same tokens.
 export const BAR = {
-  // gradient stop-lists  [offset, cssColor]
+  // gradient stop-lists  [offset, cssColor] — CRYSTAL theme, derived from the
+  // 2K cathedral background (indigo darks → violet/orchid → magenta, lavender
+  // highlights). Replaces the original gold so the bar unifies with the scene.
   GRAD: {
-    stage:  [[0, '#15120b'], [0.7, '#0c0906'], [1, '#070503']],
-    panel:  [[0, '#2d2822'], [0.5, '#1e1914'], [1, '#120e09']],
-    banner: [[0, '#19130c'], [0.5, '#2a2317'], [1, '#19130c']],
-    active: [[0, '#fadf8e'], [0.45, '#e9bf5a'], [1, '#ba852d']],
-    ring:   [[0, '#fbe9aa'], [0.34, '#e2ba5e'], [0.66, '#ad7c2f'], [1, '#5c3d17']],
-    spin:   [[0, '#2c261e'], [0.6, '#16120d'], [1, '#0a0806']],
-    gold:   [[0, 'rgba(214,173,72,0)'], [0.5, 'rgba(236,198,101,0.7)'], [1, 'rgba(214,173,72,0)']],
+    stage:  [[0, '#1a1240'], [0.7, '#0d0826'], [1, '#060418']],
+    panel:  [[0, '#2a1e52'], [0.5, '#191140'], [1, '#0c0826']],
+    banner: [[0, '#171138'], [0.5, '#281c58'], [1, '#171138']],
+    active: [[0, '#f6c8ff'], [0.45, '#db5fd8'], [1, '#8e2ec4']],
+    ring:   [[0, '#ecd6ff'], [0.34, '#b86fda'], [0.66, '#7a3cb2'], [1, '#34206a']],
+    spin:   [[0, '#2a1f4e'], [0.6, '#15102e'], [1, '#09071e']],
+    gold:   [[0, 'rgba(206,124,224,0)'], [0.5, 'rgba(220,110,220,0.78)'], [1, 'rgba(206,124,224,0)']],
   },
-  // solid colors + their role
-  label:      0xd6ab46, // gold caption text (LAST WIN / TOTAL BET / BALANCE / BET)
-  value:      0xf6f1e6, // primary value text
-  cur:        0x9a8d6f, // currency unit + DEMO + disabled text
-  icon:       0xf1e9d7, // sound / menu / stepper +/- glyph stroke
-  edge:       0xb88e40, // gold panel edge
-  divider:    0xcaa24a, // internal hairline dividers (low alpha)
-  ringInner:  0xfff1ca, // spin ring inner highlight stroke
-  centerRim:  0xffeec2, // spin center rim stroke
+  // solid colors + their role (crystal violet/magenta)
+  label:      0xd9a8f2, // caption text (LAST WIN / TOTAL BET / BALANCE / BET)
+  value:      0xf3ecff, // primary value text (lavender-white)
+  cur:        0x9c88c2, // currency unit + DEMO + disabled text
+  icon:       0xefe6ff, // sound / menu / stepper +/- glyph stroke
+  edge:       0xb86fda, // orchid panel edge
+  divider:    0xb070da, // internal hairline dividers (low alpha)
+  ringInner:  0xf0e0ff, // spin ring inner highlight stroke
+  centerRim:  0xe8d0ff, // spin center rim stroke
   gloss:      0xffffff, // top-gloss highlight (low alpha)
-  activeEdge: 0x80591c, // dark gold edge on active glyphs (autoplay/turbo)
-  spinGlow:   0xe8b94a, // soft glow disc behind SPIN
-  dark:       0x2c1d07, // dark text on a gold (active) fill
+  activeEdge: 0x4a1f7a, // deep-violet edge on active glyphs (autoplay/turbo)
+  spinGlow:   0xd84ad8, // soft magenta glow disc behind SPIN
+  dark:       0x1a0830, // dark text on an active (magenta) fill
   // Inter first; graceful fallbacks if Inter isn't bundled yet (glyph shapes
   // differ only — spacing is measured at runtime so layout is unaffected).
   FONT: "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif",
