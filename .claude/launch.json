@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "slot-pixi-1",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@artest/slot-pixi-1", "dev"],
+      "port": 5173
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/build
+**/library
+**/temp
+**/*.jsonl
+**/*.zst
+pnpm-lock.yaml

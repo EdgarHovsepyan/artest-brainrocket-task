@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds / outputs
+dist/
+build/
+coverage/
+
+# Cocos Creator editor-generated
+library/
+temp/
+profiles/
+native/
+.creator/asset-template/
+
+# Stake generated math artifacts (regenerable from seed; keep only index.json)
+**/books_*.jsonl
+**/books_*.jsonl.zst
+**/lookUpTable_*.csv
+**/stake-build/front/index.html
+
+# misc
+*.log
+.DS_Store
+.playwright-mcp/
+
+# Cocos MCP (dev-only, third-party non-commercial extension — never ship)
+.mcp.json
+**/extensions/cocos-mcp-server/
+**/settings/mcp-server.json

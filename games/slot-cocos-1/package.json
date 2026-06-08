@@ -1,0 +1,20 @@
+{
+  "name": "@artest/slot-cocos-1",
+  "version": "0.1.0",
+  "uuid": "456ab05f-2da4-42e1-84b4-57aa7e7182b1",
+  "creator": {
+    "version": "3.8.8"
+  },
+  "description": "ARTEST | BrainRocket — 5x3, 10-line slot (Cocos Creator 3.8.8).",
+  "author": "Edgar Hovsepyan",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "test": "node --import tsx --test tests/spin-engine.test.ts tests/feature.test.ts",
+    "sim": "tsx tools/rtp-sim.ts",
+    "sim:bonus": "tsx tools/bonus-sim.ts"
+  },
+  "dependencies": {
+    "@artest/math-core": "workspace:*"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "modes": [
+    {
+      "name": "base",
+      "cost": 1,
+      "events": "books_base_0.jsonl",
+      "weights": "lookUpTable_base_0.csv",
+      "rtp": 0.9544825
+    },
+    {
+      "name": "buy",
+      "cost": 20.38,
+      "events": "books_buy_0.jsonl",
+      "weights": "lookUpTable_buy_0.csv",
+      "rtp": 0.964170142296369
+    }
+  ]
+}

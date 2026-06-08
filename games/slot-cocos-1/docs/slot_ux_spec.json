@@ -1,0 +1,82 @@
+{
+  "name": "Slot Game — UX Contract",
+  "description": "5 reels x 3 rows, 10 fixed paylines, base game only (per the spec: 'Main game only / Separate screen features: no'). The only interactive control is Spin; the Win field reports the last win. Reels stop left-to-right.",
+  "layout": {
+    "reelArea": "center",
+    "title": "top",
+    "hud": "below-reels (BALANCE | BET | WIN on one plate)",
+    "spinButton": "bottom-center",
+    "responsive": "contain-fit to any aspect ratio, rebuilt on resize"
+  },
+  "controls": [
+    {
+      "id": "spinBtn",
+      "type": "spin",
+      "label": "Spin",
+      "interactive": true,
+      "disabledStates": ["spinning", "resolving", "win_presentation"]
+    },
+    {
+      "id": "winField",
+      "type": "win",
+      "label": "Win",
+      "interactive": false,
+      "note": "Shows the last spin's win; counts up kinetically on a win."
+    },
+    {
+      "id": "balanceView",
+      "type": "balance",
+      "label": "Balance",
+      "interactive": false
+    },
+    {
+      "id": "betView",
+      "type": "bet",
+      "label": "Bet (10 lines)",
+      "interactive": false,
+      "note": "Fixed total bet across the 10 lines; the brief specifies a Spin-only UI."
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "description": "Reels at rest showing the last grid; Spin enabled.",
+      "transitions": ["spinning"]
+    },
+    {
+      "name": "spinning",
+      "description": "Reels in motion; Spin disabled; reels stop left -> right on a stagger.",
+      "transitions": ["resolving"]
+    },
+    {
+      "name": "resolving",
+      "description": "Grid evaluated against the 10 paylines (Model decided the outcome before the animation).",
+      "transitions": ["win_presentation", "idle"]
+    },
+    {
+      "name": "win_presentation",
+      "description": "Winning paylines drawn and cycled, winning symbols pulse, win amount counts up.",
+      "transitions": ["idle"]
+    }
+  ],
+  "interactions": [
+    {
+      "trigger": "press",
+      "sourceControl": "spinBtn",
+      "targetState": "spinning",
+      "feedbackMs": 80,
+      "description": "From idle: bet is deducted (Model.play decides the result), then the View plays the spin and any win."
+    },
+    {
+      "trigger": "key",
+      "key": "Space",
+      "targetState": "spinning",
+      "description": "Keyboard convenience for Spin (the only on-screen button is Spin)."
+    }
+  ],
+  "accessibility": {
+    "keyboardSpin": "Space triggers Spin when enabled",
+    "winFieldReadout": "Win amount shown numerically and counted up",
+    "missingArtFallback": "Symbol cells fall back to a text label if a sprite frame is absent"
+  }
+}
