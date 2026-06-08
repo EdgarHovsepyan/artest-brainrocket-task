@@ -2261,14 +2261,90 @@
     });
     deliveredBar.on2('menu', () => openDrawer('settings'));
   }
+  // ── DELIVERED BETTING-PANEL COMPONENT (LANDSCAPE) ─────────────────────────
+  // The studio's delivered BettingBarWeb (window.BettingBarWeb, the v8 port
+  // exposed by main.ts) — the LANDSCAPE counterpart to BettingBarMobile. On
+  // LANDSCAPE we mount THIS as the entire bottom bar; on portrait it stays
+  // hidden and the mobile bar renders. Built once here, added to `hud`, and
+  // guarded with `if (deliveredBarWeb)` everywhere so the game still runs if
+  // the component is ever absent. Mirrors the portrait wiring above.
+  const deliveredBarWeb = (typeof window !== 'undefined' && window.BettingBarWeb)
+    ? new window.BettingBarWeb({ bare:true })
+    : null;
+  // The 5-cell selector shows a sliding WINDOW of betLevels centred on the
+  // active level; this records where that window starts so bet:set (which
+  // passes a CELL INDEX 0..4) can map back to an absolute betLevels index.
+  // Maintained in syncDeliveredBar(), read in the bet:set handler.
+  let _webBetWindowStart = 0;
+  if(deliveredBarWeb){
+    deliveredBarWeb.visible = false;          // portrait default; layout() flips it on in landscape
+    hud.addChild(deliveredBarWeb);
+    // SPIN — same logic as the mobile bar / native spinBtn click handler.
+    deliveredBarWeb.on2('spin', () => {
+      if(STAKE.replay) return;
+      if(winFx.on){ winFx.fastFwd = true; return; }
+      if(allReelsSpinning){ quickStopReels(); return; }
+      if(State.phase === Phase.IDLE) startSpin();
+    });
+    deliveredBarWeb.on2('autoplay', () => {
+      if(State.autoplay.active){ stopAutoplay(); try { Sound.click(); } catch(e){} }
+      else { openDrawer('autoplay'); }
+      syncDeliveredBar();
+    });
+    deliveredBarWeb.on2('turbo', () => {
+      if(!turboAllowed()) return;   // UKGC etc. — turbo is illegal; ignore the tap
+      State.turboMode = (State.turboMode + 1) % 3;
+      refreshTurboBtn();
+      try { Sound.click(); } catch(e){}
+      persistSave();
+      syncDeliveredBar();
+      if(typeof layout === 'function') layout();
+    });
+    deliveredBarWeb.on2('sound', () => {
+      if(STAKE.replay) return;
+      State.muted = !State.muted;
+      Sound.setMuted(State.muted);
+      btnSound._icon.texture = tex(State.muted ? 'icMute' : 'icSound');
+      btnSound._setActive(!State.muted);
+      persistSave();
+      syncDeliveredBar();
+    });
+    deliveredBarWeb.on2('menu', () => openDrawer('settings'));
+    deliveredBarWeb.on2('buy', () => { if(_buyAllowed()) showBuyBonusModal(); });
+    // bet:set passes a CELL INDEX 0..4 into the current sliding window; map it
+    // back to an absolute betLevels index via the recorded window start.
+    deliveredBarWeb.on2('bet:set', (cellIdx) => {
+      if(State.phase !== Phase.IDLE) return;        // match bumpBet() guards
+      if(State.autoplay.active) return;
+      const idx = Math.max(0, Math.min(State.betLevels.length - 1, _webBetWindowStart + cellIdx));
+      State.betIdx = idx;
+      State.betX6 = State.betLevels[State.betIdx];
+      try { Sound.click(); } catch(e){}
+      updateHUD();   // → syncDeliveredBar() repaints both bars
+    });
+    // ×2 — double the stake to the nearest available level <= 2x (else max).
+    deliveredBarWeb.on2('bet:double', () => {
+      if(State.phase !== Phase.IDLE || State.autoplay.active) return;
+      const target = State.betX6 * 2;
+      let idx = State.betIdx;
+      for(let i = 0; i < State.betLevels.length; i++){ if(State.betLevels[i] <= target) idx = i; }
+      State.betIdx = Math.max(0, Math.min(State.betLevels.length - 1, idx));
+      State.betX6 = State.betLevels[State.betIdx];
+      try { Sound.click(); } catch(e){}
+      updateHUD();
+    });
+  }
   // Push current game state → the delivered component (display + control states).
   // All values are passed in DISPLAY units (micro ÷ API_AMOUNT_MULTIPLIER); the
   // component formats with toLocaleString. Called from updateHUD(), flashWinValue(),
   // bumpBet/turbo/sound/autoplay changes, and once per portrait layout().
   function syncDeliveredBar(){
-    if(!deliveredBar) return;
-    try {
-      const D = API_AMOUNT_MULTIPLIER;
+    if(!deliveredBar && !deliveredBarWeb) return;
+    const D = API_AMOUNT_MULTIPLIER;
+    // Drive the SPIN→stop affordance from game phase so whichever bar is active
+    // tracks the reels (called once per layout + at every state push).
+    const spinning = !!allReelsSpinning;
+    if(deliveredBar) try {
       deliveredBar.setBalance(State.balanceX6 / D);
       deliveredBar.setBet(State.betX6 / D);
       deliveredBar.setLastWin((State.lastWinX6 || 0) / D);
@@ -2281,6 +2357,27 @@
       deliveredBar.setTurbo(State.turboMode);
       deliveredBar.setAutoplay(State.autoplay.active ? State.autoplay.remaining : null);
       deliveredBar.setSoundOn(!State.muted);
+    } catch(e){ /* never let a HUD push break the round */ }
+    // ── WEB BAR (landscape) ───────────────────────────────────────────────
+    if(deliveredBarWeb) try {
+      deliveredBarWeb.setBalance(State.balanceX6 / D);
+      deliveredBarWeb.setBet(State.betX6 / D);
+      deliveredBarWeb.setLastWin((State.lastWinX6 || 0) / D);
+      deliveredBarWeb.setCurrency(STAKE.social ? (CUR.social ? CUR.s.trim() : '') : CUR.s.trim());
+      deliveredBarWeb.setAffordable(State.balanceX6 >= State.betX6);
+      deliveredBarWeb.setTurbo(State.turboMode);
+      deliveredBarWeb.setAutoplay(State.autoplay.active ? State.autoplay.remaining : null);
+      deliveredBarWeb.setSoundOn(!State.muted);
+      deliveredBarWeb.setSpinning(spinning);
+      // 5-cell sliding window of betLevels, centred on the active level and
+      // expressed in DISPLAY units. Keep _webBetWindowStart so bet:set maps a
+      // cell index 0..4 back to an absolute betLevels index.
+      const levels = State.betLevels || [];
+      const maxStart = Math.max(0, levels.length - 5);
+      const start = Math.max(0, Math.min(State.betIdx - 2, maxStart));
+      _webBetWindowStart = start;
+      const win = levels.slice(start, start + 5).map(v => v / D);
+      deliveredBarWeb.setBetCells(win, State.betIdx - start);
     } catch(e){ /* never let a HUD push break the round */ }
   }
   // Per-frame breathing-aura layer for active buttons (turbo MAX, autoplay
@@ -6736,19 +6833,27 @@
     const padL = hudPad + INS.l, padR = hudPad + INS.r;
     const padB = hudBot + INS.b, padT = (tiny?4:25) + INS.t;
 
-    // ── DELIVERED BAR (PORTRAIT) — dock + measure FIRST ──────────────────────
-    // In portrait the delivered component IS the bottom bar. We dock it now (it
-    // depends only on W/H) so its on-screen top (barTopY) is known BEFORE the
-    // reel board is sized — the board's bottom is then clamped above it so
-    // symbols never overlap the mounted bar. A small pad keeps a visible gutter.
+    // ── DELIVERED BAR — dock + measure FIRST ─────────────────────────────────
+    // The delivered component IS the bottom bar: BettingBarMobile in PORTRAIT,
+    // BettingBarWeb in LANDSCAPE. We dock the active one now (it depends only on
+    // W/H) so its on-screen top (barTopY) is known BEFORE the reel board is
+    // sized — the board's bottom is then clamped above it so symbols never
+    // overlap the mounted bar. A small pad keeps a visible gutter.
     // Replay mode locks ALL controls via runReplay() (which disables the NATIVE
     // bar objects); use the native bar there so the lock stays authoritative.
-    const usingDeliveredBar = !!(portrait && deliveredBar && !STAKE.replay);
+    const usingDeliveredBar    = !!(portrait && deliveredBar && !STAKE.replay);
+    const usingDeliveredBarWeb = !!(!portrait && deliveredBarWeb && !STAKE.replay);
     let deliveredBarTopY = 0;
     if(usingDeliveredBar){
       const fb = deliveredBar.fitBottom(W, H);
       deliveredBarTopY = fb.barTopY;
+    } else if(usingDeliveredBarWeb){
+      const fb = deliveredBarWeb.fitBottom(W, H);
+      deliveredBarTopY = fb.barTopY;
     }
+    // True whenever EITHER delivered bar owns the bottom — drives the shared
+    // reel-board bottom reservation + hard clamp below.
+    const usingDeliveredAny = usingDeliveredBar || usingDeliveredBarWeb;
     const DELIVERED_BAR_PAD = tiny ? 8 : 14;   // gutter between reels and the mounted bar
 
     bg.position.set(W/2,H/2); coverFit(bg,W,H);
@@ -6776,11 +6881,13 @@
     // bar). Also cap CELL at 180 (was 210) so reels don't max out and
     // visually overflow on tall web viewports.
     const topRes = portrait ? (tiny?56:140) : (tiny?40:100);
-    // Portrait with the delivered bar: reserve the bottom region from the bar's
-    // measured on-screen top (+ a gutter) so the reel board sits cleanly ABOVE
-    // the mounted bar. Otherwise use the original native-bar reservations.
-    const botRes = usingDeliveredBar
-      ? Math.max(tiny?160:220, (H - deliveredBarTopY) + DELIVERED_BAR_PAD)
+    // With a delivered bar (mobile in portrait, web in landscape): reserve the
+    // bottom region from the bar's measured on-screen top (+ a gutter) so the
+    // reel board sits cleanly ABOVE the mounted bar. Otherwise use the original
+    // native-bar reservations. Floor differs by orientation (the web bar is
+    // shorter than the 2-row mobile bar, so landscape needs a smaller floor).
+    const botRes = usingDeliveredAny
+      ? Math.max(portrait ? (tiny?160:220) : (tiny?80:140), (H - deliveredBarTopY) + DELIVERED_BAR_PAD)
       : (portrait ? (tiny?160:220) : (tiny?80:140));
     // Landscape grid widens too — 0.78 → 0.88 — reels feel more present.
     const gridMaxW = W * (portrait ? 0.96 : (tiny?0.72:0.88));
@@ -6801,7 +6908,7 @@
     // Hard clamp: with the delivered portrait bar, never let the board's BOTTOM
     // edge cross into the mounted bar — push the board up if re-centering placed
     // it too low (belt-and-suspenders alongside the botRes reservation above).
-    if(usingDeliveredBar){
+    if(usingDeliveredAny){
       const maxBottom = deliveredBarTopY - DELIVERED_BAR_PAD;
       if(GY + GH > maxBottom) GY = Math.max(topRes*0.5, maxBottom - GH);
     }
@@ -6905,19 +7012,30 @@
     winLabel.alpha = 1; winValue.alpha = 1;
 
     // ── BAR MOUNT BRANCH ─────────────────────────────────────────────────────
-    // PORTRAIT (with the delivered component): the delivered BettingBarMobile IS
-    // the bar. Hide ALL native bar visuals + controls, dock + show the component
-    // (already fitBottom()-measured above), push state to it, and SKIP the entire
-    // native bar draw/positioning below. LANDSCAPE (or no component): restore the
+    // The delivered component IS the bottom bar: BettingBarMobile in PORTRAIT,
+    // BettingBarWeb in LANDSCAPE. The active branch hides ALL native bar visuals
+    // + controls, docks + shows ITS component (already fitBottom()-measured
+    // above), pushes state to it, and SKIPS the native bar draw below. Each
+    // branch toggles BOTH delivered bars' visibility so the portrait↔landscape
+    // switch is clean on every resize. REPLAY (or no component): restore the
     // native bar object set and run the existing conformed layout EXACTLY as before.
     if(usingDeliveredBar){
+      if(deliveredBarWeb) deliveredBarWeb.visible = false;   // portrait: web bar hidden
       setNativeBarVisible(false);     // hide+disable every native bar object
       bottomBarBg.clear();            // wipe any stale native bar surface
       deliveredBar.visible = true;
       deliveredBar.fitBottom(W, H);   // dock to screen bottom (width-fit)
       syncDeliveredBar();             // push balance/bet/win/states once per layout
+    } else if(usingDeliveredBarWeb){
+      if(deliveredBar) deliveredBar.visible = false;         // landscape: mobile bar hidden
+      setNativeBarVisible(false);     // hide+disable every native bar object
+      bottomBarBg.clear();            // wipe any stale native bar surface
+      deliveredBarWeb.visible = true;
+      deliveredBarWeb.fitBottom(W, H);   // dock to screen bottom (width-fit)
+      syncDeliveredBar();             // push balance/bet/win/states + bet cells once per layout
     } else {
-    if(deliveredBar) deliveredBar.visible = false;   // landscape: component hidden
+    if(deliveredBar) deliveredBar.visible = false;      // native fallback: both components hidden
+    if(deliveredBarWeb) deliveredBarWeb.visible = false;
     setNativeBarVisible(true);        // restore native bar (visibility + eventMode)
 
     // ── BAR SIZING — portrait gets TWO ROWS (top: text, bottom: buttons)
@@ -9109,6 +9227,7 @@
       // stop-texture quick-stop affordance stays for manual single spins.
       if(!State.autoplay.active) spinBtn.texture=tex('stop');
       if(deliveredBar) deliveredBar.setSpinning(true);   // delivered bar: SPIN → stop affordance
+      if(deliveredBarWeb) deliveredBarWeb.setSpinning(true);
 
       // anticipation if the round will trigger free spins via scatters on early reels
       let anticipate=false;
@@ -9122,6 +9241,7 @@
       await reelsSpinPromise(result.grid, anticipate);
       spinBtn.texture=tex('spin');
       if(deliveredBar) deliveredBar.setSpinning(false);   // reels stopped → restore SPIN glyph
+      if(deliveredBarWeb) deliveredBarWeb.setSpinning(false);
       await settleRound(result,mode);
     } catch(err){
       // A throw anywhere in the settle/ceremony chain would otherwise leave
@@ -9134,6 +9254,7 @@
       if(typeof stopAutoplay === 'function') stopAutoplay();
       State.phase = Phase.IDLE;
       if(deliveredBar) deliveredBar.setSpinning(false);   // never leave the delivered bar stuck in stop state on error
+      if(deliveredBarWeb) deliveredBarWeb.setSpinning(false);
       try { winFx.on=false; winDisplay.alpha=0; winCells=[]; winLines=[]; lineG.clear(); updateHUD(); } catch(e){}
       showError('Round interrupted', 'That round could not be completed. Your balance is safe — please spin again.', false);
     } finally {

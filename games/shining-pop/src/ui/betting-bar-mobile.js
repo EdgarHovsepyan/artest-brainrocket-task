@@ -226,14 +226,22 @@ export class BettingBarMobile extends PIXI.Container {
     this.position.set((W - this.DESIGN_W * s) / 2, (H - this.DESIGN_H * s) / 2);
     return s;
   }
-  // dock the bar to the screen bottom (width-fit), returning the on-screen
-  // top Y of the bar region (banners) so the host can keep reels above it.
-  fitBottom(W, H, maxScale) {
-    let s = W / this.DESIGN_W;
-    if (maxScale) s = Math.min(s, maxScale);
+  // Dock the bar COMPACTLY to the screen bottom. Only the visible control BAND
+  // (banners → balance bar) is docked flush at the bottom; the panel's empty
+  // top/bottom design margins are excluded. The band height is capped to a
+  // fraction of the viewport so the REELS stay the biggest element (the spin
+  // hero no longer dwarfs the board). Returns barTopY for the reel clamp.
+  fitBottom(W, H, opts) {
+    opts = opts || {};
+    const BAND_TOP = 192, BAND_BOT = 606, band = BAND_BOT - BAND_TOP; // visible bar band (design units)
+    const safeB = opts.safeBottom || 0;
+    const maxBarH = (opts.maxFrac || 0.40) * H;       // bar ≤ 40% of height → reels dominate
+    let s = Math.min(W / this.DESIGN_W, maxBarH / band);
+    if (opts.maxScale) s = Math.min(s, opts.maxScale);
     this.scale.set(s);
-    this.position.set((W - this.DESIGN_W * s) / 2, H - this.DESIGN_H * s);
-    return { scale: s, barTopY: this.y + 200 * s }; // 200 ≈ banners' top in design space
+    const bandBottom = H - safeB - 6;                  // flush to the bottom (small gutter)
+    this.position.set((W - this.DESIGN_W * s) / 2, bandBottom - BAND_BOT * s);
+    return { scale: s, barTopY: this.y + BAND_TOP * s, barH: band * s };
   }
 
   _fmt(n) { return Number(n).toLocaleString('en-US'); }

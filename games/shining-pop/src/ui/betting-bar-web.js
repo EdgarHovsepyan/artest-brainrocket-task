@@ -120,18 +120,20 @@ export class BettingBarWeb extends PIXI.Container {
       this.addChild(gs(2400, 300, G.stage));
       this.addChild(new PIXI.Graphics().rect(0, 118, 2400, 182).fill({ color: 0x000000, alpha: 0.22 }));
     }
-    // ACCOUNT PANEL (menu + sound + BALANCE)
+    // ACCOUNT PANEL (menu + sound + BALANCE). Container is offset to (40,148),
+    // so ALL children use LOCAL coords (design coord minus the 40/148 offset) —
+    // otherwise the content renders below/right of the panel (the "empty" bug).
     const acc = new PIXI.Container(); acc.position.set(40, 148); this.addChild(acc);
     acc.addChild(panel(540, 76, 38, G.panel, 2, false));
-    const menu = new PIXI.Graphics(); [175, 186, 197].forEach((y) => menu.moveTo(84, y).lineTo(116, y)); menu.stroke({ width: 3.2, color: COL.icon, cap: 'round' });
-    const menuB = new PIXI.Container(); menuB.addChild(menu); menuB.eventMode = 'static'; menuB.cursor = 'pointer'; menuB.hitArea = new PIXI.Rectangle(62, 148, 76, 76); menuB.on('pointertap', () => this._emit('menu')); acc.addChild(menuB);
-    const snd = new PIXI.Graphics().moveTo(164, 180).lineTo(170, 180).lineTo(178, 173).lineTo(178, 199).lineTo(170, 192).lineTo(164, 192).fill(COL.icon);
-    snd.arc(172, 186, 11, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon }); snd.arc(172, 186, 17, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon });
-    const sndB = new PIXI.Container(); sndB.addChild(snd); sndB.eventMode = 'static'; sndB.cursor = 'pointer'; sndB.hitArea = new PIXI.Rectangle(150, 160, 44, 52); sndB.on('pointertap', () => this._emit('sound')); acc.addChild(sndB);
-    acc.addChild(new PIXI.Graphics().moveTo(232, 162).lineTo(232, 210).stroke({ width: 1.6, color: COL.divider, alpha: 0.3 }));
-    const blbl = T('BALANCE', 19, COL.label, 700, 0, false, 2.4); blbl.position.set(258, 159); acc.addChild(blbl);
-    const bval = T('0', 30, COL.value, 700, 0, false); bval.position.set(258, 180); acc.addChild(bval);
-    const bcur = T('USD', 18, COL.cur, 600, 0, false); acc.addChild(bcur);
+    const menu = new PIXI.Graphics(); [27, 38, 49].forEach((y) => menu.moveTo(44, y).lineTo(76, y)); menu.stroke({ width: 3.2, color: COL.icon, cap: 'round' });
+    const menuB = new PIXI.Container(); menuB.addChild(menu); menuB.eventMode = 'static'; menuB.cursor = 'pointer'; menuB.hitArea = new PIXI.Rectangle(22, 0, 76, 76); menuB.on('pointertap', () => this._emit('menu')); acc.addChild(menuB);
+    const snd = new PIXI.Graphics().moveTo(124, 32).lineTo(130, 32).lineTo(138, 25).lineTo(138, 51).lineTo(130, 44).lineTo(124, 44).fill(COL.icon);
+    snd.arc(132, 38, 11, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon }); snd.arc(132, 38, 17, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon });
+    const sndB = new PIXI.Container(); sndB.addChild(snd); sndB.eventMode = 'static'; sndB.cursor = 'pointer'; sndB.hitArea = new PIXI.Rectangle(110, 12, 44, 52); sndB.on('pointertap', () => this._emit('sound')); acc.addChild(sndB);
+    acc.addChild(new PIXI.Graphics().moveTo(192, 14).lineTo(192, 62).stroke({ width: 1.6, color: COL.divider, alpha: 0.3 }));
+    const blbl = T('BALANCE', 19, COL.label, 700, 0, false, 2.4); blbl.position.set(218, 11); acc.addChild(blbl);
+    const bval = T('0', 30, COL.value, 700, 0, false); bval.position.set(218, 32); acc.addChild(bval);
+    const bcur = T('USD', 18, COL.cur, 600, 0, false); bcur.position.set(218, 40); acc.addChild(bcur);
     acc._bval = bval; acc._bcur = bcur; E.account = acc;
 
     // SIBLING BANNERS
@@ -167,9 +169,11 @@ export class BettingBarWeb extends PIXI.Container {
       c.addChild(new PIXI.Graphics().ellipse(0, 181 - 186, 19, 6.5).fill(0xe0a0ff));
     });
     hit(coins, new PIXI.Circle(0, 0, 38), () => this._emit('buy')); this.addChild(coins); E.coins = coins;
-    const gamble = this._circleBtn(2222, 186, 38, null); gamble.alpha = 0.42;
-    gamble.getChildAt(0).destroy(); gamble.addChildAt(new PIXI.Graphics().circle(0, 0, 38).fill(COL.gambleFill).circle(0, 0, 38).stroke({ width: 1.6, color: COL.gambleStroke }), 0);
-    const gx2 = T('×2', 25, COL.cur, 700, 0.5, true); gx2.position.set(0, 0); gamble.addChild(gx2); this.addChild(gamble); E.gamble = gamble;
+    // ×2 — ENABLED quick "double bet" (was a dead disabled gamble button).
+    const gamble = this._circleBtn(2222, 186, 38, null);
+    const gx2 = T('×2', 25, COL.value, 700, 0.5, true); gx2.position.set(0, 0); gamble.addChild(gx2);
+    hit(gamble, new PIXI.Circle(0, 0, 38), () => this._emit('bet:double'));
+    this.addChild(gamble); E.gamble = gamble;
 
     // TURBO (top) + AUTOPLAY (bottom), stacked at x2302
     const turbo = this._circleBtn(2302, 150, 30, (c) => {
@@ -197,8 +201,8 @@ export class BettingBarWeb extends PIXI.Container {
     return { scale: s, barTopY: this.y + 118 * s }; // 118 = scrim top in design space
   }
   _fmt(n) { return Number(n).toLocaleString('en-US'); }
-  setBalance(n) { const a = this.elements.account; a._bval.text = this._fmt(n); a._bcur.position.set(258 + a._bval.width + 12, 188); }
-  setCurrency(c) { this.elements.account._bcur.text = c; this.elements.account._bcur.position.set(258 + this.elements.account._bval.width + 12, 188); }
+  setBalance(n) { const a = this.elements.account; a._bval.text = this._fmt(n); a._bcur.position.set(218 + a._bval.width + 12, 40); }
+  setCurrency(c) { const a = this.elements.account; a._bcur.text = c; a._bcur.position.set(218 + a._bval.width + 12, 40); }
   setLastWin(n) { const p = this.elements.lastWin; p.value.text = this._fmt(n); p.relayout(); }
   setBet(n) { const p = this.elements.totalBet; p.value.text = this._fmt(n); p.relayout(); }
   // populate the 5 selector cells (values) + highlight the active index
