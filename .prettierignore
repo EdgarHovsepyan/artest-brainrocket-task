@@ -6,3 +6,4 @@
 **/*.jsonl
 **/*.zst
 pnpm-lock.yaml
+games/shining-pop

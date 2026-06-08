@@ -6,9 +6,10 @@
 //
 // The Model decides every outcome; the View only renders it.
 
-import { _decorator, Component, EventKeyboard, Input, input, KeyCode, Node } from 'cc';
+import { _decorator, Component, EventKeyboard, Input, input, KeyCode, Node, view } from 'cc';
 import { SlotModel } from '../model/slot-model';
 import { SlotView } from '../view/slot-view';
+import { BettingBarMobile } from '../ui/betting-bar';
 import { BONUS_MODES, BonusMode } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
@@ -27,6 +28,7 @@ export class SlotController extends Component {
 
   private model!: SlotModel;
   private view!: SlotView;
+  private bar!: BettingBarMobile;
 
   private state: FlowState = 'idle';
   private canStop = false;
@@ -43,14 +45,10 @@ export class SlotController extends Component {
   }
 
   private async boot(): Promise<void> {
-    await this.view.init();
+    // externalControls: the shared BettingBar provides the controls + HUD.
+    await this.view.init(true);
     this.view.showGrid(this.model.idleGrid());
-
-    this.view.onSpinClicked(() => this.onSpinPressed());
     this.view.onBuyClicked((mode) => void this.onBuy(mode as BonusMode));
-    this.view.onTurboClicked(() => this.toggleTurbo());
-    this.view.onAutoClicked(() => this.toggleAuto());
-    this.view.onSoundClicked(() => this.toggleSound());
     this.view.configureBuyMenu(
       (Object.keys(BONUS_MODES) as BonusMode[]).map((mode) => ({
         mode,
@@ -59,12 +57,41 @@ export class SlotController extends Component {
       })),
     );
 
-    this.view.setBalance(this.model.balance);
-    this.view.setBet(this.model.bet);
-    this.view.setWin(0);
-    this.view.setInteractable(true);
+    // Shared betting bar = the only on-screen controls; buy-bonus is game state.
+    const barNode = new Node('BettingBar');
+    this.node.addChild(barNode);
+    this.bar = barNode.addComponent(BettingBarMobile);
+    this.bar.on('spin', () => this.onSpinPressed());
+    this.bar.on('bet:inc', () => this.changeBet(1));
+    this.bar.on('bet:dec', () => this.changeBet(-1));
+    this.bar.on('turbo', () => this.toggleTurbo());
+    this.bar.on('autoplay', () => this.toggleAuto());
+    this.bar.on('sound', () => this.toggleSound());
+    this.bar.on('menu', () => this.view.openBuyMenu());
 
+    // Defer HUD writes one frame so the bar's onLoad has built its labels.
+    this.scheduleOnce(() => {
+      const vs = view.getVisibleSize();
+      this.bar.fit(vs.width, vs.height);
+      this.syncHud();
+      this.bar.setLastWin(0);
+    }, 0);
+
+    this.view.setInteractable(true);
     input.on(Input.EventType.KEY_DOWN, this.onKey, this);
+  }
+
+  /** Push model balance + bet into the betting bar (cents → display units). */
+  private syncHud(): void {
+    this.bar.setBalance(this.model.balance / 100);
+    this.bar.setBet(this.model.bet / 100);
+  }
+
+  /** Bet stepper from the bar (± one currency unit). */
+  private changeBet(dir: number): void {
+    if (this.state !== 'idle') return;
+    this.model.setBet(Math.max(100, Math.min(1000, this.model.bet + dir * 100)));
+    this.syncHud();
   }
 
   onDestroy(): void {
@@ -119,6 +146,7 @@ export class SlotController extends Component {
 
     const outcome = this.model.play();
     this.view.setBalance(outcome.balanceCents);
+    this.bar.setBalance(outcome.balanceCents / 100);
 
     await this.view.playSpin(outcome.result.grid, this.turbo ? VIEW_CONFIG.bonus.speedMul : 1);
 
@@ -129,6 +157,7 @@ export class SlotController extends Component {
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
       this.view.countUp(outcome.winCents);
       this.view.playCeremony(outcome.winCents, outcome.betCents, outcome.wildStrike);
+      this.bar.setLastWin(outcome.winCents / 100);
     }
 
     this.scheduleOnce(() => {
@@ -151,6 +180,7 @@ export class SlotController extends Component {
 
     const outcome = this.model.buyBonus(mode);
     this.view.setBalance(outcome.balanceCents);
+    this.bar.setBalance(outcome.balanceCents / 100);
 
     for (const step of outcome.bonus.steps) {
       this.view.clearWins();
@@ -161,6 +191,7 @@ export class SlotController extends Component {
 
     this.view.countUp(outcome.winCents);
     this.view.playCeremony(outcome.winCents, outcome.betCents, 1);
+    this.bar.setLastWin(outcome.winCents / 100);
     this.view.setBanner('FEATURE WON');
     this.scheduleOnce(() => {
       this.state = 'idle';

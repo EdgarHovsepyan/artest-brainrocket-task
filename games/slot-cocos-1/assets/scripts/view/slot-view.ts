@@ -104,7 +104,12 @@ export class SlotView extends Component {
   private winLines: { lineIndex: number; count: number }[] = [];
   private winCycle = 0;
 
-  async init(): Promise<void> {
+  /** When `externalControls` is true the View skips its own HUD + control deck —
+   *  the shared BettingBar provides them (the Controller wires it). */
+  private externalControls = false;
+
+  async init(externalControls = false): Promise<void> {
+    this.externalControls = externalControls;
     await this.loadAssets();
     this.build();
   }
@@ -265,8 +270,10 @@ export class SlotView extends Component {
     );
     this.particles = this.mkNode('particles', 10, 10, this.node).addComponent(ParticleLayer);
 
-    this.buildHud();
-    this.buildControlDeck();
+    if (!this.externalControls) {
+      this.buildHud();
+      this.buildControlDeck();
+    }
     this.bannerLabel = this.mkLabel('', 0, 250, 36, ACID);
 
     // ceremony on top of everything; shakes the whole view node
@@ -447,6 +454,10 @@ export class SlotView extends Component {
 
   closeBuyMenu(): void {
     if (this.buyMenu) this.buyMenu.active = false;
+  }
+
+  openBuyMenu(): void {
+    if (this.buyMenu) this.buyMenu.active = true;
   }
 
   // ---- public API the Controller drives ------------------------------------

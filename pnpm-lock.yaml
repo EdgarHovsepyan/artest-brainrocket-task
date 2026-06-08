@@ -45,23 +45,11 @@ importers:
         specifier: ^8.10.0
         version: 8.60.1(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
 
-  games/slot-cocos-1:
+  games/shining-pop:
     dependencies:
-      '@artest/math-core':
-        specifier: workspace:*
-        version: link:../../packages/math-core
-
-  games/slot-pixi-1:
-    dependencies:
-      '@artest/math-core':
-        specifier: workspace:*
-        version: link:../../packages/math-core
-      '@artest/stake-adapter':
-        specifier: workspace:*
-        version: link:../../packages/stake-adapter
-      '@artest/ui-kit':
-        specifier: workspace:*
-        version: link:../../packages/ui-kit
+      '@esotericsoftware/spine-pixi-v8':
+        specifier: ^4.2.0
+        version: 4.3.7(pixi.js@8.18.1)
       gsap:
         specifier: ^3.12.5
         version: 3.15.0
@@ -69,9 +57,6 @@ importers:
         specifier: 8.18.1
         version: 8.18.1
     devDependencies:
-      tsx:
-        specifier: ^4.19.0
-        version: 4.22.4
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -81,6 +66,12 @@ importers:
       vite-plugin-singlefile:
         specifier: ^2.0.3
         version: 2.3.3(rollup@4.61.1)(vite@5.4.21(@types/node@25.9.2))
+
+  games/slot-cocos-1:
+    dependencies:
+      '@artest/math-core':
+        specifier: workspace:*
+        version: link:../../packages/math-core
 
   packages/math-core:
     devDependencies:
@@ -520,6 +511,17 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@esotericsoftware/spine-canvas@4.3.7':
+    resolution: {integrity: sha512-pH5wrfbF3YbwmDKUDNTfMQpc4YEY3DKw4ne0nXCd/sdiPQSVzK/tOS5t3hgkC6mBk7sEeutt/8kG1gAbytQTWw==}
+
+  '@esotericsoftware/spine-core@4.3.7':
+    resolution: {integrity: sha512-adB/LcFivaAk3C03iBXXcXmpo7INZ6orWWhXnM5j0wOBHUhAGhDWJyBGuVcZzZXcvjJSKCh1SJ7BhmQH5AIDcw==}
+
+  '@esotericsoftware/spine-pixi-v8@4.3.7':
+    resolution: {integrity: sha512-zuhsJBBd3AIiWr4qqg3iCSFy7uCl1BQrGvq/3+KuUOcy+8wwjAlb6iTzmYzALfTg+TMThh7a4iVDRX8g/RrSPA==}
+    peerDependencies:
+      pixi.js: ^8.16.0
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1959,6 +1961,17 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@esotericsoftware/spine-canvas@4.3.7':
+    dependencies:
+      '@esotericsoftware/spine-core': 4.3.7
+
+  '@esotericsoftware/spine-core@4.3.7': {}
+
+  '@esotericsoftware/spine-pixi-v8@4.3.7(pixi.js@8.18.1)':
+    dependencies:
+      '@esotericsoftware/spine-canvas': 4.3.7
+      pixi.js: 8.18.1
 
   '@humanfs/core@0.19.2':
     dependencies:

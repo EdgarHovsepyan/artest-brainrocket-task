@@ -1,0 +1,17 @@
+crown.png
+size: 548, 353
+filter: Linear, Linear
+pma: false
+sp_crownwild_base
+  bounds: 0, 0, 548, 353
+
+crown_fx.png
+size: 512, 320
+filter: Linear, Linear
+pma: false
+sp_crownwild_glow
+  bounds: 0, 0, 256, 256
+sp_crownwild_spark
+  bounds: 336, 0, 80, 80
+sp_crownwild_sweep
+  bounds: 272, 0, 48, 256

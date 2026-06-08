@@ -1,0 +1,31 @@
+node_modules/
+dist/
+.vite/
+.claude/
+stake-build/front/index.html
+*.local
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+!.env.example
+
+# dev asset staging + source originals (local only, never committed)
+_incoming/
+art-source/
+public/assets/images/shining/_orig/
+public/assets/images/shining/_pre_candy/
+public/assets/images/shining/_orig_v1/
+public/assets/images/shining/_orig_v2/
+public/assets/images/shining/_reskin/
+public/assets/images/shining/*.jpeg
+
+# unused design-source image sets — NOT runtime-loaded (the game loads only
+# images/shining/* + the spine rig). Kept on disk for reference, never committed.
+public/assets/images/kit/
+public/assets/images/transparent/
+public/assets/images/clean/
+
+# extra-studio internal dev docs / blueprints — not part of the shipped game
+docs/

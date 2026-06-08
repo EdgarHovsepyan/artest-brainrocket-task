@@ -13,6 +13,7 @@ export default tseslint.config(
       '**/.cache/**',
       '**/*.d.ts',
       'games/*/assets/**', // Cocos editor-managed sources are linted by their own project
+      'games/shining-pop/**', // vendored single-file flagship — built & formatted by its own vite toolchain
     ],
   },
   js.configs.recommended,
