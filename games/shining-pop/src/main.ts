@@ -16,6 +16,7 @@ import { gsap } from 'gsap';
 import { SymbolRigPool } from './spine/SymbolRigPool.js';
 import { makeSkin } from './ui/betting-bar-skin.js';
 import { BettingBarMobile } from './ui/betting-bar-mobile.js';
+import { BettingBarWeb } from './ui/betting-bar-web.js';
 
 (globalThis as Record<string, unknown>).PIXI = PIXI;
 // SPINE-04/05: expose the Crown rig pool BEFORE the game module runs so game.js
@@ -35,6 +36,8 @@ gsap.ticker.lagSmoothing(500, 33);
 // DELIVERED BAR: expose the v8 port of the delivered BettingBarMobile component so
 // game.js can mount it as THE bar (full panel), hide its native bar, and wire it.
 (globalThis as Record<string, unknown>).BettingBarMobile = BettingBarMobile;
+// DELIVERED WEB BAR: the landscape (2400x300) counterpart, mounted for landscape.
+(globalThis as Record<string, unknown>).BettingBarWeb = BettingBarWeb;
 
 // Spine + GSAP are installed and ready for the next phase (see docs/10_…BLUEPRINT.md).
 // They are intentionally NOT imported yet — wrapper-first keeps the approved game
