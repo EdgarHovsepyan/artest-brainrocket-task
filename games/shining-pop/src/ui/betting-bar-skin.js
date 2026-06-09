@@ -26,28 +26,32 @@ export const BAR = {
   // gradient stop-lists  [offset, cssColor] — CRYSTAL theme, derived from the
   // 2K cathedral background (indigo darks → violet/orchid → magenta, lavender
   // highlights). Replaces the original gold so the bar unifies with the scene.
+  // CANDY / cotton-candy theme (2026-06-10 master pass) — brighter, glossier
+  // grape-violet with candy-pink + cyan accents to MATCH the Shining Pop world
+  // (was a dark crystal/cathedral skin that clashed with the candy game).
   GRAD: {
-    stage:  [[0, '#1a1240'], [0.7, '#0d0826'], [1, '#060418']],
-    panel:  [[0, '#2a1e52'], [0.5, '#191140'], [1, '#0c0826']],
-    banner: [[0, '#171138'], [0.5, '#281c58'], [1, '#171138']],
-    active: [[0, '#f6c8ff'], [0.45, '#db5fd8'], [1, '#8e2ec4']],
-    ring:   [[0, '#ecd6ff'], [0.34, '#b86fda'], [0.66, '#7a3cb2'], [1, '#34206a']],
-    spin:   [[0, '#2a1f4e'], [0.6, '#15102e'], [1, '#09071e']],
-    gold:   [[0, 'rgba(206,124,224,0)'], [0.5, 'rgba(220,110,220,0.78)'], [1, 'rgba(206,124,224,0)']],
+    stage:  [[0, '#241652'], [0.7, '#120b2e'], [1, '#08051c']],
+    panel:  [[0, '#46297a'], [0.5, '#2e1c58'], [1, '#19103e']],   // glossy candy-grape (brighter top)
+    banner: [[0, '#1c1346'], [0.5, '#34206a'], [1, '#1c1346']],
+    active: [[0, '#ffd9f4'], [0.45, '#ff5ab0'], [1, '#bf2496']],   // candy-pink active fill
+    ring:   [[0, '#ffe8fb'], [0.34, '#ff7ad0'], [0.66, '#9a4fcf'], [1, '#3e2076']],
+    spin:   [[0, '#34225e'], [0.6, '#1a1138'], [1, '#0c0826']],
+    gold:   [[0, 'rgba(255,122,208,0)'], [0.5, 'rgba(255,122,208,0.85)'], [1, 'rgba(255,122,208,0)']],
   },
-  // solid colors + their role (crystal violet/magenta)
-  label:      0xd9a8f2, // caption text (LAST WIN / TOTAL BET / BALANCE / BET)
-  value:      0xf3ecff, // primary value text (lavender-white)
-  cur:        0x9c88c2, // currency unit + DEMO + disabled text
-  icon:       0xefe6ff, // sound / menu / stepper +/- glyph stroke
-  edge:       0xb86fda, // orchid panel edge
-  divider:    0xb070da, // internal hairline dividers (low alpha)
-  ringInner:  0xf0e0ff, // spin ring inner highlight stroke
-  centerRim:  0xe8d0ff, // spin center rim stroke
-  gloss:      0xffffff, // top-gloss highlight (low alpha)
-  activeEdge: 0x4a1f7a, // deep-violet edge on active glyphs (autoplay/turbo)
-  spinGlow:   0xd84ad8, // soft magenta glow disc behind SPIN
-  dark:       0x1a0830, // dark text on an active (magenta) fill
+  // solid colors + their role (candy violet / pink / cyan)
+  label:      0xeeb6e8, // caption text (LAST WIN / TOTAL BET / BALANCE / BET)
+  value:      0xfdf2ff, // primary value text (candy-white)
+  cur:        0xae97d2, // currency unit + DEMO + disabled text
+  icon:       0xf6e8ff, // sound / menu / stepper +/- glyph stroke
+  edge:       0xff7ad0, // candy-pink glow edge (was orchid)
+  divider:    0xcf78e0, // internal hairline dividers (low alpha)
+  ringInner:  0xffe4fb, // spin ring inner highlight stroke
+  centerRim:  0xffd6f4, // spin center rim stroke
+  gloss:      0xffffff, // glassy top-sheen highlight
+  cyan:       0xbfe8ff, // candy-glass cyan inner rim (NEW)
+  activeEdge: 0x6e1f56, // deep candy edge on active glyphs (autoplay/turbo)
+  spinGlow:   0xff4ad8, // soft candy-magenta glow disc behind SPIN
+  dark:       0x24082c, // dark text on an active (pink) fill
   // Inter first; graceful fallbacks if Inter isn't bundled yet (glyph shapes
   // differ only — spacing is measured at runtime so layout is unaffected).
   FONT: "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif",
@@ -98,11 +102,14 @@ export function makeSkin(PIXI) {
     opts = opts || {};
     const ew = opts.edge != null ? opts.edge : 1.8;
     g.roundRect(x, y, w, h, r).fill(lin('panel', G.panel, false));
+    // GLASSY CANDY TOP-SHEEN — a soft white highlight over the upper ~42% reads
+    // as a glossy hard-candy surface (the "premium" quality the old flat fill lacked).
+    g.roundRect(x + 2.5, y + 2, w - 5, h * 0.42, Math.max(0, r - 2)).fill({ color: BAR.gloss, alpha: 0.13 });
     if (ew) g.roundRect(x + ew / 2, y + ew / 2, w - ew, h - ew, Math.max(0, r - ew / 2))
       .stroke({ width: ew, color: BAR.edge, alpha: 1 });
     if (opts.inner !== false)
       g.roundRect(x + 2, y + 2, w - 4, h - 4, Math.max(0, r - 2))
-        .stroke({ width: 1.2, color: BAR.gloss, alpha: 0.06 });
+        .stroke({ width: 1.1, color: BAR.cyan, alpha: 0.16 });   // candy-glass cyan inner rim
   }
 
   // Stadium banner (LAST WIN / TOTAL BET): horizontal banner gradient, full
@@ -110,10 +117,11 @@ export function makeSkin(PIXI) {
   function bannerInto(g, x, y, w, h) {
     const r = h / 2;
     g.roundRect(x, y, w, h, r).fill(lin('banner', G.banner, true));
+    g.roundRect(x + 2, y + 1.5, w - 4, h * 0.46, r - 1.5).fill({ color: BAR.gloss, alpha: 0.11 });   // glassy candy sheen
     g.roundRect(x + 0.9, y + 0.9, w - 1.8, h - 1.8, r - 0.9)
       .stroke({ width: 1.8, color: BAR.edge, alpha: 1 });
     g.roundRect(x + 2, y + 2, w - 4, h - 4, r - 2)
-      .stroke({ width: 1.2, color: BAR.gloss, alpha: 0.06 });
+      .stroke({ width: 1.1, color: BAR.cyan, alpha: 0.13 });
   }
 
   // Bottom balance bar: gold panel (lower edge weight + inner highlight).
@@ -137,6 +145,9 @@ export function makeSkin(PIXI) {
   // Circle button base (autoplay / turbo): gold panel circle + gold edge.
   function circleInto(g, cx, cy, r) {
     g.circle(cx, cy, r).fill(lin('panel', G.panel, false));
+    // glassy candy top-sheen on the circle (upper-left highlight) + cyan inner rim
+    g.ellipse(cx - r * 0.18, cy - r * 0.34, r * 0.62, r * 0.4).fill({ color: BAR.gloss, alpha: 0.12 });
+    g.circle(cx, cy, r - 1.4).stroke({ width: 1, color: BAR.cyan, alpha: 0.14 });
     g.circle(cx, cy, r).stroke({ width: 1.8, color: BAR.edge, alpha: 1 });
   }
 
