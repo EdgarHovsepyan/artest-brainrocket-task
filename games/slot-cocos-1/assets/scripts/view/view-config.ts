@@ -18,17 +18,35 @@ export const VIEW_CONFIG = {
     spinBuffer: 12,
   },
 
-  /** Reel spin animation. */
+  /** Reel spin animation — synced to shining-pop feel (ms). */
   spin: {
-    /** Minimum spin time before the first reel stops (ms). */
-    minSpinMs: 650,
-    /** Stagger between consecutive reel stops (ms). Left-to-right. */
-    reelStopStaggerMs: 150,
-    /** Fraction of each reel's motion spent winding up / decelerating. */
-    accelFraction: 0.16,
-    decelFraction: 0.36,
+    /** Minimum spin time before the first reel stops (ms). shining baseDur OFF≈440. */
+    minSpinMs: 440,
+    /** Stagger between consecutive reel stops (ms). Left-to-right. shining OFF≈88. */
+    reelStopStaggerMs: 88,
+    /** Trapezoidal velocity-curve accel/decel fractions. shining a=0.10 / d=0.34. */
+    accelFraction: 0.1,
+    decelFraction: 0.34,
     /** Squash applied to a reel's symbols on landing (the "thunk"). */
     landSquash: 0.9,
+    /** Anticipatory wind-up kick before launch (OFF mode only, over the first ~2.5%). */
+    windupMs: 80,
+    windupAmpFrac: 0.5, // × CELL
+    /** Velocity-coupled vertical motion-blur streak. */
+    blur: {
+      triggerSpd: 0.12, // cells/frame before blur engages
+      span: 0.25, // (spd-trigger)/span → 0..1
+      strengthYFrac: 0.08, // × CELL
+      strengthXFrac: 0.012, // × CELL
+      rampInDecay: 0.5,
+      rampOutDecay: 0.18,
+    },
+    /** Click-to-stop / force-stop cascade. */
+    quickStop: {
+      staggerMs: 8,
+      minMs: 55,
+      maxMs: 100,
+    },
   },
 
   /** Winning-line presentation. */
@@ -40,12 +58,20 @@ export const VIEW_CONFIG = {
     lineCycleSeconds: 0.85,
   },
 
-  /** Kinetic win counter (count-up). */
+  /** Kinetic win counter (count-up) — 3-beat: anticipation hold → count → savour. */
   counter: {
     /** Duration = baseMs + log10(win) * logScaleMs, clamped to maxMs. */
     baseMs: 600,
     logScaleMs: 350,
     maxMs: 3000,
+    /** easeOutExpo = 1 - 2^(-10p) (fast → settle). */
+    easing: 'easeOutExpo',
+    /** Beat-1 hold (number pinned at 0) before counting, by tier band (ms). */
+    antHoldMs: { epic: 320, big: 240, base: 150 },
+    /** Landing pop on count-complete (damped-elastic). */
+    landingPopMs: 380,
+    landingPopScale: 0.3, // +0.42 for MEGA+
+    landingTintMs: 420,
   },
 
   /** Tiered win ceremony (overlay shown for big wins). */
@@ -90,6 +116,38 @@ export const VIEW_CONFIG = {
     perMultiple: 1.5,
     maxCount: 56,
   },
+
+  /** Turbo speed scalar (OFF/TURBO/MAX) — scales reel baseDur + stagger. */
+  turbo: { off: 1.0, turbo: 0.4, max: 0.16 },
+
+  /** Reel land / squash / settle (damped-spring), per turbo mode. */
+  land: {
+    armAt: 0.965, // p >= armAt arms the landing
+    symDurMs: { off: 250, turbo: 165, max: 130 },
+    symStagMs: { off: 40, turbo: 26, max: 18 }, // bottom→top ripple
+    landDip: { off: 0.052, turbo: 0.038, max: 0.03 }, // × CELL column dip
+    landSq: { off: 0.055, turbo: 0.042, max: 0.034 }, // squash depth
+  },
+
+  /** Per-cell win reveal (before the ceremony), per turbo mode (ms). */
+  reveal: {
+    normalMs: { off: 1300, turbo: 720, max: 480, reduced: 700 },
+    fsMs: { off: 1800, turbo: 1300, max: 900, reduced: 900 },
+    buyMs: { off: 1500, turbo: 1100, max: 700, reduced: 600 },
+    cellCascadeMs: 300,
+    cellStaggerMs: 55,
+    fruitPopMs: 240,
+    scatterBurstStaggerMs: 120,
+  },
+
+  /** Per-bonus colour-grade overlay cross-fade (ms). */
+  grade: { outMs: 280, inMs: 320, outAlpha: 0.75 },
+
+  /** Feature banners (ms). */
+  banner: { fsHoldMs: 1100, retriggerHoldMs: 850, reducedFsHoldMs: 500 },
+
+  /** Autoplay inter-spin pause by turbo mode (ms). */
+  autoplay: { off: 720, turbo: 280, max: 140 },
 
   /** Free-spin / bonus playback. */
   bonus: {

@@ -26,6 +26,7 @@ export class AnticipationLayer extends Component {
     n.addComponent(UITransform).setContentSize(w, h);
     n.setPosition(x, y, 0);
     this.node.addChild(n);
+    n.layer = this.node.layer; // UI_2D so the 2D renderer draws it
 
     const g = n.addComponent(Graphics);
     g.fillColor = new Color(234, 255, 0, 28);

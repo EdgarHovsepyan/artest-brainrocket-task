@@ -119,8 +119,19 @@ export class ReelView extends Component {
         resolve();
       };
       strip.setPosition(0, this.startY, 0);
-      tween(strip)
-        .to(spinSeconds * speedMul, { position: new Vec3(0, 0, 0) }, { easing: reelEase })
+      const t = tween(strip);
+      // Anticipatory wind-up "slingshot": base spins only pull UP a touch, then
+      // launch down — reads as loading the reel (a Signature game-feel touch).
+      const { windupMs, windupAmpFrac } = VIEW_CONFIG.spin;
+      if (speedMul === 1 && windupMs > 0) {
+        const kick = VIEW_CONFIG.layout.cell * windupAmpFrac * 0.15;
+        t.to(
+          windupMs / 1000,
+          { position: new Vec3(0, this.startY + kick, 0) },
+          { easing: 'quadOut' },
+        );
+      }
+      t.to(spinSeconds * speedMul, { position: new Vec3(0, 0, 0) }, { easing: reelEase })
         .call(() => this.settle?.())
         .start();
     });

@@ -6,7 +6,18 @@
 //
 // The Model decides every outcome; the View only renders it.
 
-import { _decorator, Component, EventKeyboard, Input, input, KeyCode, Node, view } from 'cc';
+import {
+  _decorator,
+  Component,
+  EventKeyboard,
+  game,
+  Input,
+  input,
+  KeyCode,
+  Layers,
+  Node,
+  view,
+} from 'cc';
 import { SlotModel } from '../model/slot-model';
 import { SlotView } from '../view/slot-view';
 import { BettingBarMobile } from '../ui/betting-bar';
@@ -37,6 +48,9 @@ export class SlotController extends Component {
   private muted = false;
 
   onLoad(): void {
+    // Uncap the frame rate: Cocos web defaults to 60 — 120 lets the game run at the
+    // display's native refresh (120/144Hz ProMotion) for buttery spins. Visual/perf only.
+    game.frameRate = 120;
     this.model = new SlotModel({ balanceCents: this.startBalanceCents, betCents: this.betCents });
     const viewNode = new Node('SlotView');
     this.node.addChild(viewNode);
@@ -67,10 +81,14 @@ export class SlotController extends Component {
     this.bar.on('turbo', () => this.toggleTurbo());
     this.bar.on('autoplay', () => this.toggleAuto());
     this.bar.on('sound', () => this.toggleSound());
+    this.bar.on('volume', (v: number) => this.view.setVolume(v));
     this.bar.on('menu', () => this.view.openBuyMenu());
 
     // Defer HUD writes one frame so the bar's onLoad has built its labels.
     this.scheduleOnce(() => {
+      // Code-created nodes default to the DEFAULT layer, which the 2D UI renderer skips
+      // (→ black screen). Force the whole built tree onto UI_2D so it actually draws.
+      this.relayerUI(this.node);
       const vs = view.getVisibleSize();
       this.bar.fit(vs.width, vs.height);
       this.syncHud();
@@ -79,6 +97,13 @@ export class SlotController extends Component {
 
     this.view.setInteractable(true);
     input.on(Input.EventType.KEY_DOWN, this.onKey, this);
+  }
+
+  /** Recursively move a node subtree onto the UI_2D layer so the UI renderer draws it. */
+  private relayerUI(n: Node): void {
+    n.layer = Layers.Enum.UI_2D;
+    const kids = n.children;
+    for (let i = 0; i < kids.length; i++) this.relayerUI(kids[i]);
   }
 
   /** Push model balance + bet into the betting bar (cents → display units). */

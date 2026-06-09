@@ -8,6 +8,7 @@ export class AudioManager {
   private ctx: Ctx | null = null;
   private master: GainNode | null = null;
   private muted = false;
+  private volume = 0.5; // master gain when unmuted (0..1)
 
   /** Lazily build the graph on first call (must follow a user gesture on web). */
   private ensure(): boolean {
@@ -34,8 +35,16 @@ export class AudioManager {
 
   setMuted(m: boolean): void {
     this.muted = m;
+    this.applyGain();
+  }
+  /** Master volume 0..1 — driven by the betting-bar volume slider. */
+  setVolume(v: number): void {
+    this.volume = Math.max(0, Math.min(1, v));
+    this.applyGain();
+  }
+  private applyGain(): void {
     if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(m ? 0 : 0.5, this.ctx.currentTime, 0.02);
+      this.master.gain.setTargetAtTime(this.muted ? 0 : this.volume, this.ctx.currentTime, 0.02);
     }
   }
 

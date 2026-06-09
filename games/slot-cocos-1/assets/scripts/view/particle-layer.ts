@@ -37,6 +37,7 @@ export class ParticleLayer extends Component {
     n.addComponent(UITransform).setContentSize(16, 16);
     n.setPosition(x, y, 0);
     this.node.addChild(n);
+    n.layer = this.node.layer; // UI_2D so the 2D renderer draws it
 
     const g = n.addComponent(Graphics);
     const s = big ? 7 : 4;

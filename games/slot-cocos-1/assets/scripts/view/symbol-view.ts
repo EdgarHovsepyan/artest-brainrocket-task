@@ -6,12 +6,14 @@ import {
   _decorator,
   Color,
   Component,
+  Graphics,
   Label,
   Node,
   Sprite,
   SpriteFrame,
   tween,
   Tween,
+  UIOpacity,
   UITransform,
   Vec3,
 } from 'cc';
@@ -25,6 +27,8 @@ export class SymbolView extends Component {
   private sprite: Sprite | null = null;
   private label: Label | null = null;
   private frames: SpriteFrame[] = [];
+  private glow: Node | null = null;
+  private glowOp: UIOpacity | null = null;
 
   /** Build the cell's sprite + text fallback at `size` px square. */
   build(size: number, frames: SpriteFrame[]): void {
@@ -44,6 +48,33 @@ export class SymbolView extends Component {
     lbl.isBold = true;
     lbl.color = new Color(234, 255, 0, 255);
     this.label = lbl;
+
+    // Win light-up: a bright ACID diamond light-frame (outline + faint fill, NEVER a
+    // circle) that flashes around the cell on win so winners visibly light up, not just
+    // grow. Hidden when idle; transform + opacity only; killed in clear().
+    const glowNode = new Node('winGlow');
+    glowNode.addComponent(UITransform).setContentSize(size, size);
+    this.node.addChild(glowNode);
+    const gg = glowNode.addComponent(Graphics);
+    const r = size * 0.72;
+    const diamond = () => {
+      gg.moveTo(0, -r);
+      gg.lineTo(r, 0);
+      gg.lineTo(0, r);
+      gg.lineTo(-r, 0);
+      gg.close();
+    };
+    gg.fillColor = new Color(234, 255, 0, 40);
+    diamond();
+    gg.fill();
+    gg.lineWidth = 4;
+    gg.strokeColor = new Color(234, 255, 0, 255);
+    diamond();
+    gg.stroke();
+    glowNode.setScale(0.8, 0.8, 1);
+    this.glow = glowNode;
+    this.glowOp = glowNode.addComponent(UIOpacity);
+    this.glowOp.opacity = 0;
   }
 
   /** Show symbol `id` — sprite if its frame loaded, else the id's name. */
@@ -53,18 +84,42 @@ export class SymbolView extends Component {
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
   }
 
-  /** Win pulse — driven by Cocos Tween. */
-  playWin(): void {
+  /** Win pulse + light-up — driven by Cocos Tween. `delay` enables an L→R ripple. */
+  playWin(delay = 0): void {
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
     const half = symbolPulseMs / 2 / 1000; // ms → s, two halves
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
+    const pop = symbolPulseScale + 0.12; // first beat overshoots → the win has an attack
     tween(this.node)
+      .delay(delay)
+      .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
+      .to(half, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
       .to(half, { scale: new Vec3(symbolPulseScale, symbolPulseScale, 1) }, { easing: 'quadOut' })
       .to(half, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
-      .union()
-      .repeat(3)
+      .to(half, { scale: new Vec3(symbolPulseScale, symbolPulseScale, 1) }, { easing: 'quadOut' })
+      .to(half, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
       .start();
+    if (this.glow && this.glowOp) {
+      Tween.stopAllByTarget(this.glow);
+      Tween.stopAllByTarget(this.glowOp);
+      this.glow.setScale(0.8, 0.8, 1);
+      this.glowOp.opacity = 0;
+      tween(this.glowOp)
+        .delay(delay)
+        .to(half, { opacity: 200 })
+        .to(half, { opacity: 0 })
+        .union()
+        .repeat(3)
+        .start();
+      tween(this.glow)
+        .delay(delay)
+        .to(half, { scale: new Vec3(1.35, 1.35, 1) }, { easing: 'quadOut' })
+        .to(half, { scale: new Vec3(0.8, 0.8, 1) }, { easing: 'quadIn' })
+        .union()
+        .repeat(3)
+        .start();
+    }
   }
 
   /** Tactile landing squash-and-stretch (the reel "thunk"). */
@@ -80,5 +135,13 @@ export class SymbolView extends Component {
   clear(): void {
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
+    if (this.glow) {
+      Tween.stopAllByTarget(this.glow);
+      this.glow.setScale(0.8, 0.8, 1);
+    }
+    if (this.glowOp) {
+      Tween.stopAllByTarget(this.glowOp);
+      this.glowOp.opacity = 0;
+    }
   }
 }

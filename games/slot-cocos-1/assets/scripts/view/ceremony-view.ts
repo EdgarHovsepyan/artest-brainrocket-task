@@ -11,15 +11,20 @@ import {
   Label,
   Node,
   tween,
+  Tween,
   UIOpacity,
   UITransform,
   Vec3,
 } from 'cc';
 import { resolveBigWinTier, VIEW_CONFIG } from './view-config';
+import { PAL } from './palette';
 
 const { ccclass } = _decorator;
 
-const ACID = new Color(234, 255, 0, 255);
+// Shining-Pop identity (replaces the old industrial acid-green).
+const RIM = new Color().fromHEX(PAL.accent); // magenta panel rim + accent bars
+const CRYSTAL = new Color().fromHEX(PAL.valueText); // crystal white-pink amount
+const TITLE = new Color().fromHEX(PAL.title); // soft-magenta header default
 const fmt = (cents: number) => (cents / 100).toFixed(2);
 
 @ccclass('CeremonyView')
@@ -30,10 +35,18 @@ export class CeremonyView extends Component {
   private badgeLabel!: Label;
   private dim!: UIOpacity;
   private shakeNode: Node | null = null;
+  private shakeBase: { pos: Vec3; angle: number; scale: Vec3 } | null = null;
 
   /** Build the (hidden) overlay + a fullscreen dim used for the micro-silence beat. */
   build(shakeNode: Node): void {
     this.shakeNode = shakeNode;
+    // Snapshot the shake target's resting transform ONCE so an interrupted shake
+    // always resets to the true base (not a mid-shake position captured at call-time).
+    this.shakeBase = {
+      pos: shakeNode.position.clone(),
+      angle: shakeNode.angle,
+      scale: shakeNode.scale.clone(),
+    };
 
     // fullscreen dim behind the panel (held-breath beat)
     const dimNode = this.mk('dim', 4000, 4000, this.node);
@@ -49,20 +62,20 @@ export class CeremonyView extends Component {
     ov.active = false;
 
     const g = ov.addComponent(Graphics);
-    g.fillColor = new Color(8, 8, 10, 240);
+    g.fillColor = new Color(18, 9, 30, 244); // deep violet glass
     g.roundRect(-278, -160, 556, 320, 16);
     g.fill();
     g.lineWidth = 6;
-    g.strokeColor = ACID;
+    g.strokeColor = RIM;
     g.roundRect(-278, -160, 556, 320, 16);
     g.stroke();
-    g.fillColor = ACID; // hazard bars
+    g.fillColor = RIM; // magenta accent bars
     g.rect(-278, 150, 556, 8);
     g.rect(-278, -158, 556, 8);
     g.fill();
 
-    this.headerLabel = this.mkLabel(ov, 0, 86, 52, ACID);
-    this.amountLabel = this.mkLabel(ov, 0, -10, 60, ACID);
+    this.headerLabel = this.mkLabel(ov, 0, 86, 52, TITLE);
+    this.amountLabel = this.mkLabel(ov, 0, -10, 60, CRYSTAL);
     this.badgeLabel = this.mkLabel(ov, 210, 96, 34, Color.WHITE);
 
     this.overlay = ov;
@@ -70,6 +83,7 @@ export class CeremonyView extends Component {
 
   /** Show the tiered ceremony for a win. Returns false (HUD only) for small wins. */
   show(winCents: number, betCents: number, multiplier = 1): boolean {
+    this.abort(); // kill any in-flight ceremony so a rapid re-win cleanly replaces it
     const multiple = betCents > 0 ? winCents / betCents : 0;
     const tier = resolveBigWinTier(multiple);
     if (!tier) return false;
@@ -99,8 +113,9 @@ export class CeremonyView extends Component {
 
   /** Feature-unlocked splash (reuses the overlay). */
   showFeatureUnlocked(name: string): void {
+    this.abort();
     this.headerLabel.string = name;
-    this.headerLabel.color = ACID;
+    this.headerLabel.color = TITLE;
     this.amountLabel.string = 'FEATURE';
     this.badgeLabel.string = '';
     const ov = this.overlay;
@@ -135,15 +150,48 @@ export class CeremonyView extends Component {
 
   private shake(amp: number): void {
     const n = this.shakeNode;
-    if (!n) return;
-    const p = n.position.clone();
+    const b = this.shakeBase;
+    if (!n || !b) return;
+    Tween.stopAllByTarget(n);
+    const at = (dx: number, dy: number) => new Vec3(b.pos.x + dx, b.pos.y + dy, b.pos.z);
+    const punch = new Vec3(b.scale.x * 1.03, b.scale.y * 1.03, b.scale.z);
+    // 3-axis impact: horizontal + vertical kick, a small angle snap, and a zoom punch
+    // that all decay back to the resting base — reads as a HIT, not a slide.
     tween(n)
-      .to(0.04, { position: new Vec3(p.x + amp, p.y, 0) })
-      .to(0.04, { position: new Vec3(p.x - amp * 0.8, p.y, 0) })
-      .to(0.04, { position: new Vec3(p.x + amp * 0.5, p.y, 0) })
-      .to(0.04, { position: new Vec3(p.x - amp * 0.3, p.y, 0) })
-      .to(0.04, { position: new Vec3(p.x, p.y, 0) })
+      .to(0.04, { position: at(amp, amp * 0.55), angle: b.angle + 1.5, scale: punch })
+      .to(0.04, { position: at(-amp * 0.8, -amp * 0.4), angle: b.angle - 1.1 })
+      .to(0.04, {
+        position: at(amp * 0.5, amp * 0.25),
+        angle: b.angle + 0.6,
+        scale: b.scale.clone(),
+      })
+      .to(0.04, { position: at(-amp * 0.3, -amp * 0.15), angle: b.angle - 0.3 })
+      .to(
+        0.05,
+        { position: b.pos.clone(), angle: b.angle, scale: b.scale.clone() },
+        { easing: 'quadOut' },
+      )
       .start();
+  }
+
+  /** Kill any in-flight ceremony cleanly (on re-trigger + from SlotView's spin entry). */
+  abort(): void {
+    if (this.dim) Tween.stopAllByTarget(this.dim);
+    if (this.overlay) Tween.stopAllByTarget(this.overlay);
+    if (this.shakeNode) {
+      Tween.stopAllByTarget(this.shakeNode);
+      if (this.shakeBase) {
+        this.shakeNode.setPosition(this.shakeBase.pos);
+        this.shakeNode.angle = this.shakeBase.angle;
+        this.shakeNode.setScale(this.shakeBase.scale);
+      }
+    }
+    this.unscheduleAllCallbacks();
+    if (this.dim) this.dim.opacity = 0;
+    if (this.overlay) {
+      this.overlay.active = false;
+      this.overlay.setScale(1, 1, 1);
+    }
   }
 
   private mk(name: string, w: number, h: number, parent: Node): Node {

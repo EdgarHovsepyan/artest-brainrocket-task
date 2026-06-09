@@ -32,13 +32,14 @@ import { AudioManager } from './audio-manager';
 
 const { ccclass } = _decorator;
 
-// ---- Palette: industrial brutalism — acid on jet black ----------------------
-const ACID = new Color(234, 255, 0, 255);
-const INK = new Color(10, 10, 8, 255);
-const PLATE = new Color(18, 18, 14, 255);
-const PLATE_EDGE = new Color(60, 64, 40, 255);
-const SHADOW = new Color(0, 0, 0, 160);
-const MUTED = new Color(150, 150, 135, 255);
+// ---- Palette: SHINING-POP crystal-violet — magenta on deep violet (was acid/black) ----
+// Names kept for minimal churn; values repointed to the shining-pop identity (palette.ts).
+const ACID = new Color(255, 0, 127, 255); // primary magenta accent (#ff007f)
+const INK = new Color(20, 10, 32, 255); // deep violet glass fill (#140a20)
+const PLATE = new Color(25, 17, 64, 255); // HUD panel violet (#191140)
+const PLATE_EDGE = new Color(184, 111, 218, 255); // orchid rim (#b86fda)
+const SHADOW = new Color(5, 2, 12, 170); // obsidian shadow
+const MUTED = new Color(201, 206, 216, 255); // white-smoke caption (kill purple text)
 
 const SYM_RES = [
   'sym_wild',
@@ -287,18 +288,25 @@ export class SlotView extends Component {
   private buildBackground(): void {
     const base = this.mkNode('bg', 2600, 2200, this.node);
     const bg = base.addComponent(Graphics);
-    bg.fillColor = new Color(7, 7, 9, 255);
+    bg.fillColor = new Color(10, 6, 16, 255); // deep violet base (#0a0610)
     bg.rect(-1300, -1100, 2600, 2200);
     bg.fill();
 
     const glow = this.mkNode('bg_glow', 10, 10, this.node);
     glow.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     const gg = glow.addComponent(Graphics);
-    const RINGS = 56;
-    for (let i = RINGS; i > 0; i--) {
-      const t = i / RINGS;
-      gg.fillColor = new Color(234, 255, 0, 1);
-      gg.ellipse(0, 0, 560 * t, 420 * t);
+    // Ambient depth: faint stacked ACID diamonds (NOT rings — VFX-ban compliant).
+    const DIAMONDS = 6;
+    for (let i = DIAMONDS; i > 0; i--) {
+      const t = i / DIAMONDS;
+      const w = 620 * t;
+      const h = 470 * t;
+      gg.fillColor = new Color(255, 90, 156, Math.round(2 + (1 - t) * 7)); // soft pink bloom (#ff5a9c)
+      gg.moveTo(0, -h);
+      gg.lineTo(w, 0);
+      gg.lineTo(0, h);
+      gg.lineTo(-w, 0);
+      gg.close();
       gg.fill();
     }
     tween(glow)
@@ -332,7 +340,7 @@ export class SlotView extends Component {
     sep.setPosition(0, reelCenterY, 0);
     const sg = sep.addComponent(Graphics);
     sg.lineWidth = 2;
-    sg.strokeColor = new Color(234, 255, 0, 26);
+    sg.strokeColor = new Color(184, 111, 218, 30); // orchid hairline
     for (let r = 1; r < GRID.reels; r++) {
       const x = -this.gw / 2 + r * this.pitch - VIEW_CONFIG.layout.gap / 2;
       sg.moveTo(x, -this.gh / 2 + 6);
@@ -382,7 +390,16 @@ export class SlotView extends Component {
     } else {
       const g = n.addComponent(Graphics);
       g.fillColor = ACID;
-      g.circle(0, 0, size / 2);
+      // faceted octagon (NOT a circle — VFX-ban compliant)
+      const rad = size / 2;
+      for (let k = 0; k < 8; k++) {
+        const a = (Math.PI / 4) * k - Math.PI / 8;
+        const px = Math.cos(a) * rad;
+        const py = Math.sin(a) * rad;
+        if (k === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      }
+      g.close();
       g.fill();
       this.mkLabel('SPIN', 0, 0, 28, INK, n);
     }
@@ -661,6 +678,10 @@ export class SlotView extends Component {
     this.audio.setMuted(muted);
   }
 
+  setVolume(v: number): void {
+    this.audio.setVolume(v);
+  }
+
   // ---- winning-line overlay -------------------------------------------------
   private cellCenter(reel: number, row: number): Vec3 {
     const { cell, reelCenterY } = VIEW_CONFIG.layout;
@@ -685,7 +706,7 @@ export class SlotView extends Component {
       g.stroke();
     };
     stroke(bright ? 12 : 8, new Color(0, 0, 0, bright ? 210 : 120));
-    stroke(bright ? 6 : 4, bright ? ACID : new Color(234, 255, 0, 110));
+    stroke(bright ? 6 : 4, bright ? ACID : new Color(255, 90, 156, 130)); // magenta win-line
   }
 
   private cycleWinLine = (): void => {
