@@ -3643,10 +3643,15 @@
     })();
   }
   function modalSnap(card, bg){
-    // Cancel any tween + jump to rest state
+    // Cancel any tween + jump to rest state. The caller re-runs its layout
+    // immediately before snapping, so the card ALREADY sits at the correct
+    // rest pose for the CURRENT viewport — re-capture it instead of restoring
+    // _modalBaseY (that store goes stale when the viewport changes while the
+    // modal is open: desktop centre y≈338 restored onto Popout S H=225 parks
+    // the whole panel below the screen). Honor _fitScale like modalIn does.
     _modalTok.set(card, (_modalTok.get(card) || 0) + 1);
-    card.scale.set(1); card.alpha = 1; bg.alpha = 1;
-    if(_modalBaseY.has(card)) card.y = _modalBaseY.get(card);
+    card.scale.set(card._fitScale || 1); card.alpha = 1; bg.alpha = 1;
+    _modalBaseY.set(card, card.y || 0);
   }
   function bonusCostX6(tierIdx){
     return Math.round(State.betX6 * BONUS_TIERS[tierIdx].mult);
@@ -4434,7 +4439,13 @@
     // Was a fixed 560px modal, so autoplay/stats rendered a huge empty void
     // (user: "don't make a bigger modal for little content"). Measure the
     // populated body and shrink the panel to fit -> compact dropdown feel.
+    // Measure with the mask DETACHED (the mask lives on drawerPanel, outside this
+    // subtree) — measuring a masked container whose mask is external makes Pixi
+    // warn "Mask bounds, renderable is not inside the root container" on EVERY
+    // drawer open → production console-silence violation (Stake §4).
+    const _dm = drawerBody.mask; drawerBody.mask = null;
     const contentH = drawerBody.height || 360;
+    drawerBody.mask = _dm;
     drawerWantH = Math.max(190, Math.min(app.screen.height*0.84, contentH + 90));
     layoutDrawer();
     drawerBody._refreshScroll && drawerBody._refreshScroll();   // P0-C: clip + scroll if content still exceeds the capped panel
@@ -6113,10 +6124,12 @@
       if(_rlBuf){
         const ts = this.ctx.currentTime;
         const src = this.ctx.createBufferSource(); src.buffer = _rlBuf; src.loop = true;
+        // gentle lowpass tames harsh hiss so the whoosh sits UNDER the music
+        const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; lp.Q.value = 0.7;
         const sg = this.ctx.createGain();
         sg.gain.setValueAtTime(0, ts);
-        sg.gain.linearRampToValueAtTime(0.5, ts + 0.15);   // fade in, sits under the music
-        src.connect(sg); sg.connect(this.busGameplay);
+        sg.gain.linearRampToValueAtTime(0.34, ts + 0.18);   // softer, sits under the music
+        src.connect(lp); lp.connect(sg); sg.connect(this.busGameplay);
         src.start(ts);
         this.rushSource = { _sample: true, src, gain: sg };
         return;
@@ -6596,6 +6609,32 @@
   // using the SAME shape _stopMusic tears down (voices[].stop / lfo.stop / gain
   // ramp). Returns false if the buffer isn't decoded yet → caller falls back to
   // the procedural synth loop. This is what finally PLAYS the ElevenLabs masters.
+  // ── SEAMLESS-LOOP MAKER — some shipped loops (reel_loop) were exported with a
+  // hard seam (start ≠ end) → a loud click every loop (measured: 0.38 / −8.5 dB).
+  // Rebuild the buffer with an equal-power crossfade so end → start is continuous.
+  // Verifiable: the seam jump drops from 0.38 to ~0 after processing.
+  Sound._makeSeamless = function (buf, fadeSec) {
+    try {
+      if (!this.ctx || !buf) return buf;
+      const sr = buf.sampleRate, ch = buf.numberOfChannels, n = buf.length;
+      const F = Math.min(Math.floor(sr * (fadeSec || 0.12)), (n / 2) | 0);
+      if (F < 8) return buf;
+      const L = n - F;                                   // new seamless loop length
+      const out = this.ctx.createBuffer(ch, L, sr);
+      for (let c = 0; c < ch; c++) {
+        const inD = buf.getChannelData(c), o = out.getChannelData(c);
+        for (let i = 0; i < L; i++) {
+          if (i < F) {
+            const t = i / F, fi = Math.sin(t * Math.PI / 2), fo = Math.cos(t * Math.PI / 2);
+            o[i] = inD[i] * fi + inD[i + L] * fo;        // head crossfaded with tail
+          } else {
+            o[i] = inD[i];
+          }
+        }
+      }
+      return out;
+    } catch (e) { return buf; }
+  };
   Sound._playSampleMusic = function (id, vol, fadeSec) {
     if (State.muted || !this.ctx || !this.busMusic) return false;
     const buf = this.buffers[id];
@@ -6623,6 +6662,10 @@
           const r = await fetch('assets/audio/' + clip.file);
           if (!r.ok) continue;
           this.buffers[clip.id] = await decode(await r.arrayBuffer());
+          // De-click short looped SFX exported with a hard seam (reel_loop etc.)
+          if (clip.loop && (clip.id === 'reel_loop' || clip.id === 'coin_cascade')) {
+            this.buffers[clip.id] = this._makeSeamless(this.buffers[clip.id], 0.12);
+          }
         } catch (e) { /* keep the synth fallback for this id */ }
       }
       // The intro tap fires startIdleMusic() BEFORE these ~400KB loops finish
@@ -6658,7 +6701,12 @@
     };
   };
   _wrapSample('click', 'ui_click', 'busSfx', 0.7);
-  _wrapSample('spinStart', 'spin_start', 'busSfx', 0.8);
+  // spinStart — the shipped spin_start.mp3 is a HARSH METALLIC NOISE burst
+  // (ZCR ~11900, hfRatio 0.64) the user disliked. We do NOT play that sample;
+  // spinStart() keeps its soft procedural press-tick (mellow 840Hz triangle +
+  // 440Hz sine) then the de-clicked, low-passed reel_loop whoosh. Re-enable the
+  // wrap below to restore the recorded clip.
+  // _wrapSample('spinStart', 'spin_start', 'busSfx', 0.5);   // disabled 2026-06-10 (metallic)
   // reelStop — turbo mode plays the snappier turbo_stop master, else reel_stop.
   // (Manual wrap instead of _wrapSample so the clip id can switch on State.turbo.)
   if (typeof Sound.reelStop === 'function') {
