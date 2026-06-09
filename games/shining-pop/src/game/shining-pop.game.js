@@ -426,7 +426,7 @@
     'CASH':'COINS','Cash':'Coins','MONEY':'COINS','Money':'Coins',
     'GAMBLE':'PLAY','Gamble':'Play',
     'WAGER':'PLAY','Wager':'Play',
-    'STAKE':'PLAY AMOUNT','Stake':'Play Amount',
+    'STAKE':'PLAY AMOUNT','Stake':'Play Amount','stake':'play amount',
     'DEPOSIT':'GET COINS','Deposit':'Get Coins',
     'WITHDRAW':'REDEEM','Withdraw':'Redeem',
     'CURRENCY':'TOKEN','Currency':'Token',
@@ -434,6 +434,8 @@
     'PAYOUT':'WIN','Payout':'Win',
     'PAYTABLE':'GAME ODDS','Paytable':'Game Odds',
     'PAYS':'WINS','Pays':'Wins',
+    'PAYLINES':'LINES','Paylines':'Lines','paylines':'lines',
+    'PAYLINE':'LINE','Payline':'Line','payline':'line',
     'MAX BET':'MAX PLAY','Max Bet':'Max Play',
     'Total Bet':'Total Played','Total BET':'Total Played',
     'Base Bet':'Base Play','BASE BET':'BASE PLAY',
@@ -450,8 +452,11 @@
     if(!STAKE.social || s == null) return s;
     if(SOCIAL_TERMS[s]) return SOCIAL_TERMS[s];
     return String(s)
-      .replace(/\bPaytable\b/gi, 'Game Odds')
-      .replace(/\bPays\b/gi, 'Wins')
+      // case-PRESERVING pay* swaps (the old /gi → titlecase mangled UPPERCASE labels)
+      .replace(/\bPAYLINES\b/g, 'LINES').replace(/\bPaylines\b/g, 'Lines').replace(/\bpaylines\b/g, 'lines')
+      .replace(/\bPAYLINE\b/g, 'LINE').replace(/\bPayline\b/g, 'Line').replace(/\bpayline\b/g, 'line')
+      .replace(/\bPAYTABLE\b/g, 'GAME ODDS').replace(/\bPaytable\b/g, 'Game Odds').replace(/\bpaytable\b/g, 'game odds')
+      .replace(/\bPAYS\b/g, 'WINS').replace(/\bPays\b/g, 'Wins').replace(/\bpays\b/g, 'wins')
       .replace(/\b(Bet|Buy|Cash|Money|Gamble|Wager|Stake|Deposit|Withdraw|Currency|Cost|Payout|Purchase)\b/gi, m => SOCIAL_TERMS[m] || m);
   }
 
@@ -4500,8 +4505,8 @@
     // 2-color system: label = smoke-purple-grey (cool secondary text on dark
     // panel), value = SMOKE-WHITE (was gold). Pink reserved for active
     // emphasis only.
-    drText(label,12,0xc9b0e6,0,y);
-    const v = new PIXI.Text({ text:value, style:{ fontFamily:'Luckiest Guy', fontSize:13, fill:0xf5f7fa, letterSpacing:1 }});
+    drText(socialFilter(label),12,0xc9b0e6,0,y);   // social-safe row label (gate S4)
+    const v = new PIXI.Text({ text:socialFilter(value), style:{ fontFamily:'Luckiest Guy', fontSize:13, fill:0xf5f7fa, letterSpacing:1 }});
     v.anchor.set(1,0); v.position.set(rowW,y); drawerBody.addChild(v); return v;
   }
   function populateDrawer(name){
@@ -5060,7 +5065,7 @@
                 : recoverable ? 'BET NOT ACCEPTED' : 'CONNECTION ERROR';
     const msg = RGS_ERR_MSG[code] || (err && err.message ? String(err.message).slice(0,120) : 'Could not reach the game server.');
     if(recoverable){ State.phase = Phase.IDLE; try { updateHUD(); } catch(e){} }
-    showError(title, msg, !recoverable);
+    showError(socialFilter(title), socialFilter(msg), !recoverable);   // social-safe popup (gate S2)
   }
 
   // ── REPLAY OVERLAY ────────────────────────────────────────────
@@ -9423,7 +9428,7 @@
     } else {
       cost = wager = State.betX6;
     }
-    if(State.balanceX6 < cost) return;
+    if(State.balanceX6 < cost){ try { routeRgsError({ code:'ERR_IPB' }); } catch(e){} return; }   // dismissible notice, not a silent no-op (gate U8)
     // LOCK synchronously — BEFORE the RGS await — so a second trigger (Space,
     // swipe, autoplay timer, spin tap) arriving during the in-flight
     // /wallet/play can never slip a concurrent bet through. This is the race
