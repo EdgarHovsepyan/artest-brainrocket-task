@@ -77,6 +77,14 @@ export interface AutoplayPanelConfig {
 
 export type AutoplayOptionKey = 'stopOnFeature' | 'stopOnBigWin';
 
+export interface SettingsPanelConfig {
+  soundOn: boolean;
+  turboMode: 0 | 1 | 2;
+  reducedFx: boolean;
+}
+
+export type SettingsKey = 'sound' | 'turboMode' | 'reducedFx';
+
 @ccclass('SlotView')
 export class SlotView extends Component {
   private frames: SpriteFrame[] = [];
@@ -103,6 +111,10 @@ export class SlotView extends Component {
   private autoplayPanel: Node | null = null;
   private autoplayStartCb: ((spins: number) => void) | null = null;
   private autoplayOptionCb: ((key: AutoplayOptionKey, value: boolean) => void) | null = null;
+  private settingsPanel: Node | null = null;
+  private settingsChangeCb: ((key: SettingsKey, value: number | boolean) => void) | null = null;
+  private menuHub: Node | null = null;
+  private reducedFx = false;
 
   private spinCb: (() => void) | null = null;
   private buyCb: ((mode: string) => void) | null = null;
@@ -568,11 +580,143 @@ export class SlotView extends Component {
   }
 
   openAutoplayPanel(): void {
+    this.closeOverlays();
     if (this.autoplayPanel) this.autoplayPanel.active = true;
   }
 
   closeAutoplayPanel(): void {
     if (this.autoplayPanel) this.autoplayPanel.active = false;
+  }
+
+  // ---- settings panel (parity port of the master's SETTINGS drawer) ----------
+  /** (Re)build: Sound toggle · Turbo Speed OFF/TURBO/MEGA pills · Reduced Effects.
+   *  Rebuilt by the Controller on every change (master parity: drawer re-populates). */
+  configureSettingsPanel(cfg: SettingsPanelConfig): void {
+    const wasOpen = this.settingsPanel?.active ?? false;
+    this.settingsPanel?.destroy();
+    const w = 380;
+    const h = 92 + 3 * 62;
+    const panel = this.mkNode('settingsPanel', w, h, this.node);
+    panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    panel.active = wasOpen;
+    const bg = panel.addComponent(Graphics);
+    bg.fillColor = new Color(8, 8, 10, 245);
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.fill();
+    bg.lineWidth = 4;
+    bg.strokeColor = ACID;
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.stroke();
+    this.mkLabel('SETTINGS', 0, h / 2 - 28, 22, ACID, panel);
+    const row = (label: string, desc: string, y: number) => {
+      const l = this.mkLabel(label, -64, y + 8, 14, MUTED, panel);
+      l.horizontalAlign = Label.HorizontalAlign.LEFT;
+      const d = this.mkLabel(desc, -64, y - 12, 10, MUTED, panel);
+      d.horizontalAlign = Label.HorizontalAlign.LEFT;
+    };
+    let y = h / 2 - 78;
+    row('Sound', 'SFX & win audio', y);
+    this.mkTextButton(
+      cfg.soundOn ? 'ON' : 'OFF',
+      w / 2 - 64,
+      y,
+      72,
+      36,
+      () => this.settingsChangeCb?.('sound', !cfg.soundOn),
+      panel,
+    ).setActive(cfg.soundOn);
+    y -= 62;
+    row('Turbo Speed', 'Spin pacing — affects auto delay', y);
+    (['OFF', 'TURBO', 'MEGA'] as const).forEach((name, mode) => {
+      this.mkTextButton(
+        name,
+        w / 2 - 178 + mode * 62,
+        y,
+        56,
+        32,
+        () => this.settingsChangeCb?.('turboMode', mode),
+        panel,
+      ).setActive(cfg.turboMode === mode);
+    });
+    y -= 62;
+    row('Reduced Effects', 'Less motion & particles', y);
+    this.mkTextButton(
+      cfg.reducedFx ? 'ON' : 'OFF',
+      w / 2 - 64,
+      y,
+      72,
+      36,
+      () => this.settingsChangeCb?.('reducedFx', !cfg.reducedFx),
+      panel,
+    ).setActive(cfg.reducedFx);
+    this.settingsPanel = panel;
+  }
+
+  openSettingsPanel(): void {
+    this.closeOverlays();
+    if (this.settingsPanel) this.settingsPanel.active = true;
+  }
+
+  closeSettingsPanel(): void {
+    if (this.settingsPanel) this.settingsPanel.active = false;
+  }
+
+  // ---- MENU hub (master pending item: menu shows more than one destination) --
+  /** Small hub the bar's menu glyph opens: BUY FEATURE / SETTINGS / AUTOPLAY. */
+  openMenuHub(): void {
+    if (!this.menuHub) this.menuHub = this.buildMenuHub();
+    this.closeOverlays();
+    this.menuHub.active = true;
+  }
+
+  private buildMenuHub(): Node {
+    const entries: [string, () => void][] = [
+      ['BUY FEATURE', () => this.openBuyMenu()],
+      ['SETTINGS', () => this.openSettingsPanel()],
+      ['AUTOPLAY', () => this.openAutoplayPanel()],
+    ];
+    const w = 300;
+    const h = 64 + entries.length * 60;
+    const hub = this.mkNode('menuHub', w, h, this.node);
+    hub.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    hub.active = false;
+    const bg = hub.addComponent(Graphics);
+    bg.fillColor = new Color(8, 8, 10, 245);
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.fill();
+    bg.lineWidth = 4;
+    bg.strokeColor = ACID;
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.stroke();
+    this.mkLabel('MENU', 0, h / 2 - 26, 20, ACID, hub);
+    entries.forEach(([label, open], i) => {
+      this.mkTextButton(
+        label,
+        0,
+        h / 2 - 78 - i * 60,
+        240,
+        46,
+        () => {
+          hub.active = false;
+          open();
+        },
+        hub,
+      );
+    });
+    return hub;
+  }
+
+  /** Hide every floating panel (one overlay at a time, master parity). */
+  closeOverlays(): void {
+    this.closeBuyMenu();
+    if (this.autoplayPanel) this.autoplayPanel.active = false;
+    if (this.settingsPanel) this.settingsPanel.active = false;
+    if (this.menuHub) this.menuHub.active = false;
+  }
+
+  /** Reduced-effects accessibility flag — gates particles + anticipation drag. */
+  setReducedFx(on: boolean): void {
+    this.reducedFx = on;
   }
 
   // ---- public API the Controller drives ------------------------------------
@@ -593,6 +737,9 @@ export class SlotView extends Component {
   }
   onAutoplayOption(cb: (key: AutoplayOptionKey, value: boolean) => void): void {
     this.autoplayOptionCb = cb;
+  }
+  onSettingsChange(cb: (key: SettingsKey, value: number | boolean) => void): void {
+    this.settingsChangeCb = cb;
   }
   onSoundClicked(cb: () => void): void {
     this.soundCb = cb;
@@ -667,7 +814,7 @@ export class SlotView extends Component {
 
     let earlyWilds = 0;
     for (let r = 0; r < 3; r++) for (const id of grid[r]) if (id === SYMBOLS.WILD) earlyWilds++;
-    const antic = earlyWilds >= minEarlyWilds;
+    const antic = earlyWilds >= minEarlyWilds && !this.reducedFx;
 
     this.audio.reelTick();
     await Promise.all(
@@ -763,6 +910,7 @@ export class SlotView extends Component {
 
   /** Shard burst from the winning cells, scaled by win/total-bet multiple. */
   burstParticles(result: SpinResult, multiple: number): void {
+    if (this.reducedFx) return;
     const centers: Vec3[] = [];
     const seen = new Set<string>();
     for (const w of result.lineWins) {

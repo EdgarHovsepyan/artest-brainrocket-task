@@ -53,7 +53,8 @@ export class SlotController extends Component {
 
   private state: FlowState = 'idle';
   private canStop = false;
-  private turbo = false;
+  private turboMode: 0 | 1 | 2 = 0;
+  private reducedFx = false;
   private autoplay: AutoplayState = idleAutoplay();
   private muted = false;
 
@@ -87,6 +88,8 @@ export class SlotController extends Component {
       this.refreshAutoplayPanel();
       this.view.openAutoplayPanel();
     });
+    this.refreshSettingsPanel();
+    this.view.onSettingsChange((key, value) => this.applySetting(key, value));
 
     // Shared betting bar = the only on-screen controls; buy-bonus is game state.
     const barNode = new Node('BettingBar');
@@ -99,7 +102,7 @@ export class SlotController extends Component {
     this.bar.on('autoplay', () => this.toggleAuto());
     this.bar.on('sound', () => this.toggleSound());
     this.bar.on('volume', (v: number) => this.view.setVolume(v));
-    this.bar.on('menu', () => this.view.openBuyMenu());
+    this.bar.on('menu', () => this.view.openMenuHub());
 
     // Defer HUD writes one frame so the bar's onLoad has built its labels.
     this.scheduleOnce(() => {
@@ -143,19 +146,60 @@ export class SlotController extends Component {
     input.off(Input.EventType.KEY_DOWN, this.onKey, this);
   }
 
+  /** Master keyboard map: Space spin · A autoplay · T turbo · M mute · B buy · S settings. */
   private onKey(e: EventKeyboard): void {
     if (e.keyCode === KeyCode.SPACE) this.onSpinPressed();
     else if (e.keyCode === KeyCode.KEY_A) this.toggleAuto();
+    else if (e.keyCode === KeyCode.KEY_T) this.toggleTurbo();
+    else if (e.keyCode === KeyCode.KEY_M) this.toggleSound();
+    else if (e.keyCode === KeyCode.KEY_B) this.view.openBuyMenu();
+    else if (e.keyCode === KeyCode.KEY_S) this.view.openSettingsPanel();
   }
 
   private fmt(cents: number): string {
     return (cents / 100).toFixed(2);
   }
 
+  /** Bar turbo control cycles OFF -> TURBO -> MEGA -> OFF (master tri-state). */
   private toggleTurbo(): void {
-    this.turbo = !this.turbo;
-    this.view.setTurboVisual(this.turbo);
-    this.bar.setTurbo(this.turbo ? 1 : 0);
+    this.setTurboMode(((this.turboMode + 1) % 3) as 0 | 1 | 2);
+  }
+
+  private setTurboMode(mode: 0 | 1 | 2): void {
+    this.turboMode = mode;
+    this.view.setTurboVisual(mode > 0);
+    this.bar.setTurbo(mode);
+    this.refreshSettingsPanel();
+  }
+
+  /** Reel-duration scalar per turbo mode (view-config table). */
+  private turboScalar(): number {
+    const t = VIEW_CONFIG.turbo;
+    return [t.off, t.turbo, t.max][this.turboMode];
+  }
+
+  private applySetting(key: 'sound' | 'turboMode' | 'reducedFx', value: number | boolean): void {
+    if (key === 'sound') {
+      this.muted = !value;
+      this.view.setMuted(this.muted);
+      this.view.setSoundVisual(this.muted);
+      this.bar.setSoundOn(!this.muted);
+    } else if (key === 'turboMode') {
+      this.setTurboMode(value as 0 | 1 | 2);
+    } else {
+      this.reducedFx = value as boolean;
+      this.view.setReducedFx(this.reducedFx);
+    }
+    this.refreshSettingsPanel();
+    this.view.openSettingsPanel();
+  }
+
+  private refreshSettingsPanel(): void {
+    this.view.configureSettingsPanel({
+      soundOn: !this.muted,
+      turboMode: this.turboMode,
+      reducedFx: this.reducedFx,
+    });
   }
 
   private toggleSound(): void {
@@ -226,7 +270,7 @@ export class SlotController extends Component {
     this.view.setBalance(outcome.balanceCents);
     this.bar.setBalance(outcome.balanceCents / 100);
 
-    await this.view.playSpin(outcome.result.grid, this.turbo ? VIEW_CONFIG.bonus.speedMul : 1);
+    await this.view.playSpin(outcome.result.grid, this.turboScalar());
 
     this.state = 'resolving';
     if (outcome.wildStrike > 1) this.view.setBanner(`WILD ×${outcome.wildStrike}`);
@@ -256,7 +300,7 @@ export class SlotController extends Component {
         });
         if (verdict.stop) this.stopAuto();
         else {
-          const d = interSpinDelayMs(this.turbo ? 1 : 0);
+          const d = interSpinDelayMs(this.turboMode);
           this.scheduleOnce(() => {
             if (this.autoplay.active && this.state === 'idle') this.onSpinPressed();
           }, d / 1000);
