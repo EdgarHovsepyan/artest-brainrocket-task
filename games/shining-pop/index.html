@@ -82,7 +82,9 @@ canvas{display:block;
   transition:opacity .42s cubic-bezier(.16,1,.3,1)}
 #loader.gone{opacity:0;pointer-events:none}
 #loader .lwrap{position:relative;display:flex;flex-direction:column;
-  align-items:center;gap:34px}
+  align-items:center;gap:34px;
+  /* Beat 1 — soft branded arrival (web-animations: ease-out entrance) */
+  animation:lin .6s cubic-bezier(.16,1,.3,1) both}
 #loader .llogo{width:min(70vw,420px);max-height:50vh;object-fit:contain;
   mix-blend-mode:screen;
   animation:lbreathe 2.6s ease-in-out infinite}
@@ -91,16 +93,29 @@ canvas{display:block;
    game-logo loader"). The HTML #loader is now the SOLE loading screen;
    the branded Pixi popLoader (game logo) is skipped at the call site. */
 #loader .lgroup{display:flex;flex-direction:column;align-items:center;gap:13px}
-#loader .lbar{display:block;width:min(62vw,300px);height:5px;border-radius:3px;
+#loader .lbar{position:relative;display:block;width:min(62vw,300px);height:5px;border-radius:3px;
   background:rgba(255,255,255,.10);overflow:hidden;
   box-shadow:inset 0 0 0 1px rgba(255,0,127,.20)}
-#loader .lfill{height:100%;width:0;border-radius:3px;
+#loader .lfill{height:100%;width:0;border-radius:3px;position:relative;z-index:1;
   background:linear-gradient(90deg,#ff007f,#ff5a9c,#ffce47);
-  box-shadow:0 0 10px rgba(255,0,127,.55)}
+  box-shadow:0 0 10px rgba(255,0,127,.55);
+  /* Beat 2 — ease real Assets.load() jumps so the bar glides, never stutters */
+  transition:width .35s cubic-bezier(.16,1,.3,1)}
+/* Beat 2 — perpetual shine sweep across the track = "alive while loading" */
+#loader .lshine{position:absolute;top:0;left:0;height:100%;width:38%;z-index:2;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);
+  animation:lscan 1.5s ease-in-out infinite}
 #loader .lp{display:block;font:600 11px/1 'Fredoka',system-ui,sans-serif;
   letter-spacing:3px;color:rgba(255,255,255,.5);text-transform:uppercase}
 @keyframes lbreathe{0%,100%{transform:scale(1);opacity:.94}50%{transform:scale(1.035);opacity:1}}
 @keyframes lscan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes lin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  #loader .lwrap{animation:none}
+  #loader .lshine{animation:none;opacity:0}
+  #loader .llogo{animation:none}
+}
 @keyframes ldotpulse{0%,100%{opacity:.45}50%{opacity:1}}
 </style>
 </head>
@@ -116,7 +131,7 @@ canvas{display:block;
   <div class="lwrap">
     <div class="llogo" style="display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-weight:800;letter-spacing:2px;color:#eaff00;font-size:34px;text-align:center;">ARTEST<span style="color:#9a8d6f;font-weight:600;">&nbsp;| BrainRocket</span></div>
     <div class="lgroup">
-      <div class="lbar"><div class="lfill" id="lfill"></div></div>
+      <div class="lbar"><div class="lfill" id="lfill"></div><i class="lshine"></i></div>
       <div class="lp" id="lprog">LOADING</div>
     </div>
   </div>

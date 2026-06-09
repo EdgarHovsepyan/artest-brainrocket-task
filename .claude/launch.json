@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "slot-pixi-1",
+      "name": "shining-pop",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@artest/slot-pixi-1", "dev"],
+      "runtimeArgs": ["--filter", "@artest/shining-pop", "dev"],
       "port": 5173
     }
   ]
