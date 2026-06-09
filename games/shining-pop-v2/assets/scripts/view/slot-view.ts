@@ -29,6 +29,7 @@ import {
   RULES_LINES,
   VOLATILITY_DISPLAY,
 } from '../logic/info-content';
+import { createRng } from '../logic/rng';
 import { SpinResult } from '../logic/types';
 import { winningCellsByReel } from '../logic/win-cells';
 import { VIEW_CONFIG } from './view-config';
@@ -325,6 +326,44 @@ export class SlotView extends Component {
     bg.fillColor = new Color(10, 6, 16, 255); // deep violet base (#0a0610)
     bg.rect(-1300, -1100, 2600, 2200);
     bg.fill();
+    // Vertical depth wash — three stacked translucent bands approximate the
+    // master's painted gradient (lighter horizon behind the reels, dark floor).
+    bg.fillColor = new Color(40, 22, 78, 70); // indigo horizon
+    bg.rect(-1300, -120, 2600, 620);
+    bg.fill();
+    bg.fillColor = new Color(25, 17, 64, 90); // mid violet
+    bg.rect(-1300, -560, 2600, 440);
+    bg.fill();
+    bg.fillColor = new Color(4, 2, 8, 130); // floor shadow
+    bg.rect(-1300, -1100, 2600, 460);
+    bg.fill();
+
+    // Bokeh field — deterministic scatter of soft candy diamonds (no circles).
+    // Seeded RNG so every boot composes identically.
+    const dots = this.mkNode('bg_bokeh', 10, 10, this.node);
+    const dg = dots.addComponent(Graphics);
+    const rng = createRng(20260610).next;
+    for (let i = 0; i < 30; i++) {
+      const x = (rng() - 0.5) * 1500;
+      const y = (rng() - 0.5) * 1100;
+      const r = 4 + rng() * 14;
+      const warm = rng() > 0.55;
+      dg.fillColor = warm
+        ? new Color(255, 90, 156, Math.round(10 + rng() * 22)) // pink candy
+        : new Color(120, 200, 255, Math.round(8 + rng() * 16)); // cool sparkle
+      dg.moveTo(x, y - r);
+      dg.lineTo(x + r, y);
+      dg.lineTo(x, y + r);
+      dg.lineTo(x - r, y);
+      dg.close();
+      dg.fill();
+    }
+    tween(dots)
+      .to(3.4, { position: new Vec3(0, 10, 0) }, { easing: 'sineInOut' })
+      .to(3.4, { position: new Vec3(0, 0, 0) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
 
     const glow = this.mkNode('bg_glow', 10, 10, this.node);
     glow.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
@@ -349,11 +388,60 @@ export class SlotView extends Component {
       .union()
       .repeatForever()
       .start();
+
+    // Directional corner vignette — pulls the eye to the board (master ART-04).
+    const vig = this.mkNode('bg_vignette', 10, 10, this.node);
+    const vg = vig.addComponent(Graphics);
+    vg.fillColor = new Color(0, 0, 0, 110);
+    [
+      [-1300, 1100, 1, -1],
+      [1300, 1100, -1, -1],
+      [-1300, -1100, 1, 1],
+      [1300, -1100, -1, 1],
+    ].forEach(([cx, cy, dx, dy]) => {
+      vg.moveTo(cx, cy);
+      vg.lineTo(cx + dx * 560, cy);
+      vg.lineTo(cx, cy + dy * 420);
+      vg.close();
+      vg.fill();
+    });
   }
 
   private buildTitle(): void {
-    this.mkLabel('SLOT', 0, 332, 40, ACID);
-    this.mkLabel('5 REELS · 3 ROWS · 10 LINES · WILD STRIKE', 0, 300, 13, MUTED);
+    // Brand-family logo block (master parity: stacked playful logo, not "SLOT").
+    const logo = this.mkNode('logo', 360, 110, this.node);
+    logo.setPosition(0, 322, 0);
+    const back = logo.addComponent(Graphics);
+    back.fillColor = new Color(255, 0, 127, 26); // soft magenta plate behind the logo
+    back.roundRect(-185, -40, 370, 84, 18);
+    back.fill();
+    const shining = this.mkLabel('SHINING', 0, 22, 30, new Color(245, 247, 250, 255), logo);
+    shining.isItalic = true;
+    const pop = this.mkLabel('POP  V2', 0, -12, 34, ACID, logo);
+    pop.isItalic = true;
+    const gg = this.mkNode('logo_gems', 10, 10, logo).addComponent(Graphics);
+    [-208, 208].forEach((x) => {
+      gg.fillColor = new Color(255, 90, 156, 200);
+      gg.moveTo(x, 14);
+      gg.lineTo(x + 9, 2);
+      gg.lineTo(x, -10);
+      gg.lineTo(x - 9, 2);
+      gg.close();
+      gg.fill();
+    });
+    tween(logo)
+      .to(1.8, { scale: new Vec3(1.025, 1.025, 1) }, { easing: 'sineInOut' })
+      .to(1.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+    this.mkLabel(
+      `MAX WIN ${maxWinMultiple().toLocaleString('en-US')}× · 10 LINES · WILD STRIKE`,
+      0,
+      258,
+      12,
+      MUTED,
+    );
   }
 
   private buildFrame(): void {
@@ -363,16 +451,63 @@ export class SlotView extends Component {
     const frame = this.mkNode('frame', w, h, this.node);
     frame.setPosition(0, reelCenterY, 0);
     const g = frame.addComponent(Graphics);
-    g.lineWidth = 4;
-    g.strokeColor = ACID;
+    // Drop shadow grounds the board on the bg (master: every panel floats on shadow).
+    g.fillColor = new Color(0, 0, 0, 150);
+    g.roundRect(-w / 2 - 6, -h / 2 - 12, w + 12, h + 8, 16);
+    g.fill();
+    // Chrome bezel — violet plate around the glass window.
+    g.fillColor = new Color(25, 17, 64, 255);
+    g.roundRect(-w / 2 - 8, -h / 2 - 8, w + 16, h + 16, 16);
+    g.fill();
+    // Inner glass window.
     g.fillColor = INK;
     g.roundRect(-w / 2, -h / 2, w, h, 10);
     g.fill();
+    // Dual border: hot magenta outside, crystal highlight inside (dispersion rim).
+    g.lineWidth = 4;
+    g.strokeColor = ACID;
+    g.roundRect(-w / 2 - 8, -h / 2 - 8, w + 16, h + 16, 16);
     g.stroke();
+    g.lineWidth = 1.5;
+    g.strokeColor = new Color(240, 224, 255, 90);
+    g.roundRect(-w / 2 + 2, -h / 2 + 2, w - 4, h - 4, 8);
+    g.stroke();
+    // Glossy top sheen inside the window.
+    g.fillColor = new Color(255, 255, 255, 12);
+    g.roundRect(-w / 2 + 4, h / 2 - 26, w - 8, 22, 8);
+    g.fill();
+    // Corner gems (faceted diamonds — the brand accent, no circles).
+    const gem = (cx: number, cy: number) => {
+      g.fillColor = new Color(255, 90, 156, 235);
+      g.moveTo(cx, cy + 10);
+      g.lineTo(cx + 8, cy);
+      g.lineTo(cx, cy - 10);
+      g.lineTo(cx - 8, cy);
+      g.close();
+      g.fill();
+      g.fillColor = new Color(255, 255, 255, 120);
+      g.moveTo(cx, cy + 4);
+      g.lineTo(cx + 3, cy);
+      g.lineTo(cx, cy - 4);
+      g.lineTo(cx - 3, cy);
+      g.close();
+      g.fill();
+    };
+    gem(-w / 2 - 8, h / 2 + 8);
+    gem(w / 2 + 8, h / 2 + 8);
+    gem(-w / 2 - 8, -h / 2 - 8);
+    gem(w / 2 + 8, -h / 2 - 8);
 
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
     const sg = sep.addComponent(Graphics);
+    // Alternating glass columns lift the symbols off the dark window.
+    for (let r = 0; r < GRID.reels; r++) {
+      const x = -this.gw / 2 + r * this.pitch;
+      sg.fillColor = new Color(255, 255, 255, r % 2 ? 5 : 9);
+      sg.roundRect(x, -this.gh / 2, VIEW_CONFIG.layout.cell, this.gh, 6);
+      sg.fill();
+    }
     sg.lineWidth = 2;
     sg.strokeColor = new Color(184, 111, 218, 30); // orchid hairline
     for (let r = 1; r < GRID.reels; r++) {

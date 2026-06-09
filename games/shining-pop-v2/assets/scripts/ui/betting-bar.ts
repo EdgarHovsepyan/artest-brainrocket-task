@@ -558,9 +558,13 @@ export class BettingBarMobile extends Component {
     return this;
   }
   fit(viewW: number, viewH: number): void {
+    // Parent is the Canvas root — origin at SCREEN CENTRE, not bottom-left.
+    // The bar is a 540x684 anchor-(0,1) surface: centre it by offsetting half
+    // its scaled size from the canvas origin (the old bottom-left math parked
+    // the whole bar half a viewport to the right).
     const s = Math.min(viewW / W, viewH / H);
     this.node.setScale(s, s, 1);
-    this.node.setPosition(new Vec3((viewW - W * s) / 2, (viewH - H * s) / 2 + H * s, 0));
+    this.node.setPosition(new Vec3((-W * s) / 2, (H * s) / 2, 0));
   }
   private fmt(n: number): string {
     return n.toLocaleString('en-US');
