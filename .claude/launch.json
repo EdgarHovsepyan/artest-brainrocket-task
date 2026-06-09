@@ -6,6 +6,16 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@artest/shining-pop", "dev"],
       "port": 5173
+    },
+    {
+      "name": "shining-pop-v2-build",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "D:\\artest\\.claude\\static-server.js",
+        "4600",
+        "D:\\projects\\artest-brainrocket\\games\\shining-pop-v2\\build\\web-mobile"
+      ],
+      "port": 4600
     }
   ]
 }
