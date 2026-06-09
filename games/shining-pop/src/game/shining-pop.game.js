@@ -6103,6 +6103,11 @@
       if(tier <= 1) return;     // RETURNED / no-win — silent (UKGC LDW)
       this.ensure();
       this._duckMusic(tier);
+      // Prefer the ElevenLabs win-celebration SAMPLE matched to the win TYPE
+      // (small/nice/big/mega/epic) so the sound fits the celebration; fall back to
+      // the procedural orchestral stack only if it isn't decoded yet. (2026-06-09)
+      const _wid = tier >= 6 ? 'win_epic' : tier >= 5 ? 'win_mega' : tier >= 4 ? 'win_big' : tier >= 3 ? 'win_nice' : 'win_small';
+      if(this._playSample(_wid, 'busWin', 0.95)) return;
       // Layer schedule: [rootFreq, intervals, dur, type, vol, delay]
       const stack = [
         // Layer 0 — light glass pop (tier ≥ 2)
@@ -7965,6 +7970,87 @@
   // damped-elastic landing pop, 0→peak(≈+0.32)→0 over its window; sharper "hit"
   // than a sin() bounce (peak near p≈0.17, fully settled by 1).
   const popElastic = p => (p <= 0 || p >= 1) ? 0 : Math.sin(p * 9.0) * Math.pow(1 - p, 2.2);
+
+  // === CINEMATIC LIGHT TOOLKIT (2026-06-09) — replaces electric/arcane FX with
+  // volumetric light. ALL procedural additive Graphics (NO GLSL → Stake-safe,
+  // silent), brand palette only, _gpuWeak-aware, no per-frame allocation. ===
+  function _godRays(g, cx, cy, R, prog, rot, col, n, alphaMul){
+    if(prog <= 0) return;
+    n = n || (_gpuWeak ? 7 : 12);
+    alphaMul = (alphaMul == null) ? 1 : alphaMul;
+    col = col || 0xff2ad0;
+    for(let i = 0; i < n; i++){
+      const a = rot + (i / n) * Math.PI * 2;
+      const len = R * (i % 2 === 0 ? 1.0 : 0.62) * prog;     // alternate long/short = volumetric
+      const halfW = R * (0.052 + (i % 3) * 0.014);
+      const ux = Math.cos(a), uy = Math.sin(a) * 0.74;       // vertical squash = stage perspective
+      const px = -Math.sin(a), py = Math.cos(a) * 0.74;
+      const tx = cx + ux * len, ty = cy + uy * len;
+      const sh = 0.5 + 0.5 * Math.sin(rot * 6 + i * 1.7);    // per-shaft shimmer
+      g.poly([cx, cy, tx + px * halfW, ty + py * halfW, tx - px * halfW, ty - py * halfW])
+        .fill({ color: col, alpha: (0.018 + 0.030 * sh) * prog * alphaMul });
+    }
+  }
+  function _seedDust(n, W, H){
+    n = _gpuWeak ? Math.round(n * 0.55) : n;
+    const out = [];
+    for(let i = 0; i < n; i++){
+      out.push({ x: vrnd() * W, y: vrnd() * H, r: 0.6 + vrnd() * 1.8,
+        vy: -(0.12 + vrnd() * 0.5), vx: (vrnd() - 0.5) * 0.18,
+        ph: vrnd() * 6.283, tw: 0.4 + vrnd() * 1.6, depth: 0.35 + vrnd() * 0.65 });
+    }
+    return out;
+  }
+  function _drawDust(g, arr, W, H, now, prog){
+    if(!arr || prog <= 0) return;
+    for(const m of arr){
+      m.y += m.vy * m.depth; m.x += m.vx * m.depth;
+      if(m.y < -4){ m.y = H + 4; m.x = vrnd() * W; }
+      if(m.x < -4) m.x = W + 4; else if(m.x > W + 4) m.x = -4;
+      const tw = 0.45 + 0.55 * Math.sin(now * 0.001 * m.tw + m.ph);
+      const col = m.depth > 0.62 ? 0xffe6f4 : 0xff8ad0;
+      g.circle(m.x, m.y, m.r * (0.7 + 0.5 * m.depth) * (0.7 + 0.5 * tw))
+        .fill({ color: col, alpha: 0.05 * m.depth * tw * prog });
+    }
+  }
+  function _milledNumber(g, w, h, col, now, sweepMs, landI){
+    g.clear();
+    const hw = w * 0.5, hh = h * 0.5;
+    g.roundRect(-hw * 1.04, -hh * 0.86 + h * 0.10, w * 1.08, h * 0.92, hh * 0.4)
+      .fill({ color: 0x05030a, alpha: 0.28 + 0.10 * landI });
+    g.roundRect(-hw * 1.02, -hh * 0.80, w * 1.04, h * 0.86, hh * 0.42)
+      .stroke({ color: col, width: 2.0, alpha: 0.30 + 0.45 * landI });
+    g.roundRect(-hw * 1.02, -hh * 0.80, w * 1.04, h * 0.86, hh * 0.42)
+      .stroke({ color: 0xffe6f4, width: 0.8, alpha: 0.20 + 0.55 * landI });
+    const sw = sweepMs > 0 ? ((now % sweepMs) / sweepMs) : -1;
+    if(sw >= 0){
+      const x = -hw * 1.1 + sw * (w * 1.2);
+      const sa = Math.sin(sw * Math.PI) * (0.16 + 0.18 * landI);
+      const bw = w * 0.10;
+      g.poly([x - bw, -hh * 0.78, x + bw, -hh * 0.78, x + bw * 1.8, hh * 0.78, x, hh * 0.78])
+        .fill({ color: 0xffffff, alpha: sa });
+    }
+  }
+  function _groundGlow(g, cx, baseY, R, col, prog, pulse){
+    if(prog <= 0) return;
+    pulse = (pulse == null) ? 1 : pulse;
+    for(let k = 3; k >= 1; k--){
+      g.ellipse(cx, baseY, R * (0.40 + k * 0.26) * pulse, R * (0.07 + k * 0.035))
+        .fill({ color: k === 1 ? 0xffe6f4 : col, alpha: (k === 1 ? 0.13 : 0.05) * prog });
+    }
+  }
+  function _cineEntrance(dir, p, cx, cy, travel){
+    if(isReduced() || p >= 1) return { x: cx, y: cy, s: 1, a: 1 };
+    const e = backOutSoft(Math.min(1, p));
+    const a = Math.min(1, p * 2.0);
+    const off = (1 - e) * (travel || 220);
+    let x = cx, y = cy;
+    if(dir === 'top') y = cy - off;
+    if(dir === 'bottom') y = cy + off;
+    if(dir === 'left') x = cx - off;
+    if(dir === 'right') x = cx + off;
+    return { x, y, s: 0.82 + 0.18 * e, a };
+  }
   // ── DAMPED SETTLE — unit-normalised spring impulse, peak = 1.0 at tau≈0.21.
   // 19.2·tau·e^(-6.5·tau)·sin(2π·tau): the tau factor gives a tau²-eased onset
   // (C¹ — no pop-in), the e^(-6.5·tau) envelope is heavily damped so there is
@@ -11259,48 +11345,21 @@
             }
           }
 
-          // ─── (3b) ARCANE-ELECTRIC AURA (BIG/MEGA/EPIC) ───────────────────
-          // Branching magenta bolts crack OUTWARD from the hero amount — the
-          // same arcane signature as the MEGA bonus ceremony (reuses _drawBolt),
-          // escalating with tier (more bolts, more forks, thicker, held longer).
-          // This is what lifts the win ceremony to MEGA-bonus level. Additive on
-          // winFxBurst, ramps in → held crackle → fades with the popup. The bolt
-          // SET is generated once per celebration (winFx._arc) so it crackles in
-          // place instead of jittering every frame. (2026-06-01)
-          if(tier >= 4){
-            let arcN = tier >= 6 ? 13 : tier >= 5 ? 9 : 6;
-            if(_gpuWeak) arcN = Math.max(4, Math.round(arcN * 0.6));
-            if(!winFx._arc || winFx._arc.length !== arcN){
-              winFx._arc = [];
-              for(let i = 0; i < arcN; i++){
-                const offs = []; for(let s = 0; s < 6; s++) offs.push((vrnd() - 0.5) * 2);
-                const nb = tier >= 6 ? (vrnd() > 0.4 ? 2 : 1) : tier >= 5 ? (vrnd() > 0.6 ? 1 : 0) : (vrnd() > 0.8 ? 1 : 0);
-                const branches = [];
-                for(let b = 0; b < nb; b++){ const bo = []; for(let s = 0; s < 4; s++) bo.push((vrnd() - 0.5) * 2); branches.push({ at: 0.40 + vrnd() * 0.34, ang: (vrnd() - 0.5) * 1.5, len: 0.22 + vrnd() * 0.28, offs: bo }); }
-                winFx._arc.push({ a: (i / arcN) * Math.PI * 2 + (vrnd() - 0.5) * 0.4, offs, branches, rad: baseR * (0.95 + vrnd() * 0.55) });
-              }
-            }
-            // envelope — crack in (0-180 ms) → HELD crackle to 70 % → fade out
-            const arcEnv = el < winFx.dur * 0.70
-              ? Math.min(1, el / 180)
-              : Math.max(0, 1 - (el - winFx.dur * 0.70) / (winFx.dur * 0.30));
-            if(arcEnv > 0.02){
-              const arcRot = el * 0.00035;
-              const sc = tier >= 6 ? 0.85 : tier >= 5 ? 0.68 : 0.52;
-              for(const b of winFx._arc){
-                const a = b.a + arcRot;
-                const ex = Math.cos(a) * b.rad, ey = Math.sin(a) * b.rad * 0.78;   // vertical squash matches the popup ellipse
-                const flick = arcEnv * (0.34 + 0.46 * Math.abs(Math.sin(el * 0.022 + b.a * 8)));
-                if(flick <= 0.02) continue;
-                const mainPts = _drawBolt(winFxBurst, 0, 0, ex, ey, b.offs, 1, flick, sc);
-                for(const br of b.branches){
-                  const np = mainPts.length / 2, idx = Math.min(np - 1, Math.max(1, Math.round(np * br.at)));
-                  const sx = mainPts[idx*2], sy = mainPts[idx*2+1];
-                  const ca = Math.cos(br.ang), sa = Math.sin(br.ang);
-                  const fdx = (ex*ca - ey*sa) / (b.rad || 1), fdy = (ex*sa + ey*ca) / (b.rad || 1), fl = b.rad * br.len;
-                  _drawBolt(winFxBurst, sx, sy, sx + fdx*fl, sy + fdy*fl, br.offs, 1, flick * 0.8, sc * 0.55);
-                }
-              }
+          // ─── (3b) ELEGANT LIGHT AURA (NICE/BIG/MEGA/EPIC) ────────────────
+          // RADICAL REPLACEMENT of the old electric "arcane bolts" (user: kill the
+          // electric-flash lines in the win celebration). Soft volumetric GOD-RAY
+          // shafts + a grounding light pool radiate from the hero amount — LIGHT,
+          // not lightning. Additive on winFxBurst (cleared each frame), in-brand
+          // tierCol, rotates slowly, flares on the landing. (2026-06-09)
+          if(tier >= 3){
+            const auraEnv = el < winFx.dur * 0.74
+              ? Math.min(1, el / 240)
+              : Math.max(0, 1 - (el - winFx.dur * 0.74) / (winFx.dur * 0.26));
+            if(auraEnv > 0.02){
+              const landI = winFx.popT0 ? Math.max(0, 1 - (now - winFx.popT0) / 420) : 0;
+              const rays = tier >= 6 ? (_gpuWeak ? 10 : 16) : tier >= 5 ? 13 : tier >= 4 ? 11 : 9;
+              _godRays(winFxBurst, 0, 0, baseR * (tier >= 5 ? 1.5 : 1.25), auraEnv, el * 0.00055, tierCol, rays, (tier >= 6 ? 1.3 : 1.0) + landI * 0.6);
+              _groundGlow(winFxBurst, 0, baseR * 0.34, baseR * (0.9 + 0.5 * landI), tierCol, auraEnv, 1 + 0.06 * Math.sin(el * 0.004));
             }
           }
 
