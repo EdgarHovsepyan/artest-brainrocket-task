@@ -33,7 +33,7 @@ the job is to clear that whole bar.
   expose `window.__dbg`). Build: `pnpm -C games/shining-pop build`. Monolith:
   `src/game/shining-pop.game.js` (~12k lines) + `src/ui/betting-bar-web.js` +
   `src/ui/betting-bar-mobile.js` + `index.html` + `public/assets/`.
-- **Game 2 — slot-cocos-1**: `games/slot-cocos-1`, **Cocos Creator 3.8.8** — runs ONLY in the Cocos
+- **Game 2 — Shining Pop V2** (renamed from slot-cocos-1): `games/shining-pop-v2`, **Cocos Creator 3.8.8** — runs ONLY in the Cocos
   editor (localhost:7456), CANNOT be run/seen by the agent. TS in `assets/scripts/` (MVC:
   model/view/controller/logic). RTP sims: `npm run sim` / `npm run sim:bonus` (tsx, runnable).
 
@@ -54,7 +54,7 @@ the job is to clear that whole bar.
 | `c346329` | gate P0: insufficient-balance dismissible notice (U8) + social-safe error popups (S2) + case-preserving pay\* swaps (S3) + payline→line & drRow socialFilter (S4)                                             |
 | `d597111` | sound icon opens a crystal-magenta VOLUME slider (track+knob+mute+close X), `Sound.setVolume`, live ON/OFF icon state                                                                                         |
 | `2703923` | win celebration: DELETED the electric “arcane bolts” → elegant god-rays + grounding light; `Sound.win(tier)` plays `win_<tier>.mp3`                                                                           |
-| `53556dd` | slot-cocos-1: true **STICKY WILDS** bonus + RTP re-anchor (sim 1M: 110.68) + view bounce                                                                                                                      |
+| `53556dd` | shining-pop-v2 (then slot-cocos-1): true **STICKY WILDS** bonus + RTP re-anchor (sim 1M: 110.68) + view bounce                                                                                                |
 | `accfe36` | ElevenLabs music masters actually PLAY (idle→main_base_loop.mp3, bonus→bonus_loop.mp3, synth fallback + post-decode swap) + ALL modals/drawers gold→**crystal-magenta** (one `SURF` token + `drawSurfChrome`) |
 | `58ae4dd` | bars → vector **FillGradient** (crisp, no blur) + white-smoke type + 3-beat cinematic win ceremony                                                                                                            |
 
@@ -133,7 +133,7 @@ Playwright + swiftshader (scripts in `C:\Users\edgar\AppData\Local\Temp\pw\`: `s
 >
 > Then **ASK ME** before doing anything else:
 >
-> 1. Which game first — **Shining Pop** (Pixi, runnable) or **slot-cocos-1** (Cocos, editor-only)?
+> 1. Which game first — **Shining Pop** (Pixi, runnable) or **Shining Pop V2** (`games/shining-pop-v2`, Cocos, editor-only)?
 > 2. Which approval target — clear the **stake-approval-visual-gate floor** (P0→P1→P2) for
 >    submission, or chase the **cocos-aaa-visual-gate ceiling** (award tier)?
 > 3. Re-run a **fresh gate audit** of the CURRENT build, or continue from the pending list in

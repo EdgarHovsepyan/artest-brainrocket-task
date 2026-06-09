@@ -1,11 +1,11 @@
 {
-  "name": "@artest/slot-cocos-1",
+  "name": "@artest/shining-pop-v2",
   "version": "0.1.0",
   "uuid": "456ab05f-2da4-42e1-84b4-57aa7e7182b1",
   "creator": {
     "version": "3.8.8"
   },
-  "description": "ARTEST | BrainRocket — 5x3, 10-line slot (Cocos Creator 3.8.8).",
+  "description": "ARTEST | BrainRocket — Shining Pop V2, 5x3, 10-line slot (Cocos Creator 3.8.8).",
   "author": "Edgar Hovsepyan",
   "license": "UNLICENSED",
   "private": true,

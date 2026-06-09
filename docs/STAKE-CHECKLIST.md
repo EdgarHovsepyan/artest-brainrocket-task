@@ -44,7 +44,7 @@ Internal engineering reference for shipping a game to the Stake Engine platform.
 
 ---
 
-## Implementation status (slot-pixi-1)
+## Implementation status (shining-pop)
 
 **Done & verified:**
 

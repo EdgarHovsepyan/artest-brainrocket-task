@@ -67,7 +67,7 @@ importers:
         specifier: ^2.0.3
         version: 2.3.3(rollup@4.61.1)(vite@5.4.21(@types/node@25.9.2))
 
-  games/slot-cocos-1:
+  games/shining-pop-v2:
     dependencies:
       '@artest/math-core':
         specifier: workspace:*

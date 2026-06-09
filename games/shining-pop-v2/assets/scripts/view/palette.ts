@@ -1,4 +1,4 @@
-// Shining-Pop visual identity ported to slot-cocos-1: dark near-black violet base
+// Shining-Pop visual identity ported to shining-pop-v2: dark near-black violet base
 // + electric magenta/pink VFX, smoke-white chrome, cyan rim accent (EXTRA STUDIO
 // "villain" look). Hex STRINGS to match view-config's colour convention — consumers
 // convert with `new Color().fromHEX(c)`. VISUAL ONLY — touches no math.

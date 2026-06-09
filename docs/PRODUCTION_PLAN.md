@@ -4,7 +4,7 @@
 до состояния **production-ready / award-winner**. Две игры:
 
 - **Shining Pop** — PixiJS v8 (`games/shining-pop`), флагман, запускается на :5173.
-- **slot-cocos-1** — Cocos Creator 3.8.8 (`games/slot-cocos-1`), запускается только в редакторе (:7456).
+- **Shining Pop V2** (бывш. slot-cocos-1) — Cocos Creator 3.8.8 (`games/shining-pop-v2`), запускается только в редакторе (:7456).
 
 Причины реджекта Stake (1.00/3), которые надо закрыть: **inconsistent art · low-quality/AI assets · poor bet UI · shallow gameplay**.
 
