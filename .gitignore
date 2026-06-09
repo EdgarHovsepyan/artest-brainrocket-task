@@ -29,3 +29,5 @@ native/
 .mcp.json
 **/extensions/cocos-mcp-server/
 **/settings/mcp-server.json
+
+games/*/extensions/
