@@ -31,8 +31,27 @@ function applyMechanic(grid: Grid, mode: BonusMode, rng: Rng, sticky: Set<string
     const reel = rng.int(GRID.reels);
     for (let row = 0; row < GRID.rows; row++) grid[reel][row] = WILD;
   } else if (mode === 'wilds') {
-    const count = 1 + rng.int(2);
-    for (let k = 0; k < count; k++) grid[rng.int(GRID.reels)][rng.int(GRID.rows)] = WILD;
+    // STICKY WILDS (2026-06-09): every wild that lands PERSISTS for the rest of the
+    // bonus (it bounces on wins instead of respinning). Seed 1 on the first step,
+    // then add 0-1 per step; bounded by the 15-cell grid. Cost is re-anchored to
+    // ~96% via tools/bonus-sim.ts (cost = mean_payout / 0.96), so a richer feature
+    // is simply priced higher — RTP stays ~96%.
+    const add = sticky.size === 0 ? 1 : rng.int(2);
+    for (let k = 0; k < add; k++) {
+      for (let tries = 0; tries < 8; tries++) {
+        const r = rng.int(GRID.reels),
+          row = rng.int(GRID.rows);
+        const key = r + ',' + row;
+        if (!sticky.has(key)) {
+          sticky.add(key);
+          break;
+        }
+      }
+    }
+    for (const key of sticky) {
+      const [reel, row] = key.split(',').map(Number);
+      grid[reel][row] = WILD;
+    }
   } else if (mode === 'crowns') {
     for (const key of sticky) {
       const [reel, row] = key.split(',').map(Number);

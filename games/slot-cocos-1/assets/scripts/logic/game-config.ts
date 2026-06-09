@@ -117,7 +117,9 @@ export type BonusMode = 'wilds' | 'crowns' | 'reels';
  */
 export const BONUS_MODES: Record<BonusMode, { name: string; spins: number; cost: number }> = {
   // costs anchored to ~96% by tools/bonus-sim.ts (500k buys each).
-  wilds: { name: 'SPINNING WILDS', spins: 8, cost: 24.86 },
+  // 2026-06-09 — `wilds` is now STICKY (wilds persist + bounce, were respinning).
+  // Re-anchored to ~96% via `npm run sim:bonus` (1M buys): mean 106.25×bet → 110.68.
+  wilds: { name: 'STICKY WILDS', spins: 8, cost: 110.68 },
   crowns: { name: 'STICKY CROWNS', spins: 8, cost: 96.99 },
   reels: { name: 'WILD REELS', spins: 8, cost: 33.64 },
 };

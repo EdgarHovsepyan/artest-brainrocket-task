@@ -140,6 +140,13 @@ export class ReelView extends Component {
     rows.forEach((row) => this.cells[row]?.playWin());
   }
 
+  /** Bounce the given window rows — sticky wilds/crowns celebrating each free
+   *  spin (they persist in the grid, so this reads as "locked + alive", not a
+   *  respin). Reuses the proven one-shot win pulse. */
+  bounceSticky(rows: number[]): void {
+    rows.forEach((row) => this.cells[row]?.playWin());
+  }
+
   clearHighlight(): void {
     this.cells.forEach((c) => c.clear());
   }

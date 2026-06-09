@@ -589,6 +589,17 @@ export class SlotView extends Component {
     this.reels.forEach((reel) => reel.clearHighlight());
   }
 
+  /** Bounce the sticky cells (persistent wilds/crowns) after a free spin so they
+   *  read as locked + alive rather than respun. positions = [reel, row][]. */
+  pulseSticky(positions: Array<[number, number]>): void {
+    if (!positions || positions.length === 0) return;
+    const byReel: number[][] = this.reels.map(() => []);
+    for (const [reel, row] of positions) if (byReel[reel]) byReel[reel].push(row);
+    this.reels.forEach((reel, i) => {
+      if (byReel[i].length) reel.bounceSticky(byReel[i]);
+    });
+  }
+
   /** Kinetic count-up of the win amount, with audio ticks. */
   countUp(toCents: number): void {
     const { baseMs, logScaleMs, maxMs } = VIEW_CONFIG.counter;

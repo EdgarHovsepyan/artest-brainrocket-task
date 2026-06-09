@@ -85,6 +85,9 @@ export class SlotController extends Component {
   private syncHud(): void {
     this.bar.setBalance(this.model.balance / 100);
     this.bar.setBet(this.model.bet / 100);
+    // live bar state: dim the stepper at the bet bounds, dim spin if unaffordable.
+    this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
+    this.bar.setAffordable(this.model.canSpin());
   }
 
   /** Bet stepper from the bar (± one currency unit). */
@@ -109,17 +112,20 @@ export class SlotController extends Component {
   private toggleTurbo(): void {
     this.turbo = !this.turbo;
     this.view.setTurboVisual(this.turbo);
+    this.bar.setTurbo(this.turbo ? 1 : 0);
   }
 
   private toggleSound(): void {
     this.muted = !this.muted;
     this.view.setMuted(this.muted);
     this.view.setSoundVisual(this.muted);
+    this.bar.setSoundOn(!this.muted);
   }
 
   private toggleAuto(): void {
     this.auto = !this.auto;
     this.view.setAutoVisual(this.auto);
+    this.bar.setAutoplay(this.auto ? Infinity : null);
     if (this.auto && this.state === 'idle') this.onSpinPressed();
   }
 
@@ -135,6 +141,7 @@ export class SlotController extends Component {
 
   private async runSpin(): Promise<void> {
     this.state = 'spinning';
+    this.bar.setSpinning(true); // swap the spin arrow → stop square
     this.view.setInteractable(true); // keep enabled so a re-click can quick-stop
     this.view.clearWins();
     this.view.setWin(0);
@@ -162,6 +169,9 @@ export class SlotController extends Component {
 
     this.scheduleOnce(() => {
       this.state = 'idle';
+      this.bar.setSpinning(false); // stop square → spin arrow
+      this.bar.setAffordable(this.model.canSpin());
+      this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
       this.view.setInteractable(true);
       if (this.auto && this.model.canSpin()) this.scheduleOnce(() => this.onSpinPressed(), 0.4);
       else if (this.auto) this.toggleAuto();
@@ -172,6 +182,7 @@ export class SlotController extends Component {
   private async onBuy(mode: BonusMode): Promise<void> {
     if (this.state !== 'idle' || this.model.balance < this.model.bonusCost(mode)) return;
     this.state = 'bonus';
+    this.bar.setSpinning(true);
     this.view.setInteractable(false);
     this.view.clearWins();
     this.view.setWin(0);
@@ -185,6 +196,9 @@ export class SlotController extends Component {
     for (const step of outcome.bonus.steps) {
       this.view.clearWins();
       await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul);
+      // Sticky wilds / crowns persist in the grid — bounce them so they read as
+      // locked + alive each spin (not respun). [reel,row][] from the bonus engine.
+      this.view.pulseSticky(step.sticky);
       if (step.payout > 0) this.view.showWins(evaluateSpin(step.grid));
       await this.wait(VIEW_CONFIG.bonus.stepPauseMs);
     }
@@ -195,6 +209,7 @@ export class SlotController extends Component {
     this.view.setBanner('FEATURE WON');
     this.scheduleOnce(() => {
       this.state = 'idle';
+      this.bar.setSpinning(false);
       this.view.setInteractable(true);
     }, 0.4);
   }
