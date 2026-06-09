@@ -68,6 +68,15 @@ export interface BuyOption {
   costText: string;
 }
 
+export interface AutoplayPanelConfig {
+  counts: readonly number[];
+  allowInfinity: boolean;
+  stopOnFeature: boolean;
+  stopOnBigWin: boolean;
+}
+
+export type AutoplayOptionKey = 'stopOnFeature' | 'stopOnBigWin';
+
 @ccclass('SlotView')
 export class SlotView extends Component {
   private frames: SpriteFrame[] = [];
@@ -91,6 +100,9 @@ export class SlotView extends Component {
   private autoBtn: DeckButton | null = null;
   private soundBtn: DeckButton | null = null;
   private buyMenu: Node | null = null;
+  private autoplayPanel: Node | null = null;
+  private autoplayStartCb: ((spins: number) => void) | null = null;
+  private autoplayOptionCb: ((key: AutoplayOptionKey, value: boolean) => void) | null = null;
 
   private spinCb: (() => void) | null = null;
   private buyCb: ((mode: string) => void) | null = null;
@@ -477,6 +489,92 @@ export class SlotView extends Component {
     if (this.buyMenu) this.buyMenu.active = true;
   }
 
+  // ---- autoplay panel (parity port of the master's AUTOPLAY drawer) ----------
+  /** (Re)build the autoplay panel: count tiles + the two stop toggles.
+   *  Rebuilt by the Controller whenever a toggle flips (master parity: the Pixi
+   *  drawer re-populates on toggle). Hidden until the AUTO control opens it. */
+  configureAutoplayPanel(cfg: AutoplayPanelConfig): void {
+    const wasOpen = this.autoplayPanel?.active ?? false;
+    this.autoplayPanel?.destroy();
+    const counts: number[] = [...cfg.counts];
+    if (cfg.allowInfinity) counts.push(Infinity);
+    const cols = 3;
+    const rows = Math.ceil(counts.length / cols);
+    const w = 380;
+    const h = 92 + rows * 60 + 2 * 56;
+    const panel = this.mkNode('autoplayPanel', w, h, this.node);
+    panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    panel.active = wasOpen;
+    const bg = panel.addComponent(Graphics);
+    bg.fillColor = new Color(8, 8, 10, 245);
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.fill();
+    bg.lineWidth = 4;
+    bg.strokeColor = ACID;
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.stroke();
+    this.mkLabel('AUTOPLAY', 0, h / 2 - 28, 22, ACID, panel);
+    this.mkLabel('Number of spins:', 0, h / 2 - 58, 13, MUTED, panel);
+    counts.forEach((n, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = (col - 1) * 118;
+      const y = h / 2 - 96 - row * 60;
+      this.mkTextButton(
+        n === Infinity ? '∞' : String(n),
+        x,
+        y,
+        104,
+        46,
+        () => {
+          panel.active = false;
+          this.autoplayStartCb?.(n);
+        },
+        panel,
+      );
+    });
+    const toggleRow = (
+      label: string,
+      desc: string,
+      on: boolean,
+      key: AutoplayOptionKey,
+      y: number,
+    ) => {
+      const lbl = this.mkLabel(label, -64, y + 8, 14, MUTED, panel);
+      lbl.horizontalAlign = Label.HorizontalAlign.LEFT;
+      const d = this.mkLabel(desc, -64, y - 12, 10, MUTED, panel);
+      d.horizontalAlign = Label.HorizontalAlign.LEFT;
+      const pill = this.mkTextButton(
+        on ? 'ON' : 'OFF',
+        w / 2 - 64,
+        y,
+        72,
+        36,
+        () => this.autoplayOptionCb?.(key, !on),
+        panel,
+      );
+      pill.setActive(on);
+    };
+    const ty = h / 2 - 96 - rows * 60 - 12;
+    toggleRow(
+      'Stop on Free Spins',
+      'End auto if feature triggers',
+      cfg.stopOnFeature,
+      'stopOnFeature',
+      ty,
+    );
+    toggleRow('Stop on Big Win', `≥ 25× total bet`, cfg.stopOnBigWin, 'stopOnBigWin', ty - 56);
+    this.autoplayPanel = panel;
+  }
+
+  openAutoplayPanel(): void {
+    if (this.autoplayPanel) this.autoplayPanel.active = true;
+  }
+
+  closeAutoplayPanel(): void {
+    if (this.autoplayPanel) this.autoplayPanel.active = false;
+  }
+
   // ---- public API the Controller drives ------------------------------------
   onSpinClicked(cb: () => void): void {
     this.spinCb = cb;
@@ -489,6 +587,12 @@ export class SlotView extends Component {
   }
   onAutoClicked(cb: () => void): void {
     this.autoCb = cb;
+  }
+  onAutoplayStart(cb: (spins: number) => void): void {
+    this.autoplayStartCb = cb;
+  }
+  onAutoplayOption(cb: (key: AutoplayOptionKey, value: boolean) => void): void {
+    this.autoplayOptionCb = cb;
   }
   onSoundClicked(cb: () => void): void {
     this.soundCb = cb;

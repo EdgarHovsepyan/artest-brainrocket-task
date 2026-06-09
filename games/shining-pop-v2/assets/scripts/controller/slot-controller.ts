@@ -21,6 +21,16 @@ import {
 import { SlotModel } from '../model/slot-model';
 import { SlotView } from '../view/slot-view';
 import { BettingBarMobile } from '../ui/betting-bar';
+import {
+  AUTOPLAY_COUNTS,
+  AutoplayState,
+  evaluateContinuation,
+  idleAutoplay,
+  interSpinDelayMs,
+  spinStarted,
+  startAutoplay,
+  stopAutoplay,
+} from '../logic/autoplay';
 import { BONUS_MODES, BonusMode } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
@@ -44,7 +54,7 @@ export class SlotController extends Component {
   private state: FlowState = 'idle';
   private canStop = false;
   private turbo = false;
-  private auto = false;
+  private autoplay: AutoplayState = idleAutoplay();
   private muted = false;
 
   onLoad(): void {
@@ -70,6 +80,13 @@ export class SlotController extends Component {
         costText: this.fmt(this.model.bonusCost(mode)),
       })),
     );
+    this.refreshAutoplayPanel();
+    this.view.onAutoplayStart((spins) => this.startAuto(spins));
+    this.view.onAutoplayOption((key, value) => {
+      this.autoplay = { ...this.autoplay, [key]: value };
+      this.refreshAutoplayPanel();
+      this.view.openAutoplayPanel();
+    });
 
     // Shared betting bar = the only on-screen controls; buy-bonus is game state.
     const barNode = new Node('BettingBar');
@@ -115,9 +132,9 @@ export class SlotController extends Component {
     this.bar.setAffordable(this.model.canSpin());
   }
 
-  /** Bet stepper from the bar (± one currency unit). */
+  /** Bet stepper from the bar (± one currency unit). Locked during autoplay (master parity). */
   private changeBet(dir: number): void {
-    if (this.state !== 'idle') return;
+    if (this.state !== 'idle' || this.autoplay.active) return;
     this.model.setBet(Math.max(100, Math.min(1000, this.model.bet + dir * 100)));
     this.syncHud();
   }
@@ -128,6 +145,7 @@ export class SlotController extends Component {
 
   private onKey(e: EventKeyboard): void {
     if (e.keyCode === KeyCode.SPACE) this.onSpinPressed();
+    else if (e.keyCode === KeyCode.KEY_A) this.toggleAuto();
   }
 
   private fmt(cents: number): string {
@@ -147,11 +165,33 @@ export class SlotController extends Component {
     this.bar.setSoundOn(!this.muted);
   }
 
+  /** AUTO control (bar / keyboard A): running -> stop the run; idle -> open the panel. */
   private toggleAuto(): void {
-    this.auto = !this.auto;
-    this.view.setAutoVisual(this.auto);
-    this.bar.setAutoplay(this.auto ? Infinity : null);
-    if (this.auto && this.state === 'idle') this.onSpinPressed();
+    if (this.autoplay.active) this.stopAuto();
+    else this.view.openAutoplayPanel();
+  }
+
+  private startAuto(spins: number): void {
+    if (this.state !== 'idle') return;
+    this.autoplay = startAutoplay(spins, this.autoplay);
+    this.view.setAutoVisual(true);
+    this.bar.setAutoplay(this.autoplay.remaining);
+    this.onSpinPressed();
+  }
+
+  private stopAuto(): void {
+    this.autoplay = stopAutoplay(this.autoplay);
+    this.view.setAutoVisual(false);
+    this.bar.setAutoplay(null);
+  }
+
+  private refreshAutoplayPanel(): void {
+    this.view.configureAutoplayPanel({
+      counts: AUTOPLAY_COUNTS,
+      allowInfinity: true,
+      stopOnFeature: this.autoplay.stopOnFeature,
+      stopOnBigWin: this.autoplay.stopOnBigWin,
+    });
   }
 
   /** Spin button / Space: start a spin, or quick-stop one already running. */
@@ -166,12 +206,18 @@ export class SlotController extends Component {
 
   private async runSpin(): Promise<void> {
     this.state = 'spinning';
+    if (this.autoplay.active) {
+      // Master parity: the spin counter decrements at spin START, not settle.
+      this.autoplay = spinStarted(this.autoplay);
+      this.bar.setAutoplay(this.autoplay.remaining);
+    }
     this.bar.setSpinning(true); // swap the spin arrow → stop square
     this.view.setInteractable(true); // keep enabled so a re-click can quick-stop
     this.view.clearWins();
     this.view.setWin(0);
     this.view.setBanner('');
     this.view.closeBuyMenu();
+    this.view.closeAutoplayPanel();
 
     this.canStop = false;
     this.scheduleOnce(() => (this.canStop = true), 0.18);
@@ -198,14 +244,31 @@ export class SlotController extends Component {
       this.bar.setAffordable(this.model.canSpin());
       this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
       this.view.setInteractable(true);
-      if (this.auto && this.model.canSpin()) this.scheduleOnce(() => this.onSpinPressed(), 0.4);
-      else if (this.auto) this.toggleAuto();
+      if (this.autoplay.active) {
+        // Master-parity continuation: feature -> bigWin -> exhausted -> balance.
+        // Base game has no natural free-spin trigger (buy-only), so isFeature
+        // stays false until scatter wiring lands.
+        const verdict = evaluateContinuation(this.autoplay, {
+          isFeature: false,
+          winCents: outcome.winCents,
+          betCents: outcome.betCents,
+          balanceCents: this.model.balance,
+        });
+        if (verdict.stop) this.stopAuto();
+        else {
+          const d = interSpinDelayMs(this.turbo ? 1 : 0);
+          this.scheduleOnce(() => {
+            if (this.autoplay.active && this.state === 'idle') this.onSpinPressed();
+          }, d / 1000);
+        }
+      }
     }, 0.3);
   }
 
   /** Buy a feature: play each free spin back, then credit + celebrate. */
   private async onBuy(mode: BonusMode): Promise<void> {
-    if (this.state !== 'idle' || this.model.balance < this.model.bonusCost(mode)) return;
+    if (this.state !== 'idle' || this.autoplay.active) return;
+    if (this.model.balance < this.model.bonusCost(mode)) return;
     this.state = 'bonus';
     this.bar.setSpinning(true);
     this.view.setInteractable(false);
@@ -229,7 +292,9 @@ export class SlotController extends Component {
     }
 
     this.view.countUp(outcome.winCents);
-    this.view.playCeremony(outcome.winCents, outcome.betCents, 1);
+    // BonusOutcome has no betCents — passing it was undefined at runtime and
+    // corrupted the ceremony's win-vs-bet tier scaling. Tier against the live bet.
+    this.view.playCeremony(outcome.winCents, this.model.bet, 1);
     this.bar.setLastWin(outcome.winCents / 100);
     this.view.setBanner('FEATURE WON');
     this.scheduleOnce(() => {
