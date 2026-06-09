@@ -125,6 +125,8 @@ export class SlotView extends Component {
   private menuHub: Node | null = null;
   private infoPanel: Node | null = null;
   private infoTab: 'rules' | 'paytable' | 'info' = 'rules';
+  private quickBetPanel: Node | null = null;
+  private betSelectCb: ((cents: number) => void) | null = null;
   private reducedFx = false;
 
   private spinCb: (() => void) | null = null;
@@ -644,6 +646,7 @@ export class SlotView extends Component {
 
   openBuyMenu(): void {
     if (this.buyMenu) this.buyMenu.active = true;
+    this.audio.buyOpen();
   }
 
   // ---- autoplay panel (parity port of the master's AUTOPLAY drawer) ----------
@@ -727,6 +730,7 @@ export class SlotView extends Component {
   openAutoplayPanel(): void {
     this.closeOverlays();
     if (this.autoplayPanel) this.autoplayPanel.active = true;
+    this.audio.modalOpen();
   }
 
   closeAutoplayPanel(): void {
@@ -800,6 +804,7 @@ export class SlotView extends Component {
   openSettingsPanel(): void {
     this.closeOverlays();
     if (this.settingsPanel) this.settingsPanel.active = true;
+    this.audio.modalOpen();
   }
 
   closeSettingsPanel(): void {
@@ -908,6 +913,7 @@ export class SlotView extends Component {
     this.closeOverlays();
     if (!this.infoPanel) this.buildInfoPanel(this.infoTab);
     if (this.infoPanel) this.infoPanel.active = true;
+    this.audio.modalOpen();
   }
 
   closeInfoPanel(): void {
@@ -925,6 +931,7 @@ export class SlotView extends Component {
   private buildMenuHub(): Node {
     const entries: [string, () => void][] = [
       ['BUY FEATURE', () => this.openBuyMenu()],
+      ['QUICK BET', () => this.openQuickBetPanel()],
       ['GAME INFO', () => this.openInfoPanel()],
       ['SETTINGS', () => this.openSettingsPanel()],
       ['AUTOPLAY', () => this.openAutoplayPanel()],
@@ -967,6 +974,91 @@ export class SlotView extends Component {
     if (this.settingsPanel) this.settingsPanel.active = false;
     if (this.menuHub) this.menuHub.active = false;
     if (this.infoPanel) this.infoPanel.active = false;
+    if (this.quickBetPanel) this.quickBetPanel.active = false;
+  }
+
+  // ---- QUICK BET panel (master parity: preset stake grid, not raw arithmetic) --
+  configureQuickBetPanel(levelsCents: readonly number[], currentCents: number): void {
+    const wasOpen = this.quickBetPanel?.active ?? false;
+    this.quickBetPanel?.destroy();
+    const cols = 3;
+    const rows = Math.ceil(levelsCents.length / cols);
+    const w = 380;
+    const h = 96 + rows * 60;
+    const panel = this.mkNode('quickBetPanel', w, h, this.node);
+    panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    panel.active = wasOpen;
+    const bg = panel.addComponent(Graphics);
+    bg.fillColor = new Color(8, 8, 10, 245);
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.fill();
+    bg.lineWidth = 4;
+    bg.strokeColor = ACID;
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.stroke();
+    this.mkLabel('QUICK BET', 0, h / 2 - 28, 22, ACID, panel);
+    this.mkLabel('Total bet (10 lines):', 0, h / 2 - 58, 13, MUTED, panel);
+    levelsCents.forEach((cents, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      this.mkTextButton(
+        fmt(cents),
+        (col - 1) * 118,
+        h / 2 - 96 - row * 60,
+        104,
+        46,
+        () => {
+          panel.active = false;
+          this.betSelectCb?.(cents);
+        },
+        panel,
+      ).setActive(cents === currentCents);
+    });
+    this.quickBetPanel = panel;
+  }
+
+  openQuickBetPanel(): void {
+    this.closeOverlays();
+    if (this.quickBetPanel) this.quickBetPanel.active = true;
+    this.audio.modalOpen();
+  }
+
+  onBetSelect(cb: (cents: number) => void): void {
+    this.betSelectCb = cb;
+  }
+
+  // ---- INTRO GATE — first-gesture overlay (audio unlock + branded arrival) ----
+  /** Full-screen tap-to-play overlay. The FIRST gesture anywhere must unlock the
+   *  AudioContext (master learning) — the controller wires that; this is the
+   *  branded surface. */
+  buildIntro(onDismiss: () => void): void {
+    const ov = this.mkNode('intro', 2600, 2200, this.node);
+    const g = ov.addComponent(Graphics);
+    g.fillColor = new Color(6, 3, 12, 235);
+    g.rect(-1300, -1100, 2600, 2200);
+    g.fill();
+    g.fillColor = new Color(255, 0, 127, 30);
+    g.roundRect(-200, -64, 400, 150, 20);
+    g.fill();
+    const t1 = this.mkLabel('SHINING', 0, 54, 34, new Color(245, 247, 250, 255), ov);
+    t1.isItalic = true;
+    const t2 = this.mkLabel('POP  V2', 0, 14, 38, ACID, ov);
+    t2.isItalic = true;
+    const cta = this.mkLabel('TAP TO PLAY', 0, -40, 18, MUTED, ov);
+    tween(cta.node)
+      .to(0.8, { scale: new Vec3(1.08, 1.08, 1) }, { easing: 'sineInOut' })
+      .to(0.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+    ov.once(Node.EventType.TOUCH_END, () => {
+      const op = ov.getComponent(UIOpacity) ?? ov.addComponent(UIOpacity);
+      tween(op)
+        .to(0.4, { opacity: 0 }, { easing: 'quadOut' })
+        .call(() => ov.destroy())
+        .start();
+      onDismiss();
+    });
   }
 
   /** Reduced-effects accessibility flag — gates particles + anticipation drag. */
@@ -1070,8 +1162,11 @@ export class SlotView extends Component {
     let earlyWilds = 0;
     for (let r = 0; r < 3; r++) for (const id of grid[r]) if (id === SYMBOLS.WILD) earlyWilds++;
     const antic = earlyWilds >= minEarlyWilds && !this.reducedFx;
+    const turbo = speedMul <= VIEW_CONFIG.turbo.turbo;
 
-    this.audio.reelTick();
+    this.audio.spinStart();
+    this.audio.startRush();
+    if (antic) this.audio.anticipation();
     await Promise.all(
       this.reels.map((reel, i) => {
         let dur = (minSpinMs + i * reelStopStaggerMs) / 1000;
@@ -1085,11 +1180,12 @@ export class SlotView extends Component {
           );
         }
         return reel.spinTo(grid[i], dur, speedMul).then(() => {
-          this.audio.reelStop(i);
+          this.audio.reelStop(i, turbo);
           if (i >= 3) this.anticipation.clear();
         });
       }),
     );
+    this.audio.stopRush();
     this.anticipation.clear();
   }
 

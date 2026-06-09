@@ -567,7 +567,9 @@ export class BettingBarMobile extends Component {
     this.node.setPosition(new Vec3((-W * s) / 2, (H * s) / 2, 0));
   }
   private fmt(n: number): string {
-    return n.toLocaleString('en-US');
+    // Money renders with EXACTLY two decimals everywhere (approval gate N3/N4:
+    // "1,000" and "1000.5" style drift is a reviewer flag).
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   setBalance(n: number): void {
     this.labels['balValue'].string = this.fmt(n);

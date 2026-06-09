@@ -31,6 +31,7 @@ import {
   startAutoplay,
   stopAutoplay,
 } from '../logic/autoplay';
+import { BET_LEVELS_CENTS, maxBet, minBet, snapBet, stepBet } from '../logic/bet-levels';
 import { BONUS_MODES, BonusMode } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
@@ -90,6 +91,33 @@ export class SlotController extends Component {
     });
     this.refreshSettingsPanel();
     this.view.onSettingsChange((key, value) => this.applySetting(key, value));
+    this.view.configureQuickBetPanel(BET_LEVELS_CENTS, this.model.bet);
+    this.view.onBetSelect((cents) => {
+      if (this.state !== 'idle' || this.autoplay.active) return;
+      this.model.setBet(snapBet(cents));
+      this.view.audio.bet();
+      this.view.configureQuickBetPanel(BET_LEVELS_CENTS, this.model.bet);
+      this.syncHud();
+    });
+
+    // INTRO GATE + first-gesture audio bootstrap (master learning: ANY first
+    // gesture must unlock the bank, not only the intro tap).
+    this.view.buildIntro(() => {
+      this.view.audio.unlock();
+      this.view.audio.playMusic('main_base_loop');
+    });
+    const unlockOnce = () => {
+      this.view.audio.unlock();
+      this.view.audio.playMusic('main_base_loop');
+      window.removeEventListener('pointerdown', unlockOnce, true);
+      window.removeEventListener('keydown', unlockOnce, true);
+    };
+    try {
+      window.addEventListener('pointerdown', unlockOnce, { capture: true, once: true });
+      window.addEventListener('keydown', unlockOnce, { capture: true, once: true });
+    } catch {
+      /* non-browser runtime */
+    }
 
     // Shared betting bar = the only on-screen controls; buy-bonus is game state.
     const barNode = new Node('BettingBar');
@@ -130,15 +158,18 @@ export class SlotController extends Component {
   private syncHud(): void {
     this.bar.setBalance(this.model.balance / 100);
     this.bar.setBet(this.model.bet / 100);
-    // live bar state: dim the stepper at the bet bounds, dim spin if unaffordable.
-    this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
+    // live bar state: dim the stepper at the ladder ends, dim spin if unaffordable.
+    this.bar.setSteppers(this.model.bet > minBet(), this.model.bet < maxBet());
     this.bar.setAffordable(this.model.canSpin());
   }
 
-  /** Bet stepper from the bar (± one currency unit). Locked during autoplay (master parity). */
+  /** Bet stepper from the bar — walks the BET_LEVELS ladder (master parity).
+   *  Locked during autoplay. */
   private changeBet(dir: number): void {
     if (this.state !== 'idle' || this.autoplay.active) return;
-    this.model.setBet(Math.max(100, Math.min(1000, this.model.bet + dir * 100)));
+    this.model.setBet(stepBet(this.model.bet, dir > 0 ? 1 : -1));
+    this.view.audio.bet();
+    this.view.configureQuickBetPanel(BET_LEVELS_CENTS, this.model.bet);
     this.syncHud();
   }
 
@@ -281,6 +312,12 @@ export class SlotController extends Component {
       this.view.countUp(outcome.winCents);
       this.view.playCeremony(outcome.winCents, outcome.betCents, outcome.wildStrike);
       this.bar.setLastWin(outcome.winCents / 100);
+      // UKGC LDW rule: a return <= 1x total bet must NOT play triumphant audio.
+      if (outcome.winCents > outcome.betCents) {
+        const mult = outcome.winCents / outcome.betCents;
+        const tier = mult >= 50 ? 5 : mult >= 20 ? 4 : mult >= 8 ? 3 : mult >= 2 ? 2 : 1;
+        this.view.audio.win(tier);
+      }
     }
 
     this.scheduleOnce(() => {
@@ -323,6 +360,8 @@ export class SlotController extends Component {
     this.view.showFeatureUnlocked(BONUS_MODES[mode].name);
 
     const outcome = this.model.buyBonus(mode);
+    this.view.audio.buyConfirm();
+    this.view.audio.bonusIntro();
     this.view.setBalance(outcome.balanceCents);
     this.bar.setBalance(outcome.balanceCents / 100);
 
@@ -332,10 +371,12 @@ export class SlotController extends Component {
       // Sticky wilds / crowns persist in the grid — bounce them so they read as
       // locked + alive each spin (not respun). [reel,row][] from the bonus engine.
       this.view.pulseSticky(step.sticky);
+      if (step.sticky.length > 0) this.view.audio.stickyLock();
       if (step.payout > 0) this.view.showWins(evaluateSpin(step.grid));
       await this.wait(VIEW_CONFIG.bonus.stepPauseMs);
     }
 
+    this.view.audio.bonusEnd();
     this.view.countUp(outcome.winCents);
     // BonusOutcome has no betCents — passing it was undefined at runtime and
     // corrupted the ceremony's win-vs-bet tier scaling. Tier against the live bet.
