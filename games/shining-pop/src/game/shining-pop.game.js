@@ -6409,7 +6409,11 @@
       const m = this._tallyMult, s = this._tallyStep++;
       let f = 560;                                         // flat standard pitch (≤2×)
       if(m > 2) f = Math.min(1180, 560 + s * (m >= 10 ? 36 : 24));   // climb on bigger wins
-      this._voice(f, 0.045, 'square', m >= 40 ? 0.05 : 0.085, this.busSfx);
+      // CUTE coin-pip — soft triangle body + a quiet octave-sine sparkle (bell/coin
+      // feel) replaces the buzzy square; the pitch still climbs with the win size.
+      const v = m >= 40 ? 0.05 : 0.075;
+      this._voice(f,      0.05,  'triangle', v,         this.busSfx);
+      this._voice(f * 2,  0.035, 'sine',     v * 0.45,  this.busSfx, 0.004);   // octave sparkle
     },
 
     // ─── Scenario D: SCATTER ANTICIPATION TENSION ───

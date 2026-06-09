@@ -60,10 +60,10 @@
     },
     {
       "id": "coin_cascade",
-      "file": "coin_cascade.wav",
+      "file": "coin_cascade.mp3",
       "ms": 1992,
       "loop": true,
-      "kb": 171.6,
+      "kb": 24.8,
       "peak": 0.759
     },
     {
@@ -79,7 +79,7 @@
       "file": "main_base_loop.mp3",
       "ms": 26000,
       "loop": true,
-      "kb": 407.0,
+      "kb": 407,
       "peak": 0.639
     },
     {
@@ -124,10 +124,10 @@
     },
     {
       "id": "reel_loop",
-      "file": "reel_loop.wav",
+      "file": "reel_loop.mp3",
       "ms": 1992,
       "loop": true,
-      "kb": 171.6,
+      "kb": 33.1,
       "peak": 0.759
     },
     {
