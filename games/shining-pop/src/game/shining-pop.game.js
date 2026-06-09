@@ -1113,6 +1113,13 @@
   TEX.extraStudio  = proc(imExtraStudio, 700, true);      // boot splash — EXTRA STUDIO
   // Buy-Bonus tier emblems (keyed crystal art) — STANDARD=laurel · HOT=flame · MEGA=burst
   TEX.tierStd = proc(imTierStd, 480, true); TEX.tierHot = proc(imTierHot, 480, true); TEX.tierMega = proc(imTierMega, 480, true);
+  // ── BUY BONUS candy art (user-supplied: assets/images/shining/buy-bonus.png).
+  // Loaded SEPARATELY from the PIXI bundle so a MISSING file never breaks boot
+  // (onerror -> null). Keyed (black -> alpha) + trimmed via proc, like the logo —
+  // matches the delivered art that sits on a black background. Until the PNG is
+  // dropped in, TEX.buyBonus stays null and the button shows a candy-pill fallback.
+  const _imBuyBonus = await new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = SH + 'buy-bonus.png'; });
+  TEX.buyBonus = _imBuyBonus ? proc(_imBuyBonus, 700, true) : null;
   TEX.spin     = spinTex('spin');  TEX.stop = spinTex('stop');   // Sweet-Bonanza-style white spin button
   // winFrame is a permanently-hidden layout anchor (its ornate art was dropped —
   // the big-win backdrop is the procedural villain throne). Its only remaining job
@@ -4127,6 +4134,77 @@
   bmCancel.on('pointertap', hideBuyBonusModal);
   buyClose.on('pointertap', hideBuyBonusModal);
   buyModalBg.on('pointertap', hideBuyBonusModal);
+
+  // ── FLOATING CANDY "BUY BONUS" BUTTON (2026-06-10, delivered design) ──────────
+  // Primary entry to the bonus picker, placed per the marked layout: desktop = LEFT
+  // of the reels (vertical centre); portrait/mobile = BOTTOM-LEFT by the spin. Uses
+  // the user art (TEX.buyBonus) when present; until the PNG lands a candy-pill
+  // fallback keeps it working. The in-bar buyBar + menu entry are left intact.
+  const buyFab = new PIXI.Container();
+  buyFab.eventMode = 'static'; buyFab.cursor = 'pointer';
+  stage.addChild(buyFab);
+  const buyFabInner = new PIXI.Container(); buyFab.addChild(buyFabInner);     // layout scales this to fit
+  const buyFabAnim  = new PIXI.Container(); buyFabInner.addChild(buyFabAnim); // idle breathe + float live here
+  const buyFabPress = new PIXI.Container(); buyFabAnim.addChild(buyFabPress); // press squash (separate object → no tween conflict)
+  let buyGlow = null, buyArt = null, buyCm = null;
+  if (TEX.buyBonus) {
+    // GLOW — soft blurred additive duplicate behind the art (Stake-safe built-in
+    // BlurFilter, padding >=50 per slot-vfx-artist). Its alpha pulses in the loop.
+    buyGlow = new PIXI.Sprite(TEX.buyBonus); buyGlow.anchor.set(0.5);
+    buyGlow.blendMode = 'add'; buyGlow.alpha = 0.5; buyGlow.scale.set(1.06);
+    const gblur = new PIXI.BlurFilter({ strength: 16, quality: 3 }); gblur.padding = 60;
+    buyGlow.filters = [gblur];
+    buyFabPress.addChild(buyGlow);
+    buyArt = new PIXI.Sprite(TEX.buyBonus); buyArt.anchor.set(0.5);
+    buyCm = new PIXI.ColorMatrixFilter(); buyArt.filters = [buyCm];           // brightness "shader" shimmer
+    buyFabPress.addChild(buyArt);
+  } else {
+    const pill = new PIXI.Graphics();
+    const pw = 150, ph = 150, pr = 34;
+    pill.roundRect(-pw / 2, -ph / 2, pw, ph, pr).fill({ color: 0xb3247e, alpha: 0.95 });
+    pill.roundRect(-pw / 2, -ph / 2, pw, ph, pr).stroke({ color: 0x8fe8ff, width: 4, alpha: 0.9 });
+    pill.roundRect(-pw / 2 + 8, -ph / 2 + 8, pw - 16, ph * 0.42, pr - 10).fill({ color: 0xffffff, alpha: 0.12 });
+    buyFabPress.addChild(pill);
+    const lbl = new PIXI.Text({ text: 'BUY\nBONUS', style: { fontFamily: THEME.type.familyDisplay, fontSize: 30, fill: 0xffe24a, align: 'center', lineHeight: 30, stroke: { color: 0xd1356f, width: 5, join: 'round' } } });
+    lbl.anchor.set(0.5); buyFabPress.addChild(lbl);
+  }
+  const _buyBaseW = Math.max(1, (buyArt || buyFabPress).width);   // intrinsic size for fit (blur-free)
+  buyFab.on('pointertap', () => { try { Sound.click(); } catch (e) {} showBuyBonusModal(); });
+  // PRESS FEEDBACK — Emil canon: 0.94 down (power3.out), elastic settle up.
+  buyFab.on('pointerdown', () => { try { window.gsap && window.gsap.to(buyFabPress.scale, { x: 0.94, y: 0.94, duration: 0.1, ease: 'power3.out' }); } catch (e) {} });
+  const _buyRelease = () => { try { window.gsap && window.gsap.to(buyFabPress.scale, { x: 1, y: 1, duration: 0.42, ease: 'elastic.out(1, 0.5)' }); } catch (e) {} };
+  buyFab.on('pointerup', _buyRelease); buyFab.on('pointerupoutside', _buyRelease); buyFab.on('pointercancel', _buyRelease);
+  // IDLE VFX LOOP — top-tier: breathe + float + glow pulse + brightness shimmer.
+  // Stake-safe (built-in filters + GSAP transform/alpha, no raw GLSL). Honors
+  // reduced-motion. The button persists for the session, so the loops live on.
+  (function buyFabVfx() {
+    const g = window.gsap;
+    if (!g || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    g.to(buyFabAnim.scale, { x: 1.045, y: 1.045, duration: 1.5, ease: 'sine.inOut', repeat: -1, yoyo: true });
+    g.to(buyFabAnim, { y: '-=7', duration: 1.9, ease: 'sine.inOut', repeat: -1, yoyo: true });
+    if (buyGlow) g.to(buyGlow, { alpha: 0.9, duration: 1.2, ease: 'sine.inOut', repeat: -1, yoyo: true });
+    if (buyCm) { const o = { b: 1 }; g.to(o, { b: 1.16, duration: 1.2, ease: 'sine.inOut', repeat: -1, yoyo: true, onUpdate() { try { buyCm.brightness(o.b, false); } catch (e) {} } }); }
+  })();
+  try { if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || /[?&]debug=/.test(location.search)) { window.__buyFab = buyFab; window.__buyModal = buyModal; } } catch (e) {}
+  function layoutBuyFab() {
+    const W = app.screen.width, H = app.screen.height;
+    const portrait = H > W * 1.05;
+    const targetW = portrait ? Math.min(W * 0.17, 88) : Math.min(W * 0.13, 184);   // mobile ~2x smaller per request
+    buyFabInner.scale.set(targetW / _buyBaseW);
+    if (portrait) buyFab.position.set(W * 0.17, H * 0.77);   // bottom-left by the spin
+    else buyFab.position.set(W * 0.085, H * 0.46);            // left of the reels, vertical centre
+  }
+  layoutBuyFab();
+  // VISIBILITY — show ONLY when buying is actually possible: idle phase, policy
+  // allows it, and the picker isn't already open. Driven by the render loop
+  // (refreshBuyFabVisibility) so it updates on every state change — fixes the
+  // "buy-bonus active case still showing / not updating" bug.
+  function refreshBuyFabVisibility() {
+    // User: KEEP the BUY BONUS visible during spins (do NOT hide every spin) —
+    // only hide it while the picker itself is open, or when policy/replay forbids it.
+    buyFab.visible = _buyAllowed() && !buyModal.visible;
+  }
+  refreshBuyFabVisibility();
   bmConfirm.on('pointertap', () => {
     const cost = bonusCostX6(_selectedTier);
     if(State.balanceX6 < cost){ hideBuyBonusModal(); return; }
@@ -4677,6 +4755,23 @@
       drRow('Paylines','10 fixed',y,w); y+=22;
       drRow('RTP',RTP_DISPLAY,y,w); y+=22;
       drRow('Max Win',ADVERTISED_MAX_X.toLocaleString('en-US')+'×',y,w);
+      y += 32;
+      // ── GAME INFO button — opens the full info/paytable modal straight from the
+      // menu drawer (user: "add game information in the menu, not only settings").
+      const giBtn = new PIXI.Container(); giBtn.eventMode = 'static'; giBtn.cursor = 'pointer';
+      const giBg = new PIXI.Graphics(); giBtn.addChild(giBg);
+      const drawGi = (hov) => { giBg.clear()
+        .roundRect(0, 0, w, 34, 9).fill(hov ? SURF.accent : SURF.pillOff)
+        .roundRect(0, 0, w, 34, 9).stroke({ color: SURF.accentHi, width: 1.5 }); };
+      drawGi(false);
+      const giT = new PIXI.Text({ text: 'GAME INFO', style: { fontFamily: SURF.familyDisplay, fontSize: 12, fill: 0xffffff, letterSpacing: 1.5 } });
+      giT.anchor.set(0.5); giT.position.set(w / 2, 17); giBtn.addChild(giT);
+      giBtn.position.set(0, y);
+      giBtn.on('pointerover', (e) => { if (!e || e.pointerType === 'mouse') drawGi(true); });
+      giBtn.on('pointerout', () => drawGi(false));
+      giBtn.on('pointertap', () => { try { Sound.click(); } catch (e) {} closeDrawer(); showInfoModal(); });
+      drawerBody.addChild(giBtn);
+      y += 42;
     }
     if(name==='autoplay'){
       drawerTitle.text = 'AUTOPLAY';
@@ -7166,6 +7261,7 @@
     const W=app.screen.width, H=app.screen.height;
     const portrait = H > W*1.05;
     const tiny = H < 330;   // genuinely short viewports only (Popout S) — a tall phone is NOT tiny
+    try { layoutBuyFab(); } catch(e){}   // reposition the floating Buy Bonus button per preset
     // 25 px breathing room on every edge for normal viewports; Popout S (tiny)
     // keeps a slim margin — 25 px all-round would crush a 225 px-tall window.
     // Portrait gets EXTRA bottom padding (award-tier audit #7) — the spin
@@ -10585,6 +10681,10 @@
   app.ticker.add((ticker) => {
     const dt=ticker.deltaTime;
     const now=performance.now();
+
+    // Floating BUY BONUS button — show only when buying is possible (idle, allowed,
+    // picker closed). Updates every frame so phase changes flip it instantly.
+    try { refreshBuyFabVisibility(); } catch(e){}
 
     // Bonus FX overlay — runs every frame during FREESPIN
     drawBonusFx(now);
