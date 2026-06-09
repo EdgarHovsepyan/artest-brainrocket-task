@@ -154,6 +154,7 @@ export class SlotController extends Component {
     else if (e.keyCode === KeyCode.KEY_M) this.toggleSound();
     else if (e.keyCode === KeyCode.KEY_B) this.view.openBuyMenu();
     else if (e.keyCode === KeyCode.KEY_S) this.view.openSettingsPanel();
+    else if (e.keyCode === KeyCode.KEY_I) this.view.openInfoPanel();
   }
 
   private fmt(cents: number): string {

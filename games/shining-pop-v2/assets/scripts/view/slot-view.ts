@@ -21,6 +21,14 @@ import {
   view,
 } from 'cc';
 import { GRID, PAYLINES, SYMBOLS } from '../logic/game-config';
+import {
+  CONTROLS_LINES,
+  maxWinMultiple,
+  paytableRows,
+  RTP_DISPLAY,
+  RULES_LINES,
+  VOLATILITY_DISPLAY,
+} from '../logic/info-content';
 import { SpinResult } from '../logic/types';
 import { winningCellsByReel } from '../logic/win-cells';
 import { VIEW_CONFIG } from './view-config';
@@ -114,6 +122,8 @@ export class SlotView extends Component {
   private settingsPanel: Node | null = null;
   private settingsChangeCb: ((key: SettingsKey, value: number | boolean) => void) | null = null;
   private menuHub: Node | null = null;
+  private infoPanel: Node | null = null;
+  private infoTab: 'rules' | 'paytable' | 'info' = 'rules';
   private reducedFx = false;
 
   private spinCb: (() => void) | null = null;
@@ -661,6 +671,114 @@ export class SlotView extends Component {
     if (this.settingsPanel) this.settingsPanel.active = false;
   }
 
+  // ---- GAME INFORMATION panel (master parity: Rules / Paytable / Info tabs) --
+  /** Rebuild the info panel on the given tab. Content derives from logic data
+   *  (paytable rows, computed max win) so the panel can never drift from the math. */
+  private buildInfoPanel(tab: 'rules' | 'paytable' | 'info'): void {
+    const wasOpen = this.infoPanel?.active ?? true;
+    this.infoPanel?.destroy();
+    this.infoTab = tab;
+    const w = 460;
+    const h = 560;
+    const panel = this.mkNode('infoPanel', w, h, this.node);
+    panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY - 40, 0);
+    panel.active = wasOpen;
+    const bg = panel.addComponent(Graphics);
+    bg.fillColor = new Color(8, 8, 10, 248);
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.fill();
+    bg.lineWidth = 4;
+    bg.strokeColor = ACID;
+    bg.roundRect(-w / 2, -h / 2, w, h, 14);
+    bg.stroke();
+    this.mkLabel('GAME INFORMATION', 0, h / 2 - 26, 20, ACID, panel);
+    (['rules', 'paytable', 'info'] as const).forEach((name, i) => {
+      this.mkTextButton(
+        name.toUpperCase(),
+        (i - 1) * 130,
+        h / 2 - 66,
+        118,
+        34,
+        () => this.buildInfoPanel(name),
+        panel,
+      ).setActive(tab === name);
+    });
+    const top = h / 2 - 104;
+    const left = (text: string, y: number, size = 12, col = MUTED) => {
+      const l = this.mkLabel(text, -w / 2 + 24, y, size, col, panel);
+      l.horizontalAlign = Label.HorizontalAlign.LEFT;
+      return l;
+    };
+    if (tab === 'rules') {
+      let y = top;
+      for (const line of RULES_LINES) {
+        left('· ' + line, y);
+        y -= 26;
+      }
+      y -= 14;
+      left('CONTROLS', y, 14, ACID);
+      y -= 26;
+      for (const line of CONTROLS_LINES) {
+        left(line, y);
+        y -= 24;
+      }
+    } else if (tab === 'paytable') {
+      left('SYMBOL', top, 11, ACID);
+      [3, 4, 5].forEach((n, i) => {
+        const head = this.mkLabel(`x${n}`, w / 2 - 170 + i * 62, top, 11, ACID, panel);
+        head.horizontalAlign = Label.HorizontalAlign.RIGHT;
+      });
+      let y = top - 28;
+      for (const row of paytableRows()) {
+        left(row.name, y, 12);
+        [row.pay3, row.pay4, row.pay5].forEach((pay, i) => {
+          const v = this.mkLabel(String(pay), w / 2 - 170 + i * 62, y, 12, MUTED, panel);
+          v.horizontalAlign = Label.HorizontalAlign.RIGHT;
+        });
+        y -= 30;
+      }
+      left('Pays are line-bet multiples.', y - 6, 10);
+    } else {
+      let y = top;
+      const stat = (label: string, value: string) => {
+        left(label, y, 12);
+        const v = this.mkLabel(value, w / 2 - 80, y, 13, ACID, panel);
+        v.horizontalAlign = Label.HorizontalAlign.RIGHT;
+        y -= 30;
+      };
+      stat('RTP', RTP_DISPLAY);
+      stat('MAX WIN', `${maxWinMultiple().toLocaleString('en-US')}× line bet`);
+      stat('VOLATILITY', VOLATILITY_DISPLAY);
+      stat('LINES', String(PAYLINES.length));
+      stat('GRID', `${GRID.reels}×${GRID.rows}`);
+      y -= 10;
+      left('RTP is calculated over many plays.', y, 10);
+      y -= 22;
+      left('Individual sessions may vary.', y, 10);
+    }
+    const close = this.mkTextButton(
+      'CLOSE',
+      0,
+      -h / 2 + 38,
+      120,
+      40,
+      () => this.closeInfoPanel(),
+      panel,
+    );
+    void close;
+    this.infoPanel = panel;
+  }
+
+  openInfoPanel(): void {
+    this.closeOverlays();
+    if (!this.infoPanel) this.buildInfoPanel(this.infoTab);
+    if (this.infoPanel) this.infoPanel.active = true;
+  }
+
+  closeInfoPanel(): void {
+    if (this.infoPanel) this.infoPanel.active = false;
+  }
+
   // ---- MENU hub (master pending item: menu shows more than one destination) --
   /** Small hub the bar's menu glyph opens: BUY FEATURE / SETTINGS / AUTOPLAY. */
   openMenuHub(): void {
@@ -672,6 +790,7 @@ export class SlotView extends Component {
   private buildMenuHub(): Node {
     const entries: [string, () => void][] = [
       ['BUY FEATURE', () => this.openBuyMenu()],
+      ['GAME INFO', () => this.openInfoPanel()],
       ['SETTINGS', () => this.openSettingsPanel()],
       ['AUTOPLAY', () => this.openAutoplayPanel()],
     ];
@@ -712,6 +831,7 @@ export class SlotView extends Component {
     if (this.autoplayPanel) this.autoplayPanel.active = false;
     if (this.settingsPanel) this.settingsPanel.active = false;
     if (this.menuHub) this.menuHub.active = false;
+    if (this.infoPanel) this.infoPanel.active = false;
   }
 
   /** Reduced-effects accessibility flag — gates particles + anticipation drag. */
