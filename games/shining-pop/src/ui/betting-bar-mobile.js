@@ -1,97 +1,79 @@
 /* ============================================================================
    ARTEST | BrainRocket — BettingBarMobile  (PixiJS v8)
    ----------------------------------------------------------------------------
-   A faithful v8 port of the DELIVERED `BettingBarMobile.pixi.js` (v7) from
-   BETTING PANEL INFO.zip — the studio's betting panel, used as THE bar in
-   every game. Design space 540x684 portrait. Same public API + events as the
-   delivered file, so it is a drop-in:
+   A faithful v8 port of the DELIVERED `BettingBarMobile.pixi.js` betting panel,
+   used as THE bar in every game. Design space 540x684 portrait. Same public API
+   + events, so it is a drop-in:
 
      const bar = new BettingBarMobile({ bare:true });  // bare = no stage bg/scrim
      host.addChild(bar);  bar.fitBottom(viewW, viewH); // dock to screen bottom
      bar.setBalance(10000000); bar.setBet(50); bar.setLastWin(200000000);
      bar.on2('spin', ()=>startSpin());  bar.on2('bet:inc', ...); ...
 
-   Events: spin · bet:inc · bet:dec · autoplay · turbo · sound · menu
-   Game-state extensions (not in the delivered file, additive): setSpinning,
-   setAutoplay, setTurbo, setAffordable, setSteppers.
+   Events: spin · bet:inc · bet:dec · betmenu · autoplay · turbo · sound · menu
+   Game-state extensions: setSpinning, setAutoplay, setTurbo, setAffordable,
+   setSteppers, setDemo.
 
-   v7→v8 port notes: Graphics `.beginFill().draw*().endFill()` → `.shape().fill()`,
-   `.lineStyle().draw*()` → `.shape().stroke()`, `PIXI.Text(t,style)` →
-   `new PIXI.Text({text,style})`, `BlurFilter(9)` → `new BlurFilter({strength:9})`.
-   DropShadowFilter (pixi-filters) is optional — degrades to no shadow.
+   RENDERING: v8 FillGradient (VECTOR) — crisp borders at any DPR, no masked
+   gradient-sprites (the old blur source on retina/iPhone), no DropShadow/Blur
+   filters (expensive on mobile; depth comes from inner gloss + the dark scrim).
    ============================================================================ */
 import * as PIXI from 'pixi.js';
 
 const DPR = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
-const DSF =
-  (PIXI.filters && PIXI.filters.DropShadowFilter) ||
-  (typeof window !== 'undefined' && window.__PIXI_FILTERS__ && window.__PIXI_FILTERS__.DropShadowFilter) ||
-  null;
 
-// Delivered gold palette (exact stop-lists from the zip).
+// CRYSTAL theme: indigo darks → violet/orchid → magenta, lavender highlights.
 const G = {
-  // CRYSTAL theme (derived from the 2K cathedral bg): indigo darks → violet/
-  // orchid → magenta, lavender highlights. Replaces the delivered gold.
   stage: [[0, '#1a1240'], [0.7, '#0d0826'], [1, '#060418']],
   panel: [[0, '#2a1e52'], [0.5, '#191140'], [1, '#0c0826']],
   banner: [[0, '#171138'], [0.5, '#281c58'], [1, '#171138']],
   active: [[0, '#f6c8ff'], [0.45, '#db5fd8'], [1, '#8e2ec4']],
   ring: [[0, '#ecd6ff'], [0.34, '#b86fda'], [0.66, '#7a3cb2'], [1, '#34206a']],
   spin: [[0, '#2a1f4e'], [0.6, '#15102e'], [1, '#09071e']],
-  gold: [[0, 'rgba(206,124,224,0)'], [0.5, 'rgba(220,110,220,0.78)'], [1, 'rgba(206,124,224,0)']],
+  divider: [[0, 'rgba(206,124,224,0)'], [0.5, 'rgba(220,110,220,0.78)'], [1, 'rgba(206,124,224,0)']],
+  glow: [[0, 'rgba(216,74,216,0.22)'], [0.55, 'rgba(216,74,216,0.08)'], [1, 'rgba(216,74,216,0)']],
 };
+// 2026-06-09 — all panel text + currency + icons = WHITE-SMOKE (user: kill purple
+// text). Labels are a muted white-smoke for hierarchy (NOT purple).
+const COL = { edge: 0xb86fda, label: 0xc9ced8, value: 0xf5f7fa, cur: 0xe9edf3, icon: 0xf5f7fa, divider: 0xb070da, gloss: 0xffffff };
+const FS = 1.1;   // global type-scale bump (user: "bigger all texts")
 const FONT = "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
 
-function mkShadow(dy, blur, alpha) {
-  if (!DSF) return null;
-  try { return new DSF({ offset: { x: 0, y: dy }, blur, alpha, color: 0x000000, quality: 5 }); }
-  catch (e) { return null; }
+// ── VECTOR gradients (FillGradient) — crisp at any scale, no mask blur ──
+function fg(stops, dir) {
+  const end = dir === 'h' ? { x: 1, y: 0 } : dir === 'd' ? { x: 1, y: 1 } : { x: 0, y: 1 };
+  return new PIXI.FillGradient({
+    type: 'linear', start: { x: 0, y: 0 }, end,
+    colorStops: stops.map((s) => ({ offset: s[0], color: s[1] })), textureSpace: 'local',
+  });
 }
-const fSh = () => mkShadow(3, 5, 0.5);
-const fSpin = () => mkShadow(9, 14, 0.55);
-const fSoft = () => new PIXI.BlurFilter({ strength: 9 });
-const setF = (o, f) => { if (f) o.filters = [f]; return o; };
-
-// canvas linear/radial gradient → Texture (faithful to the delivered approach)
-function grad(w, h, stops, horiz) {
-  const sw = Math.max(1, Math.ceil(w * DPR)), sh = Math.max(1, Math.ceil(h * DPR));
-  const c = document.createElement('canvas'); c.width = sw; c.height = sh;
-  const x = c.getContext('2d');
-  const g = horiz ? x.createLinearGradient(0, 0, sw, 0) : x.createLinearGradient(0, 0, 0, sh);
-  stops.forEach((s) => g.addColorStop(s[0], s[1]));
-  x.fillStyle = g; x.fillRect(0, 0, sw, sh);
-  return PIXI.Texture.from(c);
+function fgRad(stops, cx, cy) {
+  return new PIXI.FillGradient({
+    type: 'radial', center: { x: cx, y: cy }, innerRadius: 0,
+    outerCenter: { x: 0.5, y: 0.5 }, outerRadius: 0.6,
+    colorStops: stops.map((s) => ({ offset: s[0], color: s[1] })), textureSpace: 'local',
+  });
 }
-function radial(d, stops, cx, cy) {
-  const sd = Math.ceil(d * DPR);
-  const c = document.createElement('canvas'); c.width = c.height = sd;
-  const x = c.getContext('2d');
-  const g = x.createRadialGradient(sd * cx, sd * cy, 0, sd * 0.5, sd * 0.5, sd * 0.55);
-  stops.forEach((s) => g.addColorStop(s[0], s[1]));
-  x.fillStyle = g; x.fillRect(0, 0, sd, sd);
-  return PIXI.Texture.from(c);
-}
-function gs(w, h, stops, horiz) { const s = new PIXI.Sprite(grad(w, h, stops, horiz)); s.width = w; s.height = h; return s; }
-
 function panel(w, h, rx, fill, ew, horiz, inRx) {
-  const c = new PIXI.Container();
-  const sp = gs(w, h, fill, horiz);
-  const m = new PIXI.Graphics().roundRect(0, 0, w, h, rx).fill(0xffffff);
-  sp.mask = m; c.addChild(sp, m);
-  if (ew) c.addChild(new PIXI.Graphics().roundRect(ew / 2, ew / 2, w - ew, h - ew, rx - ew / 2).stroke({ width: ew, color: 0xb86fda }));
-  if (inRx !== undefined) c.addChild(new PIXI.Graphics().roundRect(2, 2, w - 4, h - 4, inRx).stroke({ width: 1.2, color: 0xffffff, alpha: 0.06 }));
-  return c;
+  const g = new PIXI.Graphics();
+  g.roundRect(0, 0, w, h, rx).fill(fg(fill, horiz ? 'h' : 'v'));
+  if (inRx !== undefined) g.roundRect(2, 2, w - 4, h - 4, inRx).stroke({ width: 1.2, color: COL.gloss, alpha: 0.06 });
+  if (ew) g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: COL.edge });
+  return g;
 }
 function cbase(r, fill, sc, sw) {
-  const c = new PIXI.Container();
-  const d = r * 2; const sp = gs(d, d, fill); sp.position.set(-r, -r);
-  const m = new PIXI.Graphics().circle(0, 0, r).fill(0xffffff); sp.mask = m; c.addChild(sp, m);
-  if (sw) c.addChild(new PIXI.Graphics().circle(0, 0, r).stroke({ width: sw, color: sc != null ? sc : 0xb86fda }));
-  return c;
+  const g = new PIXI.Graphics();
+  g.circle(0, 0, r).fill(fg(fill, 'v'));
+  if (sw) {
+    // inset strokes (no edge bleed) → crisper border: crystal rim + thin inner gloss
+    g.circle(0, 0, r - sw * 0.5).stroke({ width: sw, color: sc != null ? sc : COL.edge, alpha: 0.92 });
+    g.circle(0, 0, r - sw - 0.5).stroke({ width: 1, color: COL.gloss, alpha: 0.10 });
+  }
+  return g;
 }
 function T(t, sz, col, w, ax, mid, ls) {
-  const o = new PIXI.Text({ text: t, style: { fontFamily: FONT, fontSize: sz, fontWeight: String(w || 700), fill: col, letterSpacing: ls || 0 } });
-  o.resolution = DPR; o.anchor.set(ax || 0, mid ? 0.5 : 0); return o;
+  const o = new PIXI.Text({ text: t, style: { fontFamily: FONT, fontSize: Math.round(sz * FS), fontWeight: String(w || 700), fill: col, letterSpacing: ls || 0 } });
+  o.resolution = Math.max(2, DPR); o.anchor.set(ax || 0, mid ? 0.5 : 0); return o;
 }
 function hit(c, h, fn) {
   c.eventMode = 'static'; c.cursor = 'pointer'; c.hitArea = h; let d = false;
@@ -116,9 +98,9 @@ export class BettingBarMobile extends PIXI.Container {
 
   _siblingPanel(w, h, label, value) {
     const c = new PIXI.Container();
-    const p = panel(w, h, h / 2, G.banner, 1.8, true, h / 2 - 2); setF(p, fSh()); c.addChild(p);
-    const l = T(label, 13, 0xd9a8f2, 700, 0, true, 1.5);
-    const v = T(value, 17, 0xf3ecff, 700, 0, true);
+    c.addChild(panel(w, h, h / 2, G.banner, 1.8, true, h / 2 - 2));
+    const l = T(label, 13, COL.label, 700, 0, true, 1.5);
+    const v = T(value, 17, COL.value, 700, 0, true);
     c.relayout = () => {
       v.scale.set(1);
       const maxV = w - 20 - l.width - 10;            // keep label + value inside the banner
@@ -130,22 +112,21 @@ export class BettingBarMobile extends PIXI.Container {
   }
   _spin(cx, cy, R) {
     const g = new PIXI.Container(); g.position.set(cx, cy); const inner = R * 0.7857;
-    const rs = gs(R * 2, R * 2, G.ring, true); rs.position.set(-R, -R);
-    const rm = new PIXI.Graphics().circle(0, 0, R).fill(0xffffff); rs.mask = rm; g.addChild(rs, rm);
-    g.addChild(new PIXI.Graphics().circle(0, 0, R - 1).stroke({ width: R * 0.057, color: 0xf0e0ff, alpha: 0.6 }));
-    const ct = new PIXI.Sprite(radial(inner * 2, G.spin, 0.4, 0.34)); ct.anchor.set(0.5);
-    const cm = new PIXI.Graphics().circle(0, 0, inner).fill(0xffffff); ct.mask = cm; g.addChild(ct, cm);
-    g.addChild(new PIXI.Graphics().circle(0, 0, inner).stroke({ width: R * 0.031, color: 0xe8d0ff, alpha: 0.4 }));
-    g.addChild(new PIXI.Graphics().ellipse(-R * 0.23, -R * 0.26, R * 0.49 / 2, R * 0.21 / 2).fill({ color: 0xffffff, alpha: 0.07 }));
+    const base = new PIXI.Graphics();
+    base.circle(0, 0, R).fill(fg(G.ring, 'd'));
+    base.circle(0, 0, R - 1).stroke({ width: R * 0.057, color: COL.value, alpha: 0.6 });
+    base.circle(0, 0, inner).fill(fgRad(G.spin, 0.4, 0.34));
+    base.circle(0, 0, inner).stroke({ width: R * 0.031, color: 0xe8d0ff, alpha: 0.4 });
+    base.ellipse(-R * 0.23, -R * 0.26, R * 0.49 / 2, R * 0.21 / 2).fill({ color: COL.gloss, alpha: 0.07 });
+    g.addChild(base);
     // rotatable arrow (shown in idle/spin) + a stop square (shown while spinning)
     const a = new PIXI.Container(); const ar = R * 0.4;
-    a.addChild(new PIXI.Graphics().arc(0, 0, ar, -1.206, -1.936 + 2 * Math.PI).stroke({ width: R * 0.107, color: 0xf3ecff, cap: 'round' }));
+    a.addChild(new PIXI.Graphics().arc(0, 0, ar, -1.206, -1.936 + 2 * Math.PI).stroke({ width: R * 0.107, color: COL.value, cap: 'round' }));
     const tip = ar + R * 0.02;
-    a.addChild(new PIXI.Graphics().moveTo(0, -tip - R * 0.03).lineTo(-R * 0.114, -ar + R * 0.06).lineTo(-R * 0.171, -tip - R * 0.07).fill(0xf3ecff));
+    a.addChild(new PIXI.Graphics().moveTo(0, -tip - R * 0.03).lineTo(-R * 0.114, -ar + R * 0.06).lineTo(-R * 0.171, -tip - R * 0.07).fill(COL.value));
     g.addChild(a);
-    const stop = new PIXI.Graphics().roundRect(-R * 0.26, -R * 0.26, R * 0.52, R * 0.52, R * 0.12).fill({ color: 0xf3ecff, alpha: 0.98 }).stroke({ color: 0x8a2bc0, width: R * 0.03, alpha: 0.9 });
+    const stop = new PIXI.Graphics().roundRect(-R * 0.26, -R * 0.26, R * 0.52, R * 0.52, R * 0.12).fill({ color: COL.value, alpha: 0.98 }).stroke({ color: 0x8a2bc0, width: R * 0.03, alpha: 0.9 });
     stop.visible = false; g.addChild(stop);
-    setF(g, fSpin());
     g._arrow = a; g._stop = stop;
     g.spin = () => {
       if (g.__s) return; g.__s = true; const s = performance.now();
@@ -157,33 +138,33 @@ export class BettingBarMobile extends PIXI.Container {
   _build() {
     const E = {}; this.elements = E;
     if (!this._bare) {
-      this.addChild(gs(540, 684, G.stage));
+      this.addChild(new PIXI.Graphics().rect(0, 0, 540, 684).fill(fg(G.stage, 'v')));
       this.addChild(new PIXI.Graphics().rect(0, 300, 540, 384).fill({ color: 0x000000, alpha: 0.12 }));
     }
-    const g1 = gs(540, 1.3, G.gold, true); g1.position.set(0, 299.5); this.addChild(g1);
-    const glow = new PIXI.Graphics().circle(270, 392, 92).fill({ color: 0xd84ad8, alpha: 0.12 }); glow.filters = [fSoft()]; this.addChild(glow);
+    this.addChild(new PIXI.Graphics().rect(0, 299.5, 540, 1.4).fill(fg(G.divider, 'h')));
+    // soft hero glow under the spin — radial FillGradient (no blur filter)
+    this.addChild(new PIXI.Graphics().circle(270, 392, 116).fill(fgRad(G.glow, 0.5, 0.5)));
 
     const lw = this._siblingPanel(200, 46, 'LAST WIN', '0.00'); lw.position.set(60, 210); this.addChild(lw); E.lastWinPanel = lw;
     const tb = this._siblingPanel(200, 46, 'TOTAL BET', '0'); tb.position.set(280, 210); this.addChild(tb); E.totalBetPanel = tb;
 
     const demo = new PIXI.Container(); demo.position.set(210, 272); demo.addChild(panel(120, 24, 12, G.panel, 1.1, false));
-    const dt = T('DEMO MODE', 11, 0x9c88c2, 700, 0.5, true, 2.5); dt.position.set(60, 12); demo.addChild(dt); demo.visible = false; this.addChild(demo); E.demoBadge = demo;
+    const dt = T('DEMO MODE', 11, COL.cur, 700, 0.5, true, 2.5); dt.position.set(60, 12); demo.addChild(dt); demo.visible = false; this.addChild(demo); E.demoBadge = demo;
 
     const spin = this._spin(270, 392, 70); hit(spin, new PIXI.Circle(0, 0, 70), () => { if (!spin._stop.visible) spin.spin(); this._emit('spin'); }); this.addChild(spin); E.spinButton = spin;
 
     // autoplay button (+ count overlay for running state)
-    const au = new PIXI.Container(); au.position.set(104, 506); const ac = cbase(30, G.panel, 0xb86fda, 1.8); setF(ac, fSh()); au.addChild(ac);
-    const at = gs(18, 20, G.active); at.position.set(-6, -10);
-    const am = new PIXI.Graphics().moveTo(12, 0).lineTo(-6, -10).lineTo(-6, 10).fill(0xffffff); at.mask = am; au.addChild(at, am);
-    const aCount = T('', 17, 0xf3ecff, 700, 0.5, true); aCount.visible = false; au.addChild(aCount);
+    const au = new PIXI.Container(); au.position.set(104, 506); au.addChild(cbase(30, G.panel, COL.edge, 1.8));
+    const at = new PIXI.Graphics().poly([12, 0, -6, -10, -6, 10]).fill(fg(G.active, 'v')); au.addChild(at);
+    const aCount = T('', 17, COL.value, 700, 0.5, true); aCount.visible = false; au.addChild(aCount);
     hit(au, new PIXI.Circle(0, 0, 30), () => this._emit('autoplay')); this.addChild(au); E.autoplayButton = au; au._glyph = at; au._count = aCount;
 
     // stepper pill  [-] value [+]
-    const st = new PIXI.Container(); st.position.set(170, 479); const sp = panel(200, 54, 27, G.panel, 1.8, false, 25); setF(sp, fSh()); st.addChild(sp);
-    [237, 303].forEach((x) => st.addChild(new PIXI.Graphics().moveTo(x - 170, 7).lineTo(x - 170, 47).stroke({ width: 1.3, color: 0xb070da, alpha: 0.28 })));
-    const mi = new PIXI.Container(); mi.addChild(new PIXI.Graphics().moveTo(19, 27).lineTo(47, 27).stroke({ width: 3, color: 0xefe6ff, cap: 'round' }));
-    const sv = T('0', 24, 0xf3ecff, 700, 0.5, true); sv.position.set(100, 27);
-    const pi = new PIXI.Container(); pi.addChild(new PIXI.Graphics().moveTo(167, 13).lineTo(167, 41).moveTo(153, 27).lineTo(181, 27).stroke({ width: 3, color: 0xefe6ff, cap: 'round' }));
+    const st = new PIXI.Container(); st.position.set(170, 479); st.addChild(panel(200, 54, 27, G.panel, 1.8, false, 25));
+    [237, 303].forEach((x) => st.addChild(new PIXI.Graphics().moveTo(x - 170, 7).lineTo(x - 170, 47).stroke({ width: 1.3, color: COL.divider, alpha: 0.28 })));
+    const mi = new PIXI.Container(); mi.addChild(new PIXI.Graphics().moveTo(19, 27).lineTo(47, 27).stroke({ width: 3, color: COL.icon, cap: 'round' }));
+    const sv = T('0', 24, COL.value, 700, 0.5, true); sv.position.set(100, 27);
+    const pi = new PIXI.Container(); pi.addChild(new PIXI.Graphics().moveTo(167, 13).lineTo(167, 41).moveTo(153, 27).lineTo(181, 27).stroke({ width: 3, color: COL.icon, cap: 'round' }));
     st.addChild(mi, sv, pi);
     mi.eventMode = 'static'; mi.cursor = 'pointer'; mi.hitArea = new PIXI.Rectangle(-3, -15, 70, 54);
     pi.eventMode = 'static'; pi.cursor = 'pointer'; pi.hitArea = new PIXI.Rectangle(133, -15, 70, 54);
@@ -193,19 +174,18 @@ export class BettingBarMobile extends PIXI.Container {
     st.minus = mi; st.plus = pi; st.value = sv; this.addChild(st); E.betStepper = st;
 
     // turbo button
-    const tbtn = new PIXI.Container(); tbtn.position.set(436, 506); const tc = cbase(30, G.panel, 0xb86fda, 1.8); setF(tc, fSh()); tbtn.addChild(tc);
-    const tbB = gs(17, 26, G.active); tbB.position.set(-9, -12);
-    const tm = new PIXI.Graphics().moveTo(4, -12).lineTo(-9, 3).lineTo(-1, 3).lineTo(-5, 14).lineTo(8, -2).lineTo(0, -2).fill(0xffffff); tbB.mask = tm; tbtn.addChild(tbB, tm);
+    const tbtn = new PIXI.Container(); tbtn.position.set(436, 506); tbtn.addChild(cbase(30, G.panel, COL.edge, 1.8));
+    const tbB = new PIXI.Graphics().poly([4, -12, -9, 3, -1, 3, -5, 14, 8, -2, 0, -2]).fill(fg(G.active, 'v')); tbtn.addChild(tbB);
     const tPip = new PIXI.Graphics(); tPip.visible = false; tbtn.addChild(tPip);
     hit(tbtn, new PIXI.Circle(0, 0, 30), () => this._emit('turbo')); this.addChild(tbtn); E.turboButton = tbtn; tbtn._glyph = tbB; tbtn._pip = tPip;
 
     // bottom balance bar (+ sound + menu)
-    const bb = new PIXI.Container(); bb.position.set(14, 560); const bbp = panel(512, 44, 22, G.panel, 1.8, false, 20); setF(bbp, fSh()); bb.addChild(bbp);
-    const blbl = T('BALANCE', 13, 0xd9a8f2, 700, 0, true, 1.2); blbl.position.set(22, 22);
-    const bval = T('0', 15, 0xf3ecff, 700, 0, true);
-    const bcur = T('USD', 11, 0x9c88c2, 600, 0, true);
-    const betlbl = T('BET', 12, 0xd9a8f2, 700, 0, true, 1.2);
-    const betval = T('0', 15, 0xf3ecff, 700, 0, true);
+    const bb = new PIXI.Container(); bb.position.set(14, 560); bb.addChild(panel(512, 44, 22, G.panel, 1.8, false, 20));
+    const blbl = T('BALANCE', 13, COL.label, 700, 0, true, 1.2); blbl.position.set(22, 22);
+    const bval = T('0', 15, COL.value, 700, 0, true);
+    const bcur = T('USD', 11, COL.cur, 600, 0, true);
+    const betlbl = T('BET', 12, COL.label, 700, 0, true, 1.2);
+    const betval = T('0', 15, COL.value, 700, 0, true);
     bb.relayout = () => {
       bval.scale.set(1); betval.scale.set(1);              // scale-to-fit so long values don't crush
       if (bval.width > 120) bval.scale.set(120 / bval.width);
@@ -216,13 +196,13 @@ export class BettingBarMobile extends PIXI.Container {
       betlbl.position.set(cx - tot / 2, 22); betval.position.set(cx - tot / 2 + betlbl.width + 7, 22);
     };
     bb.addChild(blbl, bval, bcur, betlbl, betval); bb.relayout();
-    bb.addChild(new PIXI.Graphics().moveTo(430, 8).lineTo(430, 36).stroke({ width: 1.2, color: 0xb070da, alpha: 0.3 }));
+    bb.addChild(new PIXI.Graphics().moveTo(430, 8).lineTo(430, 36).stroke({ width: 1.2, color: COL.divider, alpha: 0.3 }));
     const snd = new PIXI.Graphics()
-      .moveTo(448, 17).lineTo(453, 17).lineTo(459, 12).lineTo(459, 32).lineTo(453, 27).lineTo(448, 27).fill(0xefe6ff);
-    snd.arc(458.39, 22, 7, -1.0297, 1.0297).stroke({ width: 2, color: 0xefe6ff, cap: 'round' });
-    snd.moveTo(466, 12).arc(459.37, 22, 12, -0.9851, 0.9851).stroke({ width: 2, color: 0xefe6ff, cap: 'round' });
+      .moveTo(448, 17).lineTo(453, 17).lineTo(459, 12).lineTo(459, 32).lineTo(453, 27).lineTo(448, 27).fill(COL.icon);
+    snd.arc(458.39, 22, 7, -1.0297, 1.0297).stroke({ width: 2, color: COL.icon, cap: 'round' });
+    snd.moveTo(466, 12).arc(459.37, 22, 12, -0.9851, 0.9851).stroke({ width: 2, color: COL.icon, cap: 'round' });
     const sB = new PIXI.Container(); sB.addChild(snd); sB.eventMode = 'static'; sB.cursor = 'pointer'; sB.hitArea = new PIXI.Rectangle(444, 6, 34, 32); sB.on('pointertap', () => this._emit('sound')); bb.addChild(sB);
-    const mn = new PIXI.Graphics(); [16, 22, 28].forEach((y) => mn.moveTo(478, y).lineTo(500, y)); mn.stroke({ width: 2.6, color: 0xefe6ff, cap: 'round' });
+    const mn = new PIXI.Graphics(); [16, 22, 28].forEach((y) => mn.moveTo(478, y).lineTo(500, y)); mn.stroke({ width: 2.6, color: COL.icon, cap: 'round' });
     const mB = new PIXI.Container(); mB.addChild(mn); mB.eventMode = 'static'; mB.cursor = 'pointer'; mB.hitArea = new PIXI.Rectangle(472, 6, 36, 32); mB.on('pointertap', () => this._emit('menu')); bb.addChild(mB);
     bb.balanceLabel = blbl; bb.balanceValue = bval; bb.balanceCurrency = bcur; bb.betLabel = betlbl; bb.betValue = betval; bb.soundButton = sB; bb.menuButton = mB;
     this.addChild(bb); E.balanceBar = bb;
@@ -238,8 +218,8 @@ export class BettingBarMobile extends PIXI.Container {
   // Dock the bar COMPACTLY to the screen bottom. Only the visible control BAND
   // (banners → balance bar) is docked flush at the bottom; the panel's empty
   // top/bottom design margins are excluded. The band height is capped to a
-  // fraction of the viewport so the REELS stay the biggest element (the spin
-  // hero no longer dwarfs the board). Returns barTopY for the reel clamp.
+  // fraction of the viewport so the REELS stay the biggest element. Returns
+  // barTopY for the reel clamp.
   fitBottom(W, H, opts) {
     opts = opts || {};
     const BAND_TOP = 192, BAND_BOT = 606, band = BAND_BOT - BAND_TOP; // visible bar band (design units)

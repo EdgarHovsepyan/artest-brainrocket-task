@@ -1683,10 +1683,13 @@
       gradeFilter.brightness(1.06, true);
       gradeFilter.contrast(0.04, true);
     } else if(mode === 'bonus_mega'){
-      // MEGA — cold, ominous, distinct: desat first then violet tint + contrast bump.
-      gradeFilter.saturate(-0.12, true);
-      gradeFilter.tint(0x8a2be2, true);
-      gradeFilter.contrast(0.06, true);
+      // MEGA — the marquee mode is the MOST saturated + brightest, in-brand fuchsia
+      // (was a backwards desaturate + off-brand violet 0x8a2be2 that fought the
+      // electric-fuchsia frost wash + bloom). Cyan stays a rim accent only.
+      gradeFilter.saturate(0.26, true);
+      gradeFilter.tint(0xff2ad0, true);
+      gradeFilter.brightness(1.05, true);
+      gradeFilter.contrast(0.05, true);
     }
     // 'base' (or anything unknown) leaves the matrix at _baseGradeMatrix.
   }
@@ -2271,11 +2274,6 @@
   const deliveredBarWeb = (typeof window !== 'undefined' && window.BettingBarWeb)
     ? new window.BettingBarWeb({ bare:true })
     : null;
-  // The 5-cell selector shows a sliding WINDOW of betLevels centred on the
-  // active level; this records where that window starts so bet:set (which
-  // passes a CELL INDEX 0..4) can map back to an absolute betLevels index.
-  // Maintained in syncDeliveredBar(), read in the bet:set handler.
-  let _webBetWindowStart = 0;
   if(deliveredBarWeb){
     deliveredBarWeb.visible = false;          // portrait default; layout() flips it on in landscape
     hud.addChild(deliveredBarWeb);
@@ -2311,13 +2309,14 @@
     });
     deliveredBarWeb.on2('menu', () => openDrawer('settings'));
     deliveredBarWeb.on2('buy', () => { if(_buyAllowed()) showBuyBonusModal(); });
-    // bet:set passes a CELL INDEX 0..4 into the current sliding window; map it
-    // back to an absolute betLevels index via the recorded window start.
-    deliveredBarWeb.on2('bet:set', (cellIdx) => {
+    // bet:set passes an ABSOLUTE betLevels index — the swipe carousel snaps to a
+    // centred level across the full list, so no sliding-window remap is needed.
+    deliveredBarWeb.on2('bet:set', (idx) => {
       if(State.phase !== Phase.IDLE) return;        // match bumpBet() guards
       if(State.autoplay.active) return;
-      const idx = Math.max(0, Math.min(State.betLevels.length - 1, _webBetWindowStart + cellIdx));
-      State.betIdx = idx;
+      const i = Math.max(0, Math.min(State.betLevels.length - 1, idx | 0));
+      if(i === State.betIdx) return;
+      State.betIdx = i;
       State.betX6 = State.betLevels[State.betIdx];
       try { Sound.click(); } catch(e){}
       updateHUD();   // → syncDeliveredBar() repaints both bars
@@ -2369,15 +2368,11 @@
       deliveredBarWeb.setAutoplay(State.autoplay.active ? State.autoplay.remaining : null);
       deliveredBarWeb.setSoundOn(!State.muted);
       deliveredBarWeb.setSpinning(spinning);
-      // 5-cell sliding window of betLevels, centred on the active level and
-      // expressed in DISPLAY units. Keep _webBetWindowStart so bet:set maps a
-      // cell index 0..4 back to an absolute betLevels index.
-      const levels = State.betLevels || [];
-      const maxStart = Math.max(0, levels.length - 5);
-      const start = Math.max(0, Math.min(State.betIdx - 2, maxStart));
-      _webBetWindowStart = start;
-      const win = levels.slice(start, start + 5).map(v => v / D);
-      deliveredBarWeb.setBetCells(win, State.betIdx - start);
+      // Swipe carousel: feed the FULL betLevels list (display units) + the active
+      // index. The component centres the active level and snaps on drag-release,
+      // emitting bet:set with an ABSOLUTE index.
+      const levels = (State.betLevels || []).map(v => v / D);
+      deliveredBarWeb.setBetLevels(levels, State.betIdx, (v) => fmtMoney(v * D));
     } catch(e){ /* never let a HUD push break the round */ }
   }
   // Per-frame breathing-aura layer for active buttons (turbo MAX, autoplay
@@ -2674,11 +2669,12 @@
   //                above (FREE SPINS WIN — issue #173 "cuter VFX")
   // GPU-aware (×fxScale + _gpuWeak hard cap), fully suppressed under reduced
   // motion. Called from celebrate() (tier≥4) and the FS-win path.
-  function spawnCascade(tier, cute){
+  function spawnCascade(tier, cute, mult){
     if(isReduced()) return;
+    mult = (mult == null) ? 1 : mult;   // 2-wave model: 0.45 at start, 1.0 on landing
     const W = app.screen.width, H = app.screen.height;
-    const n = Math.ceil(((cute ? 16 : 11) + tier*4) * fxScale);
-    const cap = _gpuWeak ? 70 : 170;
+    const n = Math.ceil(((cute ? 16 : 11) + tier*4) * fxScale * mult);
+    const cap = _gpuWeak ? 70 : 200;    // a touch more headroom for the 2-wave shower
     // Magenta-villain-crystal gem palette (was gold 0xffd24a/0xffce47 + cream —
     // off-brand). Soft→bright→hot magenta + an electric-fuchsia crystal-gem accent
     // (0xff2ad0, on-brand — was violet 0xc566ff) + crystal-white highlight.
@@ -2686,10 +2682,10 @@
     const pal = cute
       ? [0xff8ad0,0xff5ab0,0xffd9ec,0xff2ad0,0xffffff]
       : [0xff007f,0xff5ab0,0xff2ad0,0xffd9ec,0xffffff];
-    const spreadX = Math.min(W*0.44, 380);
+    const spreadX = Math.min(W*0.52, 440);   // wider fountain, less "single puff"
     for(let i=0;i<n;i++){
       if(winGems.length > cap) break;
-      const rain = cute && (i%3===0);   // a third of the confetti drifts down from above
+      const rain = (i%4===0);   // a quarter rains down from above on EVERY tier (was cute-only)
       winGems.push({
         shape: cute ? (i%2 ? 'star':'diamond') : 'diamond',
         x: (vrnd()-0.5)*spreadX,
@@ -2697,7 +2693,8 @@
         vx: (vrnd()-0.5)*(cute?3.2:4.4),
         vy: rain ? (1.1+vrnd()*1.4) : -(7.2 + vrnd()*4.2 + tier*0.5),
         grav: cute ? 0.16 : 0.23,
-        life: 1500 + vrnd()*1100, t: 0,
+        life: 1500 + vrnd()*1100,
+        t: -(i % 6) * 26,   // per-gem stagger → a SHOWER over ~150ms, not one instant puff
         color: pal[(vrnd()*pal.length)|0],
         r: (cute?6:7) + vrnd()*5,
         rot: vrnd()*6.283, spin: (vrnd()-0.5)*(cute?0.16:0.12),
@@ -6101,6 +6098,34 @@
       // Sub-bass impact on EPIC for that "screen-rumble felt by the chest"
       if(tier >= 6) this._voice(55, 0.6, 'sine', 0.28, this.busWin, 1.20);
     },
+    // ── BEAT-1 ANTICIPATION — soft rising "charge" UNDER the count-up (2026-06-09)
+    winAnticipate(tier){
+      this.ensure();
+      if(State.muted || !this.ctx) return;
+      const t0 = this.ctx.currentTime;
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(180, t0);
+      o.frequency.exponentialRampToValueAtTime(180 + tier*70, t0 + 0.34);   // tension rise
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.05 + tier*0.006, t0 + 0.30);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+      o.connect(g); g.connect(this.busWin);
+      o.start(t0); o.stop(t0 + 0.44);
+      o.onended = () => { try { o.disconnect(); g.disconnect(); } catch(e){} };
+    },
+    // ── BEAT-3 LANDING STING — the "ka-ching" hit on popT0 (2026-06-09). A bright
+    // bell transient + crystalline noise burst + (tier≥5) a felt sub-thump, so the
+    // visual landing flash and the audio impact land on the SAME frame.
+    winLand(tier){
+      this.ensure();
+      if(State.muted || !this.ctx) return;
+      this._voice(1318, 0.30, 'triangle', 0.16, this.busWin, 0);
+      this._voice(1976, 0.22, 'sine',     0.10, this.busWin, 0.01);
+      this._noise(0.22, 6000, 3, 0.06 + tier*0.006, this.busWin, 0);    // crystalline shimmer burst
+      if(tier >= 5) this._voice(60, 0.34, 'sine', 0.22, this.busWin, 0);  // felt sub-thump on MEGA/EPIC
+      this._duckMusic(tier|0);
+    },
 
     // ─── WIN-LINE ENERGY ZING (2026-06-01) ───
     // Subtle rising "zing" as each win line traces in (the new energy-line VFX was
@@ -7859,6 +7884,14 @@
   }
   // celebration easing — one snappy overshoot, settles exactly at 1 (cute pop)
   const outBack = p => { const c=1.70158; return 1 + (c+1)*Math.pow(p-1,3) + c*Math.pow(p-1,2); };
+  // ── 3-BEAT CEREMONY EASINGS (2026-06-09 elegant win-ceremony redesign) ──
+  const easeOutExpo = p => p >= 1 ? 1 : 1 - Math.pow(2, -10 * p);    // count: fast → settle
+  const easeInCubic = p => p * p * p;                                 // exit: deliberate, accelerating
+  // gentler overshoot than outBack's 1.70158 — premium, not a cartoon spring
+  const backOutSoft = p => { const c=1.25; return 1 + (c+1)*Math.pow(p-1,3) + c*Math.pow(p-1,2); };
+  // damped-elastic landing pop, 0→peak(≈+0.32)→0 over its window; sharper "hit"
+  // than a sin() bounce (peak near p≈0.17, fully settled by 1).
+  const popElastic = p => (p <= 0 || p >= 1) ? 0 : Math.sin(p * 9.0) * Math.pow(1 - p, 2.2);
   // ── DAMPED SETTLE — unit-normalised spring impulse, peak = 1.0 at tau≈0.21.
   // 19.2·tau·e^(-6.5·tau)·sin(2π·tau): the tau factor gives a tau²-eased onset
   // (C¹ — no pop-in), the e^(-6.5·tau) envelope is heavily damped so there is
@@ -8143,6 +8176,7 @@
   // ── WIN PRESENTATION ──────────────────────────────────────────
   const winFx = { on:false, t0:0, tier:0, dur:0, fastFwd:false,
     countX6Target:0, countX6Display:0, popT0:0,
+    tAnt:0, tLand:0, landFired:false,   // 3-beat schedule (anticipation→count→savour) + savour-fire latch
     // customLabel: optional override for the ribbon (e.g. "FREE SPINS WIN")
     // — set externally before winFx.on = true. If set, the draw code uses
     // this instead of the tier→label mapping. Cleared at celebrate() entry.
@@ -8603,20 +8637,25 @@
     winFx.countX6Target = amountX6;
     winFx.countX6Display = 0;
     winFx.popT0 = 0;    // set when count-up completes → pop scale
+    winFx.landFired = false;
     winFx._arc = null;  // regenerate the arcane-bolt set for this celebration
-    // Crystal-shard particles outward from center (more for higher tiers)
-    if(tier>=2 && !isReduced()) {
-      spawnParticles(app.screen.width/2, GY+GH*0.42, tier*8, tier);
-    }
+    // ── 3-BEAT SCHEDULE (anticipation → count → savour) ──────────────────
+    // BEAT 1: a real held breath BEFORE the number moves (anticipation = felt
+    // power), tier-scaled 150→320ms. BEAT 2: count races up to tLand, leaving a
+    // ~30% SAVOUR dwell so the landing reads as the payoff, not the end.
+    const _antMs = isReduced() ? 0 : (tier >= 5 ? 320 : tier >= 3 ? 240 : 150);
+    winFx.tAnt  = _antMs;
+    winFx.tLand = _antMs + (isReduced() ? 1 : Math.max(360, (winFx.dur - _antMs) * 0.55));
+    if(tier>=2 && !isReduced()){ try { Sound.winAnticipate(tier); Sound.tallyStart(mx100/100); } catch(e){} }   // charge + pitch-climbing tally ladder under the count
+    // BEAT-1 dust only (HALF the old burst); the BIG particle WAVE + full cascade
+    // fire at the LANDING (popT0) in the draw loop, synced to the money moment.
+    if(tier>=2 && !isReduced()) spawnParticles(app.screen.width/2, GY+GH*0.42, tier*4, tier);
     if(tier>=4 && !isReduced()){ shakeAmount=tier*3; shakeT0=performance.now(); }
-    // MOTION-04 — big-win camera push-in. Uses the existing render-loop _camPushT0
-    // system (sine-eased 1.0→1.04→1.0 over _camPushDur=1500ms, see line ~10577).
-    // Tier-5+ (MEGA/EPIC) only; skip on reduced-motion + replay so accessibility +
-    // Stake replay-lockout are honored.
+    // MOTION-04 — big-win camera push-in (tier-5+, sine-eased 1.0→1.04→1.0).
     if(tier>=5 && !isReduced() && !STAKE.replay){ _camPushT0 = performance.now(); }
-    // ── AWARD-TIER TREASURE SHOWER — faceted gems fountain up from the hero
-    // number on BIG/MEGA/EPIC. Spawn-gated to tier≥4 so small wins stay clean.
-    if(tier>=4) spawnCascade(tier, false);
+    // SMALL first cascade wave (40%) so the count-up isn't visually empty; the
+    // full landing wave (1.0) fires at popT0 in the draw loop.
+    if(tier>=4 && !isReduced()) spawnCascade(tier, false, 0.45);
   }
 
   // ── FS TRANSITION (cinematic enter into Free Spins scene) ─────
@@ -8878,6 +8917,9 @@
     //                   reads as light ON the metal/crystal, not a floating box.
     const crownRimC = new PIXI.Sprite(SYM_TEX[7]); crownRimC.anchor.set(0.5); crownRimC.tint = 0x7fe7ff; crownRimC.blendMode = 'add';
     const crownRimM = new PIXI.Sprite(SYM_TEX[7]); crownRimM.anchor.set(0.5); crownRimM.tint = 0xff2f93; crownRimM.blendMode = 'add';
+    // back rim-light: a scaled-up cyan-white crown copy BEHIND everything so the
+    // dark silhouette edge always separates from the bg (core crown-on-black fix).
+    const crownRimBack = new PIXI.Sprite(SYM_TEX[7]); crownRimBack.anchor.set(0.5); crownRimBack.tint = 0xbff4ff; crownRimBack.blendMode = 'add';
     // PERF: the masked surface FX (charge wash + glint + gem facets) needs a mask,
     // which costs an extra GPU pass PER FRAME → skip it on weak GPUs. The cheap
     // chromatic rims (2 sprites) alone still give the crown its energised material
@@ -8886,7 +8928,7 @@
     const crownFxG  = _crownSurf ? new PIXI.Graphics() : null;
     const crownMask = _crownSurf ? new PIXI.Sprite(SYM_TEX[7]) : null;
     if(_crownSurf){ crownFxG.blendMode = 'add'; crownMask.anchor.set(0.5); crownFxG.mask = crownMask; }
-    stage.addChild(backdropG, bloomG, arcG, crownRimC, crownRimM, crownS);   // rims behind < crown
+    stage.addChild(backdropG, bloomG, crownRimBack, arcG, crownRimC, crownRimM, crownS);   // back-rim < light < bolts < rims < crown
     if(_crownSurf) stage.addChild(crownMask, crownFxG);                      // masked surface FX on top (strong GPU only)
     crownS.position.set(cx, cy);
     // ── SPINE-05 — swap the flat crown SPRITE for the live Crown-Wild RIG when ready.
@@ -8912,7 +8954,7 @@
       [gx + gw * 0.5, gy], [gx + gw * 0.5, gy + gh],
       [gx, gy + gh * 0.5], [gx + gw, gy + gh * 0.5],
     ];
-    const BOLT_N = _gpuWeak ? 7 : 12;                     // MORE bolts
+    const BOLT_N = _gpuWeak ? 4 : 7;                      // FEWER bolts — light (plate/pedestal/rim) now leads, electricity is an accent (user: "electric lights bad")
     const bolts = [];
     for(let i = 0; i < BOLT_N; i++){
       const offs = [];
@@ -8928,16 +8970,25 @@
     shakeAmount = 7; shakeT0 = performance.now();
     try { Sound.feature(); } catch(e){}
     let shook = false;
-    const t0 = performance.now(), DUR = 2400;             // HELD LONGER (was 1550)
+    const t0 = performance.now(), DUR = 1900;             // tightened from 2400 — less time on the dim backdrop
     let _chargeSnd = null; try { _chargeSnd = Sound.megaCharge(DUR / 1000 * 0.84); } catch(e){}   // rising charge hum (synced to charge phase)
     await new Promise(res => {
       function step(){
         const now = performance.now(), t = (now - t0) / DUR;
-        if(t >= 1){ backdropG.destroy(); bloomG.destroy(); arcG.destroy(); if(crownFxG){ crownFxG.mask = null; crownFxG.destroy(); } if(crownMask) crownMask.destroy(); crownRimC.destroy(); crownRimM.destroy(); crownS.destroy(); if (_crownRig && _spinePool) { try { _spinePool.release(_crownRig); } catch(e) {} _crownRig = null; } res(); return; }
-        // dark backdrop — fade in, hold, fade out
+        if(t >= 1){ backdropG.destroy(); bloomG.destroy(); arcG.destroy(); if(crownFxG){ crownFxG.mask = null; crownFxG.destroy(); } if(crownMask) crownMask.destroy(); crownRimBack.destroy(); crownRimC.destroy(); crownRimM.destroy(); crownS.destroy(); if (_crownRig && _spinePool) { try { _spinePool.release(_crownRig); } catch(e) {} _crownRig = null; } res(); return; }
+        // VIGNETTE backdrop (NOT a flat black box): a lit, transparent centre so the
+        // painted hall reads behind the crown → soft dark edges that FRAME the hero.
+        // Capped at 0.40 (was flat 0.62) — the "crown floating on a black box" fix.
         backdropG.clear();
-        const bdA = Math.min(1, t / 0.12) * (1 - Math.max(0, (t - 0.88) / 0.12)) * 0.62;
-        backdropG.rect(0, 0, W, H).fill({ color: 0x05030a, alpha: bdA });
+        const bdEnv = Math.min(1, t / 0.14) * (1 - Math.max(0, (t - 0.86) / 0.14));
+        const bdA = bdEnv * 0.40;
+        if(bdA > 0.001){
+          const vR = Math.max(W, H) * 0.62;
+          for(let k = 5; k >= 1; k--){
+            backdropG.circle(cx, cy, vR * (0.55 + k * 0.16)).fill({ color: 0x05030a, alpha: bdA * 0.18 * (k / 5) });
+          }
+          backdropG.rect(0, 0, W, H).fill({ color: 0x05030a, alpha: bdA * 0.16 });   // faint even global dim
+        }
         // crown scale-in (0-0.16) → charge jitter (held) → discharge pop
         const inP = Math.min(1, t / 0.16), sIn = 0.34 + 0.66 * (1 - Math.pow(1 - inP, 3));
         let struck = 0; for(const b of bolts){ if(t >= b.t0 + 0.10) struck++; }
@@ -8966,6 +9017,9 @@
         // (A) chromatic energy rim — cyan/magenta crown copies offset ± behind the hero
         crownRimC.position.set(ccx - 2.6, ccy + 0.6); crownRimC.scale.set(crScl * 1.045); crownRimC.alpha = (0.08 + 0.42 * heat) * crownS.alpha;
         crownRimM.position.set(ccx + 2.6, ccy - 0.6); crownRimM.scale.set(crScl * 1.045); crownRimM.alpha = (0.08 + 0.42 * heat) * crownS.alpha;
+        // back rim — scaled 1.12× behind the hero so the silhouette's bottom edge
+        // always reads against the bg (the literal "crown on black" separation).
+        crownRimBack.position.set(ccx, ccy); crownRimBack.scale.set(crScl * 1.12); crownRimBack.alpha = (0.10 + 0.30 * heat) * crownS.alpha;
         if(_crownSurf){   // masked surface FX — strong GPU only (mask = extra pass)
         // mask tracks the crown exactly → surface FX clips to the silhouette
         crownMask.position.set(ccx, ccy); crownMask.scale.set(crScl);
@@ -8992,13 +9046,22 @@
           }
         }
         }   // end _crownSurf (masked surface FX)
-        // bloom behind the crown — grows with charge, flares on discharge
+        // BACKING PLATE + LIGHT-POOL pedestal — the crown-on-black fix: the hero
+        // sits ON a luminous fuchsia disc + a glowing pedestal so its dark
+        // silhouette ALWAYS separates from the bg (was 3 thin circles @ ≤0.11).
         bloomG.clear();
-        const bR = crownMax * (0.5 + 0.5 * charge) + crownMax * 0.5 * Math.sin(Math.min(Math.PI, disP * Math.PI));
+        const plateA = 0.55 + 0.45 * Math.min(1, charge + disP);
+        const plateR = crownMax * (0.62 + 0.30 * charge) + crownMax * 0.45 * Math.sin(Math.min(Math.PI, disP * Math.PI));
+        // light-pool pedestal — squashed additive ellipses under the crown
         for(let k = 3; k >= 1; k--){
-          bloomG.circle(cx, cy, bR * (0.5 + k * 0.22))
-            .fill({ color: k === 1 ? 0xffd9ec : 0xff2f93, alpha: (k === 1 ? 0.11 : 0.055) * (0.4 + 0.6 * charge) });
+          bloomG.ellipse(cx, cy + crownMax * 0.46, plateR * (0.46 + k * 0.20), plateR * (0.10 + k * 0.05) * 0.55)
+            .fill({ color: k === 1 ? 0xffe6f4 : 0xff2ad0, alpha: (k === 1 ? 0.14 : 0.06) * plateA });
         }
+        // backing plate — wide soft halo → mid glow → bright near-white core puddle
+        bloomG.circle(cx, cy, plateR * 1.45).fill({ color: 0xff2ad0, alpha: 0.05 * plateA });
+        bloomG.circle(cx, cy, plateR * 1.05).fill({ color: 0xff2ad0, alpha: 0.09 * plateA });
+        bloomG.circle(cx, cy, plateR * 0.70).fill({ color: 0xffd9ec, alpha: 0.10 * plateA });
+        bloomG.circle(cx, cy, plateR * 0.40).fill({ color: 0xffffff, alpha: 0.07 * plateA });
         // bolts strike inward, then HOLD crackling (longer), with branching forks
         arcG.clear();
         for(const b of bolts){
@@ -9006,9 +9069,9 @@
           const bp = (t - b.t0) / 0.13, prog = Math.min(1, bp);
           if(!b._zapped && bp >= 0.92){ b._zapped = true; try { Sound.megaZap(bolts.indexOf(b)); } catch(e){} }   // electric crackle as the bolt hits the crown
           let flick;
-          if(bp < 1)        flick = 0.6 + 0.4 * Math.sin(now * 0.09);                              // striking in
-          else if(t < 0.84) flick = 0.30 + 0.32 * Math.abs(Math.sin(now * 0.011 + b.t0 * 9));      // HELD crackle
-          else              flick = Math.max(0, 1 - (t - 0.84) / 0.12) * 0.30;                     // fade on discharge
+          if(bp < 1)        flick = 0.42 + 0.22 * Math.sin(now * 0.09);                             // striking in (dimmer)
+          else if(t < 0.84) flick = 0.16 + 0.18 * Math.abs(Math.sin(now * 0.011 + b.t0 * 9));      // HELD crackle (softened — no crackly-toy read)
+          else              flick = Math.max(0, 1 - (t - 0.84) / 0.12) * 0.22;                     // fade on discharge
           if(flick <= 0.01) continue;
           const mainPts = _drawBolt(arcG, b.src[0], b.src[1], cx, cy, b.offs, prog, flick, 1);
           // forks branch off the main path once it has drawn past their start
@@ -9776,12 +9839,18 @@
     // small total; route <=1x to a neutral surface where LDW is suppressed.
     const fsTier = winTier(Math.round(fs.total*100));
     winFx.countX6Target = totalX6;   // count-up animates to the REAL total (was unset -> flickered toward $0)
+    // 3-beat: this reuse path sets winFx.on directly (bypasses celebrate()), so it
+    // MUST reset the count-up + savour-latch state, else stale popT0/landFired from
+    // a prior base-win ceremony break the FS-win landing.
+    winFx.countX6Display = 0; winFx.popT0 = 0; winFx.landFired = false; winFx._arc = null;
     if(fsTier <= 1 && !COMPLY.allow_ldw_celebration){
       winFx.customLabel = socialFilter('FREE SPINS COMPLETE');
       bigWinLabel.text   = socialFilter('FREE SPINS COMPLETE');
       winFx.tier = 1;                                   // Sound.win(<=1) is silent (LDW guard, L4828)
       winFx.on=true; winFx.t0=performance.now();
       winFx.dur=isReduced()?600:1400;
+      winFx.tAnt = isReduced()?0:120;                   // minimal breath; count then settles
+      winFx.tLand = winFx.tAnt + (isReduced()?1:Math.max(360,(winFx.dur-winFx.tAnt)*0.55));
     } else {
       winFx.customLabel = socialFilter('FREE SPINS WIN');
       bigWinLabel.text   = socialFilter('FREE SPINS WIN');
@@ -9795,17 +9864,20 @@
       winFx.tier = Math.max(fsTier, 3);
       winFx.on=true; winFx.t0=performance.now();
       winFx.dur=Math.min(isReduced()?700:2800, COMPLY.max_animation_ms||3500);   // clamp to jurisdiction cap
+      // 3-beat schedule (same shape as celebrate()) — the reuse path seeds it here.
+      const _fsAnt = isReduced()?0:(winFx.tier>=5?320:240);
+      winFx.tAnt = _fsAnt;
+      winFx.tLand = _fsAnt + (isReduced()?1:Math.max(360,(winFx.dur-_fsAnt)*0.55));
       Sound.win(winFx.tier);
-      // ── RICH-BUT-ELEGANT FREE-SPINS FINALE (2026-06-01) — the bonus payoff is
-      // the game's biggest moment, so it gets a stronger central burst + a lush,
-      // STAGGERED cascade (3 waves rolling in) which reads as a "top effect"
-      // without clutter. The `winFx.on` guards stop stray spawns once it ends.
+      // ── ELEGANT FREE-SPINS FINALE (2026-06-09) — 3-beat, same as base wins.
+      // BEAT-1 dust + a SMALL first cascade here; the BIG particle wave + full
+      // cascade + ka-ching fire at the LANDING (popT0) in the draw loop. The old
+      // cute=true path (soft stars + floaty rain) the user flagged is gone — this
+      // now reads identical-quality to a base MEGA.
       if(!isReduced()){
-        // MINIMALIST finale (2026-06) — one gentle central burst + a single cascade.
-        // Was 30 particles + 3 staggered cascade waves + a 16-particle re-burst,
-        // which read as "too many particles/electrics". Elegant, not a dump.
-        spawnParticles(app.screen.width/2, GY+GH*0.42, 14, winFx.tier);
-        spawnCascade(winFx.tier, true);
+        try { Sound.winAnticipate(winFx.tier); Sound.tallyStart(fs.total); } catch(e){}
+        spawnParticles(app.screen.width/2, GY+GH*0.42, winFx.tier*4, winFx.tier);
+        spawnCascade(winFx.tier, false, 0.45);
       }
     }
     await waitWinOrSkip(winFx.dur);   // #16: skippable (tap/Space) instead of a hard delay
@@ -10884,39 +10956,54 @@
       const W = app.screen.width, H = app.screen.height;
       const cx = W/2, cy = GY + GH*0.5;
       winDisplay.position.set(cx, cy);
-      // ── COUNT-UP — high-speed dollar amount with pop-at-end (motion brief)
-      const countDur = Math.max(420, winFx.dur * 0.55);
-      const countP = Math.min(1, el / countDur);
-      // Ease-out cubic so it decelerates as it approaches target
-      const countEase = 1 - Math.pow(1 - countP, 3);
+      // ── BEAT-DRIVEN COUNT-UP (3-beat: anticipation → count → savour) ─────
+      // Number holds at 0 during the anticipation breath (el ≤ tAnt), then races
+      // up easeOutExpo to the LANDING (tLand) with ~30% of the window left to
+      // savour. Replaces the old plain cubic over max(420, dur*0.55).
+      const tAnt  = winFx.tAnt  || 0;
+      const tLand = winFx.tLand || (winFx.dur * 0.55);
+      let countP;
+      if(el <= tAnt)        countP = 0;
+      else if(el >= tLand)  countP = 1;
+      else                  countP = (el - tAnt) / (tLand - tAnt);
+      const countEase = easeOutExpo(countP);
       const targetX6 = winFx.countX6Target || 0;
       const curX6 = Math.round(targetX6 * countEase);
       if(curX6 !== winFx.countX6Display){
         winFx.countX6Display = curX6;
         bigWinAmount.text = fmtMoney(curX6);
+        if(!isReduced()){ try { Sound.tally(now); } catch(e){} }   // pitch-climbing tally pip
       }
-      // Pop trigger — when count-up just finished, scale up briefly
-      if(countP >= 1 && !winFx.popT0) winFx.popT0 = now;
-      // ── DYNAMIC FONT-SIZE on the amount so it never clips horizontally
+      // ── LANDING (start of BEAT-3 SAVOUR) — fires ONCE via the landFired latch ─
+      if(countP >= 1 && !winFx.popT0){
+        winFx.popT0 = now;
+        if(!winFx.landFired){
+          winFx.landFired = true;
+          if(!isReduced()){
+            // particle WAVE + full cascade SECOND wave at the money moment
+            spawnParticles(W/2, GY+GH*0.42, winFx.tier*7, winFx.tier);
+            if(winFx.tier>=3) spawnCascade(winFx.tier, false, 1.0);
+            if(winFx.tier>=4){ shakeAmount = winFx.tier*4; shakeT0 = now; }   // impact shake
+          }
+          try { Sound.winLand(winFx.tier); } catch(e){}   // distinct ka-ching sting on the hit
+        }
+      }
+      // ── DYNAMIC FONT-FIT + ELASTIC LANDING POP (single measure, not doubled) ─
       const maxW = Math.min(W * 0.78, 560);
       bigWinAmount.scale.set(1);
-      const overflow = bigWinAmount.width / maxW;
-      if(overflow > 1) bigWinAmount.scale.set(1 / overflow);
-      // Pop scale — slight bump 1.0 → 1.08 → 1.0 over 220ms when count-up ends
-      let popScale = 1;
-      if(winFx.popT0){
-        const pe = (now - winFx.popT0) / 220;
-        if(pe < 1) popScale = 1 + Math.sin(pe * Math.PI) * 0.08;
-      }
       const dynScale = (bigWinAmount.width / maxW) > 1 ? (1 / (bigWinAmount.width / maxW)) : 1;
+      let popScale = 1;
+      if(winFx.popT0 && !isReduced()){
+        const pe = (now - winFx.popT0) / 380;             // 380ms spring window
+        if(pe < 1) popScale = 1 + popElastic(pe) * (winFx.tier>=5 ? 0.42 : 0.30);   // sharp hit, not a soft bounce
+      }
       bigWinAmount.scale.set(dynScale * popScale);
-      // ── LIVING TINT — the hero number warms to gold the instant the count-up
-      // lands (winFx.popT0), then cools back to smoke-white. Cheap .tint (no
-      // text re-layout). Reset to white on teardown so it never bleeds to idle.
+      // ── LIVING TINT — warm to crystal-white-pink on landing (NOT gold), then
+      // cool back to smoke-white. In-brand de-gold (G-8, B-12; was G-16, B-64).
       if(winFx.popT0){
         const _te = Math.min(1, (now - winFx.popT0)/420);
         const _warm = Math.sin(_te*Math.PI);    // 0 → 1 → 0
-        bigWinAmount.tint = (255<<16) | ((255 - Math.round(_warm*16))<<8) | (255 - Math.round(_warm*64));
+        bigWinAmount.tint = (255<<16) | ((255 - Math.round(_warm*8))<<8) | (255 - Math.round(_warm*12));
       } else if(bigWinAmount.tint !== 0xffffff){
         bigWinAmount.tint = 0xffffff;
       }
@@ -10934,24 +11021,25 @@
                                  // underline ghost behind the next idle frame.
         winGemG.clear(); winGems.length = 0;   // dump the treasure cascade
         bigWinAmount.tint = 0xffffff;          // reset the living count-up tint
+        winFx.landFired = false;               // re-arm the savour-wave latch
         winFx._arc = null;                     // drop the arcane-bolt set
       } else {
-        const inMs = isReduced() ? 1 : 260;
-        const outMs = Math.min(320, winFx.dur * 0.3);
+        const inMs  = isReduced() ? 1 : Math.max(tAnt, 200);   // entry covers the anticipation beat
+        const outMs = isReduced() ? 1 : 360;                   // FIXED deliberate exit (was min(320, dur*0.3))
         let envScale = 1, envAlpha = 1;
         if(el < inMs){
           const p = el / inMs;
-          const e = (tier >= 3 && !isReduced()) ? outBack(p) : 1 - Math.pow(1-p, 3);
+          const e = isReduced() ? 1 : backOutSoft(p);          // premium overshoot on the WHOLE popup
           envAlpha = Math.min(1, p * 1.6);
-          envScale = 0.92 + 0.08 * e;
+          envScale = 0.94 + 0.06 * e;                          // floor 0.94 (never below 0.9)
         } else if(el > winFx.dur - outMs){
           const p = (el - (winFx.dur - outMs)) / outMs;
-          const eOut = 1 - Math.pow(1 - p, 3);
+          const eOut = easeInCubic(p);                         // deliberate, accelerating exit
           envAlpha = 1 - eOut;
-          envScale = 1 - 0.06 * eOut;
+          envScale = 1 - 0.05 * eOut;
         } else {
-          // Hold — gentle breathing on tier ≥ 4 (villain spec: "subtle floating")
-          envScale = 1 + (tier >= 4 ? Math.sin((el - inMs) * 0.0036) * 0.025 : 0);
+          // SAVOUR hold — number sits bright; the whole popup barely breathes.
+          envScale = 1 + (tier >= 4 ? Math.sin((el - inMs) * 0.0030) * 0.012 : 0);   // halved (was 0.025)
         }
         winDisplay.alpha = envAlpha;
         winDisplay.scale.set(envScale);
@@ -10982,6 +11070,7 @@
         for(let gi=winGems.length-1; gi>=0; gi--){
           const gm=winGems[gi];
           gm.t += 16;
+          if(gm.t < 0) continue;   // per-gem stagger: hold off-screen until its delay elapses
           const glife = 1 - gm.t/gm.life;
           if(glife<=0){ winGems.splice(gi,1); continue; }
           gm.x += gm.vx; gm.y += gm.vy; gm.vy += gm.grav; gm.vx *= 0.992; gm.rot += gm.spin;
@@ -11207,12 +11296,14 @@
                 const _sx = winDisplay.scale.x || 1, _sy = winDisplay.scale.y || 1;
                 winFxBurst.rect(-winDisplay.x/_sx, -winDisplay.y/_sy,
                                 app.screen.width/_sx, app.screen.height/_sy)
-                  .fill({ color:0xffffff, alpha:0.16*fl });
+                  .fill({ color:0xffffff, alpha:0.12*fl });   // shorter, dimmer = camera pop, not cheap glare
               }
               const cb = Math.max(0, 1 - el/400), off = 3 + 5*cb;
-              winFxBurst.circle(-off,0,baseR*1.05).stroke({ color:0xff0033, width:2.5, alpha:0.22*cb });
-              winFxBurst.circle(0,0,baseR*1.05).stroke({ color:0x00ff66, width:2.5, alpha:0.18*cb });
-              winFxBurst.circle(off,0,baseR*1.05).stroke({ color:0x3366ff, width:2.5, alpha:0.22*cb });
+              // in-brand chromatic split: fuchsia one way, cyan the other, warm-white
+              // core — reads as lens refraction, not off-brand RGB TV noise.
+              winFxBurst.circle(-off,0,baseR*1.05).stroke({ color:0xff2ad0, width:2.5, alpha:0.24*cb });
+              winFxBurst.circle(0,0,baseR*1.05).stroke({ color:0xffe6f4, width:2.0, alpha:0.16*cb });
+              winFxBurst.circle(off,0,baseR*1.05).stroke({ color:0x7fe7ff, width:2.5, alpha:0.20*cb });
             }
           }
         }
