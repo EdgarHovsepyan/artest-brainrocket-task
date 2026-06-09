@@ -3219,6 +3219,35 @@
     }
   }
 
+  // ── SURF: ONE SOURCE OF TRUTH FOR EVERY NON-GAMEPLAY SURFACE (2026-06-09) ──
+  // The betting bar (delivered anchor) is CRYSTAL-MAGENTA. Every page must speak
+  // the SAME language. Before this, modals/drawers called drawPanelChrome with GOLD
+  // overrides (0xb88e40/0xf0d089/0x6b5526) + gold text — which is why the pages read
+  // as "a different app". SURF freezes the family ONCE; never hand-pick a panel/text
+  // colour at a callsite again — reference SURF.*.
+  const SURF = Object.freeze({
+    chrome: { accent: 0xff007f, bright: 0xff8ad0, tint: 0x9a3bd6, radius: 18, titleDivAt: 44 },
+    scrim:  0x05030a,  scrimA: 0.82,
+    title:    0xff8ad0, heading:  0xff8ad0, value:    0xffe6f4, label:    0xf5f7fa,
+    muted:    0x9a90b6, accent:   0xff007f, accentHi: 0xff5ab0, link:     0x65d4f0,
+    win:      0x52d189, loss: 0xff6b6b,
+    tileBg:   0x140d1c, tileBgHover: 0x241730, pillOff:  0x1a1330, pillStroke: 0x3a2550,
+    family:   'Fredoka', familyDisplay: 'Luckiest Guy',
+  });
+  // Call from EVERY panel layout so the look is byte-identical (palette locked).
+  function drawSurfChrome(g, w, h, opts){
+    opts = opts || {};
+    drawPanelChrome(g, w, h, {
+      accent: SURF.chrome.accent, bright: SURF.chrome.bright, tint: SURF.chrome.tint,
+      radius: opts.radius != null ? opts.radius : SURF.chrome.radius,
+      titleDivAt: opts.titleDivAt != null ? opts.titleDivAt : SURF.chrome.titleDivAt,
+    });
+  }
+  // One backdrop wash for every overlay/modal bg Graphics.
+  function drawSurfScrim(g, W, H){
+    g.clear().rect(0,0,W,H).fill({ color: SURF.scrim, alpha: SURF.scrimA });
+  }
+
   // ── SHARED POPUP CHROME (villain console) ─────────────────────────
   // Single source of truth for the premium panel look the autoplay/drawer,
   // info, buy-bonus and reality-check popups already use: obsidian base +
@@ -3289,8 +3318,8 @@
     }
     container._bg.clear()
       .circle(0, 0, CLOSE_R).fill({ color: 0x0a0912, alpha: 0.94 })
-      .circle(0, 0, CLOSE_R).stroke({ color: 0xb88e40, width: 1.3, alpha: 0.85 })   // gold ring
-      .circle(0, 0, CLOSE_R - 3).stroke({ color: 0xe9bf5a, width: 0.8, alpha: 0.28 }); // soft inner glow
+      .circle(0, 0, CLOSE_R).stroke({ color: SURF.accent, width: 1.3, alpha: 0.9 })    // magenta ring (matches bar)
+      .circle(0, 0, CLOSE_R - 3).stroke({ color: SURF.accentHi, width: 0.8, alpha: 0.30 }); // soft inner glow
     if(icon && icon.texture && icon.texture.width){
       if(icon.anchor) icon.anchor.set(0.5);
       icon.scale.set(CLOSE_TEX / icon.texture.width);
@@ -4086,7 +4115,7 @@
   const betMenuBg = new PIXI.Graphics(); betMenu.addChild(betMenuBg); betMenuBg.eventMode='static';
   const betMenuCard = new PIXI.Container(); betMenu.addChild(betMenuCard);
   const bmtCardBg = new PIXI.Graphics(); betMenuCard.addChild(bmtCardBg);
-  const bmtTitle = new PIXI.Text({ text:socialFilter('SELECT BET'), style:txtStyle(18, 0xe9bf5a) });
+  const bmtTitle = new PIXI.Text({ text:socialFilter('SELECT BET'), style:txtStyle(18, SURF.title) });
   bmtTitle.anchor.set(0.5,0); betMenuCard.addChild(bmtTitle);
   const bmtClose = new PIXI.Container(); bmtClose.eventMode='static'; bmtClose.cursor='pointer';
   betMenuCard.addChild(bmtClose);
@@ -4195,7 +4224,7 @@
 
   function layoutBetMenu(){
     const W=app.screen.width, H=app.screen.height;
-    betMenuBg.clear().rect(0,0,W,H).fill({ color:0x05050a, alpha:0.75 });
+    drawSurfScrim(betMenuBg, W, H);
     const levels = State.betLevels || [];
     const buyRow = (COMPLY.allow_buy_bonus && !STAKE.replay);
     bmtN = levels.length;
@@ -4218,7 +4247,7 @@
     // FIT-TO-VIEWPORT clamp (Popout S 400×225) — === 1 at every larger preset.
     const fitScale = Math.min(1, (W - 16) / cardW, (H - 12) / cardH);
     betMenuCard._fitScale = fitScale; betMenuCard.scale.set(fitScale);
-    drawPanelChrome(bmtCardBg, cardW, cardH, { accent: 0xb88e40, bright: 0xf0d089, tint: 0x6b5526, radius: 16, titleDivAt: 44 });
+    drawSurfChrome(bmtCardBg, cardW, cardH, { radius: 16, titleDivAt: 44 });
     bmtTitle.position.set(0, -cardH/2 + 18);
     styleClose(bmtClose, bmtCloseIcon, cardW/2, cardH/2);
 
@@ -4235,17 +4264,17 @@
       const c = new PIXI.Container(); c._idx = i; c.position.set(i * bmtStep, 0);
       const cr = tileH * 0.28;
       const cell = new PIXI.Graphics();
-      cell.roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).fill({ color:0x140d1c, alpha:0.95 })
+      cell.roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).fill({ color:SURF.tileBg, alpha:0.95 })
           .roundRect(-tileW/2+3,-tileH/2+2, tileW-6,1, 0.5).fill({ color:0xffffff, alpha:0.10 })
-          .roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).stroke({ color:0xb88e40, width:1, alpha:0.30 });
+          .roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).stroke({ color:SURF.accent, width:1, alpha:0.30 });
       c.addChild(cell);
       // SELECTED gold-crystal pill — visibility driven by the carousel focus.
       const hi = new PIXI.Graphics();
-      hi.roundRect(-tileW/2-3,-tileH/2-3, tileW+6,tileH+6, cr+2).fill({ color:0xc9a24a, alpha:0.22 })
-        .roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).fill({ color:0x4a3a14, alpha:1 })
-        .roundRect(-tileW/2+1,-tileH/2+1, tileW-2,tileH*0.5, cr).fill({ color:0xe9bf5a, alpha:0.55 })
+      hi.roundRect(-tileW/2-3,-tileH/2-3, tileW+6,tileH+6, cr+2).fill({ color:SURF.accent, alpha:0.22 })
+        .roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).fill({ color:0x3a0a26, alpha:1 })
+        .roundRect(-tileW/2+1,-tileH/2+1, tileW-2,tileH*0.5, cr).fill({ color:SURF.accentHi, alpha:0.55 })
         .roundRect(-tileW/2+4,-tileH/2+2, tileW-8,1.3, 0.7).fill({ color:0xffffff, alpha:0.5 })
-        .roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).stroke({ color:0xf0d089, width:1.6, alpha:1 });
+        .roundRect(-tileW/2,-tileH/2, tileW,tileH, cr).stroke({ color:SURF.chrome.bright, width:1.6, alpha:1 });
       hi.visible = (i === (State.betIdx || 0)); c._hi = hi; c.addChild(hi);
       const label = new PIXI.Text({ text:fmtMoney(amt), style:{ fontFamily:'Luckiest Guy', fontSize:15, letterSpacing:0.6, fill:0xffffff }});
       label.anchor.set(0.5); c.addChild(label);
@@ -4260,14 +4289,14 @@
     for(const [sx, sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]){
       bmtCenterHi.moveTo(sx*(bX-10), rowY + sy*bY).lineTo(sx*bX, rowY + sy*bY).lineTo(sx*bX, rowY + sy*(bY-10));
     }
-    bmtCenterHi.stroke({ color:0xf0d089, width:2, alpha:0.85 });
+    bmtCenterHi.stroke({ color:SURF.accentHi, width:2, alpha:0.85 });
 
     // ‹ › nudge one tile; the label is the live selection slot "i / N".
     const showNav = bmtN > 1;
     const navY = -cardH/2 + topH + 4 + tileH + 18;
     for(const btn of [bmtPrev, bmtNext]){
       btn.visible = showNav; btn.eventMode = 'static'; btn.cursor = 'pointer'; btn.alpha = 1;
-      drawGlossyBtn(btn._bg, 36, 26, 'secondary-gold');
+      drawGlossyBtn(btn._bg, 36, 26, 'secondary');
     }
     bmtPrev.position.set(-vpW/2 + 22, navY);
     bmtNext.position.set(vpW/2 - 22, navY);
@@ -4277,7 +4306,7 @@
 
     // MAX BET button at bottom (+ BUY BONUS row beneath it when allowed)
     const btnW = Math.min(180, cardW*0.5), btnH = 40;
-    drawGlossyBtn(bmtMaxBtn._bg, btnW, btnH, 'primary-gold');
+    drawGlossyBtn(bmtMaxBtn._bg, btnW, btnH, 'primary');
     bmtMaxBtn.position.set(0, cardH/2 - (buyRow ? 80 : 32));
     // BUY BONUS row (P0-B) — magenta + gold-stroked so it reads as the special
     // feature, distinct from the gold MAX BET. Hidden when the jurisdiction
@@ -4317,7 +4346,7 @@
   const drawerPanel = new PIXI.Container(); drawerLayer.addChild(drawerPanel);
   // Procedural dark+gold panel (matches new bar style); old popupSet sprite removed
   const drawerPanelBg = new PIXI.Graphics(); drawerPanel.addChild(drawerPanelBg);
-  const drawerTitle = new PIXI.Text({ text:'', style:txtStyle(18, 0xe9bf5a) });
+  const drawerTitle = new PIXI.Text({ text:'', style:txtStyle(18, SURF.title) });
   drawerTitle.anchor.set(0.5,0); drawerPanel.addChild(drawerTitle);
   const drawerClose = new PIXI.Container(); drawerClose.eventMode='static'; drawerClose.cursor='pointer';
   drawerPanel.addChild(drawerClose);
@@ -4426,7 +4455,7 @@
     // (2026-06-01). Replaced the bespoke sci-fi corner-bracket panel so the
     // settings drawer speaks the exact same award-tier glassy language: gradient
     // body, glossy top sheen, cyan-dispersion border, magenta bloom, title divider.
-    drawPanelChrome(drawerPanelBg, panW, panH, { accent:0xb88e40, bright:0xf0d089, tint:0x6b5526, radius:18, titleDivAt:44 });
+    drawSurfChrome(drawerPanelBg, panW, panH, { radius:18, titleDivAt:44 });
     drawerTitle.position.set(0,-panH/2+18);
     styleClose(drawerClose, drawerCloseIcon, panW/2, panH/2);   // unified close
     drawerBody.position.set(-panW/2+22,-panH/2+58);
@@ -4464,8 +4493,8 @@
         const bg=new PIXI.Graphics(); c.addChild(bg);
         const sel=tab===name;
         // Selected tab = gold bg + dark text; inactive = dark slate
-        bg.roundRect(0,0,bw,26,6).fill(sel?0xba852d:0x1f1c2e).stroke({ color:sel?0xe9bf5a:0x3d3d4e, width:1.5 });
-        const t=new PIXI.Text({ text:tab.toUpperCase(), style:{ fontFamily:'Luckiest Guy', fontSize:11, fill:sel?0x1a0a16:0xc9b0e6, letterSpacing:1 }});
+        bg.roundRect(0,0,bw,26,6).fill(sel?SURF.accent:SURF.pillOff).stroke({ color:sel?SURF.accentHi:SURF.pillStroke, width:1.5 });
+        const t=new PIXI.Text({ text:tab.toUpperCase(), style:{ fontFamily:SURF.familyDisplay, fontSize:11, fill:sel?0xffffff:SURF.label, letterSpacing:1 }});
         t.anchor.set(0.5); t.position.set(bw/2,13); c.addChild(t);
         c.position.set(i*(bw+8),0);
         c.on('pointertap', () => { closeDrawer(); openDrawer(tab); });
@@ -4481,7 +4510,7 @@
           const h=State.history[i]; const y=36+i*26;
           drText('#'+(i+1),10,0x776688,0,y);
           // history rows — winning rows in gold, losing rows in muted grey
-          drText(h.label||'—',12,h.mx100>0?0xf0d089:0x9988aa,30,y);
+          drText(h.label||'—',12,h.mx100>0?SURF.value:SURF.muted,30,y);
           const pay = h.mx100>0 ? fmtMoney(Math.round(h.betX6*h.mx100/100)) : '—';
           const pv=new PIXI.Text({ text:pay, style:{ fontFamily:'Fredoka', fontSize:11, fill:h.mx100>0?0x83dd9e:0x776688, fontWeight:'bold' }});
           pv.anchor.set(1,0); pv.position.set(w,y); drawerBody.addChild(pv);
@@ -4520,7 +4549,7 @@
         // hit area (52×26 vs 40×22) so it's easier to tap.
         const tw = 52, th = 26;
         const tr = th * 0.5;
-        const G_CORE = 0xba852d, G_EDGE = 0xe9bf5a;   // gold ON-state (shared studio surface)
+        const G_CORE = SURF.accent, G_EDGE = SURF.accentHi;   // magenta ON-state (matches the bar)
         // (1) Outer glow halo (only when ON)
         if(val){
           tbg.roundRect(-4, -3, tw+8, th+6, tr+3).fill({ color: G_CORE, alpha: 0.12 });
@@ -4574,7 +4603,7 @@
       const segKnob = new PIXI.Graphics();
       const segPad = 2, cellW = (segW - segPad*2) / 3;
       // 3-state turbo knob: OFF = neutral grey, TURBO = soft gold, MAX = bright gold
-      const knobCol = State.turboMode===2 ? 0xe9bf5a : State.turboMode===1 ? 0xf0d089 : 0x6a6a78;
+      const knobCol = State.turboMode===2 ? SURF.accent : State.turboMode===1 ? SURF.accentHi : 0x6a6a78;
       segKnob.roundRect(segPad + State.turboMode*cellW, segPad, cellW, segH-segPad*2, (segH-segPad*2)/2)
         .fill({color:knobCol, alpha:0.95});
       segG.addChild(segKnob);
@@ -4630,9 +4659,9 @@
         // Gold autoplay tiles — dark slate bg, gold edge + warm-gold number, hover lift.
         const drawTile = hov => { bg.clear().roundRect(0,0,bw,bh,8)
           .fill(hov?0x2a2436:0x1f1c2e)
-          .stroke({ color:hov?0xe9bf5a:0xb88e40, width:hov?2:1.6, alpha:hov?0.95:0.6 }); };
+          .stroke({ color:hov?SURF.accentHi:SURF.accent, width:hov?2:1.6, alpha:hov?0.95:0.6 }); };
         drawTile(false);
-        const t=new PIXI.Text({ text:n===0?'∞':n.toString(), style:{ fontFamily:'Luckiest Guy', fontSize:13, fill:0xf0d089 }});
+        const t=new PIXI.Text({ text:n===0?'∞':n.toString(), style:{ fontFamily:SURF.familyDisplay, fontSize:13, fill:SURF.value }});
         t.anchor.set(0.5); t.position.set(bw/2,bh/2); c.addChild(t);
         c.position.set(col*(bw+6),y+row*(bh+6));
         c.on('pointerover', e => { if(!e || e.pointerType==='mouse'){ drawTile(true); t.scale.set(1.08); } });
@@ -4653,7 +4682,7 @@
         const tbg=new PIXI.Graphics(); tg.addChild(tbg);
         const tknob=new PIXI.Graphics(); tg.addChild(tknob);
         const tw=36,th=18;
-        tbg.roundRect(0,0,tw,th,th/2).fill(val?0xba852d:0x2a2a36).stroke({ color:val?0xe9bf5a:0x3d3d4e, width:1 });
+        tbg.roundRect(0,0,tw,th,th/2).fill(val?SURF.accent:SURF.pillOff).stroke({ color:val?SURF.accentHi:SURF.pillStroke, width:1 });
         tknob.circle(val?tw-th/2:th/2,th/2,th/2-3).fill(0xf5f7fa);
         tg.position.set(w-tw,y+2);
         tg.on('pointertap', () => { State.autoplay[key]=!State.autoplay[key]; closeDrawer(); openDrawer('autoplay'); });
@@ -4670,7 +4699,7 @@
   const infoCard = new PIXI.Container(); infoModal.addChild(infoCard);
   // Procedural dark+gold panel (matches new bar + drawer + buy modal)
   const infoCardBg = new PIXI.Graphics(); infoCard.addChild(infoCardBg);
-  const infoTitle = new PIXI.Text({ text:'GAME INFORMATION', style:txtStyle(16, 0xe9bf5a) });
+  const infoTitle = new PIXI.Text({ text:'GAME INFORMATION', style:txtStyle(16, SURF.title) });
   infoTitle.anchor.set(0.5,0); infoCard.addChild(infoTitle);
   const infoBody = new PIXI.Container(); infoCard.addChild(infoBody);
   makeScrollable(infoBody, infoCard);   // P0-C: clip + scroll (paytable overflows on Popout S)
@@ -4708,7 +4737,7 @@
     infoCard.position.set(W/2,H/2);
     // ── PREMIUM PANEL — unified gold crystal-glass chrome (shared studio
     // surface, same drawPanelChrome as every betting/control modal).
-    drawPanelChrome(infoCardBg, cardW, cardH, { accent:0xb88e40, bright:0xf0d089, tint:0x6b5526, radius:18, titleDivAt:44 });
+    drawSurfChrome(infoCardBg, cardW, cardH, { radius:18, titleDivAt:44 });
     infoTitle.position.set(0,-cardH/2+18);
     styleClose(infoCloseBtn, infoCloseIcon, cardW/2, cardH/2);   // unified close
     infoBody.position.set(-cardW/2+22,-cardH/2+54);
@@ -4723,7 +4752,7 @@
       const bg=new PIXI.Graphics(); c.addChild(bg);
       const sel=t===tab;
       // Selected tab = gold pill, inactive = dark slate
-      bg.roundRect(0,0,bw,24,6).fill(sel?0xba852d:0x1f1c2e).stroke({ color:sel?0xe9bf5a:0x3d3d4e, width:sel?2:1 });
+      bg.roundRect(0,0,bw,24,6).fill(sel?SURF.accent:SURF.pillOff).stroke({ color:sel?SURF.accentHi:SURF.pillStroke, width:sel?2:1 });
       const txt=new PIXI.Text({ text:socialFilter(t==='paytable'?'PAYTABLE':t.toUpperCase()), style:{ fontFamily:'Fredoka', fontSize:10, fill:sel?0xf5f7fa:0xc9b0e6, fontWeight:'bold', letterSpacing:1 }});
       txt.anchor.set(0.5); txt.position.set(bw/2,12); c.addChild(txt);
       c.position.set(i*(bw+6),0);
@@ -4737,14 +4766,14 @@
       t.position.set(0,y); infoBody.addChild(t); y+=t.height+4; return t;
     };
     if(tab==='rules'){
-      line('HOW TO PLAY',13,0xf0d089,true);
+      line('HOW TO PLAY',13,SURF.heading,true);
       line('1. Pick your bet with the + and − buttons\n2. Hit SPIN (or the Spacebar)\n3. Land 3 or more matching symbols on a line, starting from the left\n4. Land 3 or more STARs anywhere to win Free Spins\n5. In a hurry? BUY BONUS takes you straight to Free Spins',11);
       y+=6;
-      line('GAME MECHANICS',13,0xf0d089,true);
+      line('GAME MECHANICS',13,SURF.heading,true);
       line('• 5 reels, 3 rows, 10 fixed lines\n• Lines pay left to right, starting on reel 1\n• The STAR is a scatter — it pays from anywhere, no line needed\n• In Free Spins, every line win is multiplied by ×'+FS_MULT+'\n• Land 3+ STARs in Free Spins to win +'+FS_RETRIGGER+' more spins\n• Every spin is separate and decided fairly by the game server',11);
       y+=8;
       const boxY=y;
-      [['RTP',RTP_DISPLAY,0x4cd07a],['MAX WIN',ADVERTISED_MAX_X.toLocaleString('en-US')+'×',0xf0d089],['VOL.','MED-HIGH',0x65d4f0]].forEach(([lbl,val,col],i) => {
+      [['RTP',RTP_DISPLAY,SURF.win],['MAX WIN',ADVERTISED_MAX_X.toLocaleString('en-US')+'×',SURF.value],['VOL.','MED-HIGH',SURF.link]].forEach(([lbl,val,col],i) => {
         const bx=i*(w/3);
         const l=new PIXI.Text({ text:socialFilter(lbl), style:{ fontFamily:'Fredoka', fontSize:9, fill:0xc9b0e6, fontWeight:'bold', letterSpacing:1 }});
         l.anchor.set(0.5,0); l.position.set(bx+w/6,boxY); infoBody.addChild(l);
@@ -4754,7 +4783,7 @@
       y=boxY+38;
       line('RTP is calculated over many plays. Individual sessions may vary.',9,0x9988aa);
     } else if(tab==='paytable'){
-      line('SYMBOL PAYS — 3 / 4 / 5 of a kind',12,0xf0d089,true);
+      line('SYMBOL PAYS — 3 / 4 / 5 of a kind',12,SURF.heading,true);
       line('Values shown × bet per line (total bet ÷ '+NLINES+').',9,0x9988aa);
       y+=4;
       for(let s=0;s<8;s++){
@@ -4763,20 +4792,20 @@
         ic.scale.set(symScale(SYM_TEX[s], sz)); ic.position.set(0,rowY+12); infoBody.addChild(ic);
         const nm=new PIXI.Text({ text:SYM_NAME[s], style:{ fontFamily:'Fredoka', fontSize:11, fill:0xe8dcc8, fontWeight:'bold' }});
         nm.anchor.set(0,0.5); nm.position.set(sz+8,rowY+12); infoBody.addChild(nm);
-        const pv=new PIXI.Text({ text:PAY[s][0]+'  /  '+PAY[s][1]+'  /  '+PAY[s][2], style:{ fontFamily:'Luckiest Guy', fontSize:12, fill:0xf0d089, letterSpacing:1 }});
+        const pv=new PIXI.Text({ text:PAY[s][0]+'  /  '+PAY[s][1]+'  /  '+PAY[s][2], style:{ fontFamily:'Luckiest Guy', fontSize:12, fill:SURF.value, letterSpacing:1 }});
         pv.anchor.set(1,0.5); pv.position.set(w,rowY+11); infoBody.addChild(pv);
         y+=24;
       }
       y+=2;
-      line('STAR SCATTER — pays × total bet',12,0xf0d089,true);
+      line('STAR SCATTER — pays × total bet',12,SURF.heading,true);
       const sic=new PIXI.Sprite(SYM_TEX[8]); sic.anchor.set(0,0.5);
       sic.scale.set(symScale(SYM_TEX[8], 26)); sic.position.set(0,y+12); infoBody.addChild(sic);
-      const sv=new PIXI.Text({ text:'3★ = '+SCAT[3]+'×    4★ = '+SCAT[4]+'×    5★ = '+SCAT[5]+'×', style:{ fontFamily:'Luckiest Guy', fontSize:12, fill:0xf0d089, letterSpacing:1 }});
+      const sv=new PIXI.Text({ text:'3★ = '+SCAT[3]+'×    4★ = '+SCAT[4]+'×    5★ = '+SCAT[5]+'×', style:{ fontFamily:'Luckiest Guy', fontSize:12, fill:SURF.value, letterSpacing:1 }});
       sv.anchor.set(0,0.5); sv.position.set(34,y+12); infoBody.addChild(sv);
       y+=34;
       line('3 / 4 / 5 scatters also award '+FS_AWARD[3]+' / '+FS_AWARD[4]+' / '+FS_AWARD[5]+' Free Spins.',10,0xc9b0e6);   // P1-M: derive from FS_AWARD (was hard-coded 10/15/20; actual award is 10/12/15)
       y+=8;
-      line('10 PAYLINES — wins pay left → right from reel 1',11,0xf0d089,true);
+      line('10 PAYLINES — wins pay left → right from reel 1',11,SURF.heading,true);
       y+=4;
       // payline map — all 10 win lines drawn on a mini 5×3 grid
       const plg=new PIXI.Graphics();
@@ -4792,13 +4821,13 @@
       infoBody.addChild(plg);
       y+=ROWS*plCh+6;
     } else {
-      line('CONTROLS',13,0xf0d089,true);
+      line('CONTROLS',13,SURF.heading,true);
       line('SPIN — start a round\n+ / − — change your bet\nBUY BONUS — pay to go straight to Free Spins\nAUTO — spin automatically (10/25/50/100/250 times)\nTURBO — speed up the reels\nSOUND — turn audio on or off',11);
       y+=6;
-      line('KEYBOARD',13,0xf0d089,true);
+      line('KEYBOARD',13,SURF.heading,true);
       line('Space — Spin / quick-stop\n↑/↓ — Adjust bet\nF — Fullscreen\nM — Mute',11);
       y+=10;
-      line('DISCLAIMER',12,0xf0d089,true);
+      line('DISCLAIMER',12,SURF.heading,true);
       line('Malfunction voids all wins and plays. A consistent internet connection is required. In the event of a disconnection, reload the game to finish any uncompleted rounds. The expected return is calculated over many plays (theoretical RTP '+RTP_DISPLAY+'; maximum win capped at '+ADVERTISED_MAX_X.toLocaleString('en-US')+'× the total bet). The game display is not representative of any physical device and is for illustrative purposes only. Winnings are settled according to the amount received from the Remote Game Server and not from events within the web browser. TM and © 2026 Stake Engine.',9,0x9988aa);
       y+=6;
       // ── CLICKABLE RG LINK (2026-05-30, Task #4 / Stake approval blocker) ──
@@ -4822,7 +4851,7 @@
   const rcCardBg = new PIXI.Graphics(); rcCard.addChild(rcCardBg);
   // Title — Luckiest Guy (same family as HUD values), neon magenta
   const rcTitle = new PIXI.Text({ text:'REALITY CHECK', resolution:3, style:{
-    fontFamily:'Luckiest Guy', fontSize:20, fill:0xe9bf5a, letterSpacing:2,
+    fontFamily:'Luckiest Guy', fontSize:20, fill:SURF.title, letterSpacing:2,
     stroke:{ color:0x0a0a0e, width:2, join:'round' },
   }});
   rcTitle.anchor.set(0.5,0); rcCard.addChild(rcTitle);
@@ -4863,7 +4892,7 @@
     rcCard.position.set(W/2,H/2);
     // ── VILLAIN PANEL — neon-magenta border + obsidian fill + glow halo
     // Unified vibrant crystal-glass chrome (same drawPanelChrome as every modal)
-    drawPanelChrome(rcCardBg, cardW, cardH, { accent:0xb88e40, bright:0xf0d089, tint:0x6b5526, radius:16, titleDivAt:0 });
+    drawSurfChrome(rcCardBg, cardW, cardH, { radius:16, titleDivAt:0 });
     rcTitle.position.set(0,-cardH/2+18);
     rcDesc.position.set(0,-cardH/2+50);
     rcStats.removeChildren();
@@ -4875,7 +4904,7 @@
       const bx=-cardW/2+20+i*(cardW-40)/4;
       // label: cool-purple-grey (same as drawer labels), pink-soft for emphasis labels
       const l=new PIXI.Text({ text:lbl, style:{
-        fontFamily:'Fredoka', fontSize:10, fill:0xf0d089, fontWeight:'700', letterSpacing:1.2,
+        fontFamily:'Fredoka', fontSize:10, fill:SURF.heading, fontWeight:'700', letterSpacing:1.2,
       }});
       l.anchor.set(0.5,0); l.position.set(bx+(cardW-40)/8,0); rcStats.addChild(l);
       // value: SMOKE-WHITE in Luckiest Guy — matches BAL / BET in main HUD
@@ -4893,7 +4922,7 @@
     const btnW=cardW*0.38, btnH=44, btnY=cardH/2-30;
     const btnGap = 14;
     // STOP — dark slate + gold stroke (subordinate visual weight)
-    drawGlossyBtn(rcBtnStop._bg, btnW, btnH, 'secondary-gold');
+    drawGlossyBtn(rcBtnStop._bg, btnW, btnH, 'secondary');
     rcBtnStop.hitArea = new PIXI.Rectangle(-btnW/2, -btnH/2, btnW, btnH);
     rcBtnStop.position.set(-(btnW+btnGap)/2, btnY);
     rcBtnStop._t.style.fontFamily = 'Luckiest Guy';
@@ -4901,7 +4930,7 @@
     rcBtnStop._t.style.fill = 0xf5f7fa;
     rcBtnStop._t.style.letterSpacing = 1.2;
     // CONTINUE — solid gold (primary action, dominant weight)
-    drawGlossyBtn(rcBtnContinue._bg, btnW, btnH, 'primary-gold');
+    drawGlossyBtn(rcBtnContinue._bg, btnW, btnH, 'primary');
     rcBtnContinue.hitArea = new PIXI.Rectangle(-btnW/2, -btnH/2, btnW, btnH);
     rcBtnContinue.position.set((btnW+btnGap)/2, btnY);
     rcBtnContinue._t.style.fontFamily = 'Luckiest Guy';
@@ -6281,7 +6310,11 @@
       if(this.musicId === 'idle') return;
       this._stopMusic();
       this.musicId = 'idle';
-      this._startHappyLoop();   // HAPPY procedural casino loop (was a static pad drone)
+      // Prefer the ElevenLabs elegant master loop; fall back to the procedural
+      // happy loop only if the sample isn't decoded yet (Stake single-file build).
+      if(!this._playSampleMusic('main_base_loop', 0.9, 1.2)){
+        this._startHappyLoop();
+      }
     },
     startBonusMusic(mode){
       const id = mode === 'bonus_mega' ? 'bonus_mega'
@@ -6289,15 +6322,19 @@
                : 'bonus_standard';
       if(this.musicId === id) return;
       this._stopMusic();
-      if(id === 'bonus_mega'){
-        // Orchestral with timpani — deeper root, wider chord
-        this._startMusicVoice(id, { root: 165, chord: [0, 5, 12, 17, 24], rate: 0.30, wave: 'sawtooth', vol: 0.16 });
-      } else if(id === 'bonus_hot'){
-        // Aggressive percussion + brass — square wave, mid root
-        this._startMusicVoice(id, { root: 220, chord: [0, 4, 7, 12], rate: 0.45, wave: 'triangle', vol: 0.13 });
-      } else {
-        // Standard — uplifting major-key triangle pad
-        this._startMusicVoice(id, { root: 261, chord: [0, 4, 7, 11], rate: 0.22, wave: 'triangle', vol: 0.14 });
+      // Prefer the ElevenLabs elegant free-spins master loop for ALL bonus tiers;
+      // fall back to the per-tier procedural voice only if not decoded.
+      if(!this._playSampleMusic('bonus_loop', 0.95, 1.0)){
+        if(id === 'bonus_mega'){
+          // Orchestral with timpani — deeper root, wider chord
+          this._startMusicVoice(id, { root: 165, chord: [0, 5, 12, 17, 24], rate: 0.30, wave: 'sawtooth', vol: 0.16 });
+        } else if(id === 'bonus_hot'){
+          // Aggressive percussion + brass — square wave, mid root
+          this._startMusicVoice(id, { root: 220, chord: [0, 4, 7, 12], rate: 0.45, wave: 'triangle', vol: 0.13 });
+        } else {
+          // Standard — uplifting major-key triangle pad
+          this._startMusicVoice(id, { root: 261, chord: [0, 4, 7, 11], rate: 0.22, wave: 'triangle', vol: 0.14 });
+        }
       }
       this.musicId = id;
     },
@@ -6403,6 +6440,28 @@
       return true;
     } catch (e) { return false; }
   };
+  // ── SAMPLE-BASED MUSIC (looping, crossfaded) — 2026-06-09 ──
+  // Plays a decoded loop buffer on busMusic with a fade-in, stored in musicVoice
+  // using the SAME shape _stopMusic tears down (voices[].stop / lfo.stop / gain
+  // ramp). Returns false if the buffer isn't decoded yet → caller falls back to
+  // the procedural synth loop. This is what finally PLAYS the ElevenLabs masters.
+  Sound._playSampleMusic = function (id, vol, fadeSec) {
+    if (State.muted || !this.ctx || !this.busMusic) return false;
+    const buf = this.buffers[id];
+    if (!buf) return false;
+    try {
+      const t0 = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(vol == null ? 0.9 : vol, t0 + (fadeSec || 1.2));
+      src.connect(g); g.connect(this.busMusic);
+      src.start(t0);
+      this.musicVoice = { voices: [src], lfo: { stop(){} }, filt: null, gain: g, _sample: true };
+      return true;
+    } catch (e) { return false; }
+  };
   Sound.loadSamples = function () {
     if (this._samplesReq || !this.ctx) return;
     this._samplesReq = true;
@@ -6415,6 +6474,20 @@
           this.buffers[clip.id] = await decode(await r.arrayBuffer());
         } catch (e) { /* keep the synth fallback for this id */ }
       }
+      // The intro tap fires startIdleMusic() BEFORE these ~400KB loops finish
+      // decoding, so the player would keep hearing the procedural synth until the
+      // next music transition. Once decoded, swap the still-playing synth fallback
+      // to the now-available ElevenLabs sample loop seamlessly.
+      // NB: the synth fallback (_startHappyLoop) is timer-based and never sets
+      // musicVoice, so "not a sample" = !(musicVoice && musicVoice._sample).
+      try {
+        const playingSample = !!(this.musicVoice && this.musicVoice._sample);
+        if (this.musicId === 'idle' && !playingSample) {
+          this.musicId = null; this.startIdleMusic();
+        } else if (this.musicId && this.musicId !== 'idle' && !playingSample) {
+          const m2 = this.musicId; this.musicId = null; this.startBonusMusic(m2);
+        }
+      } catch (e) {}
     }).catch(() => { /* single-file / offline → synth fallback stays */ });
   };
   const _soundEnsure = Sound.ensure.bind(Sound);

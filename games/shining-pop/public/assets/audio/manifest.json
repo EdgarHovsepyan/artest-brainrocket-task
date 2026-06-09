@@ -1,6 +1,6 @@
 {
   "sampleRate": 44100,
-  "generated": "procedural",
+  "generated": "elevenlabs",
   "clips": [
     {
       "id": "anticipation",
@@ -28,10 +28,10 @@
     },
     {
       "id": "bonus_loop",
-      "file": "bonus_loop.wav",
-      "ms": 7992,
+      "file": "bonus_loop.mp3",
+      "ms": 24000,
       "loop": true,
-      "kb": 688.4,
+      "kb": 375.1,
       "peak": 0.687
     },
     {
@@ -76,10 +76,10 @@
     },
     {
       "id": "main_base_loop",
-      "file": "main_base_loop.wav",
-      "ms": 7992,
+      "file": "main_base_loop.mp3",
+      "ms": 26000,
       "loop": true,
-      "kb": 688.4,
+      "kb": 407.0,
       "peak": 0.639
     },
     {
