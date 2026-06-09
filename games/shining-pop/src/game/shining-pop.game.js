@@ -5195,7 +5195,7 @@
   // glow (managed in the render loop)
   const introCtaBg = new PIXI.Graphics();
   introOverlay.addChild(introCtaBg);
-  const introCta = new PIXI.Text({ text:'PRESS TO CONTINUE', style:{
+  const introCta = new PIXI.Text({ text:'TAP TO START', style:{
     fontFamily:THEME.type.familyDisplay, fontSize:22,
     fill:THEME.colors.text, align:'center', letterSpacing:3.5,
     stroke:{ color:0x2a0a1e, width:3, join:'round' },
@@ -5284,6 +5284,21 @@
         _introSparkle(introAddFront, lx + g[0]*lw*0.5, ly + g[1]*lh*0.5, 2.5 + 5.5*tw, 0.25 + 0.55*tw);
       }
     }
+    // ── BEAT 3 · LOGO SHINE SWEEP — a single slim diagonal highlight travels
+    // left→right across the wordmark, driven by the GSAP tween on _shine in
+    // showIntroOverlay (gsap-timeline skill). Additive over the logo so it reads
+    // as a specular glint; alpha eases in/out at the travel ends (no hard pop).
+    const _sh = introOverlay._shine;
+    if(!reduced && _sh >= 0 && _sh <= 1){
+      const lw2 = introLogo.width, lh2 = introLogo.height;
+      const sx = lx + (_sh - 0.5) * lw2 * 1.25;           // sweep position
+      const hw = Math.max(8, lw2 * 0.05), hh = lh2 * 0.6, dx = hh * 0.36;  // slim slanted band
+      const sa = 0.42 * Math.sin(_sh * Math.PI);          // 0 at ends, peak mid-sweep
+      introAddFront.poly([
+        sx - hw + dx, ly - hh,   sx + hw + dx, ly - hh,
+        sx + hw - dx, ly + hh,   sx - hw - dx, ly + hh,
+      ]).fill({ color: 0xffffff, alpha: sa });
+    }
     if(introCta._bgRect){
       const r = introCta._bgRect;
       const cp = 0.5+0.5*Math.sin(now*0.004);
@@ -5307,14 +5322,16 @@
   introOverlay._dismissing = false;
   introOverlay._fadeIn = 0;
   introOverlay._fadeStart = 0;
+  introOverlay._shine = -1;        // Beat 3 — logo shine-sweep phase (-1 = idle, 0..1 = sweeping)
+  introOverlay._irisActive = false; // Beat 4 — GSAP iris-wipe owns the dismiss anim when true
+  introOverlay._iris = null;        // lazily-built iris mask Graphics
   introOverlay.on('pointertap', () => {
     if(introOverlay._dismissing) return;
     // 350ms grace at boot — stray "pointertap" can be synthesised by the
     // browser when the page first becomes interactive (esp. via WebDriver /
     // preview harnesses). The player needs at least one visible frame.
     if(performance.now() - (introOverlay._shownAt||0) < 350) return;
-    introOverlay._dismissing = true;
-    introOverlay._fadeStart = performance.now();
+    irisDismissIntro();       // Beat 4 — cinematic iris-wipe reveal (GSAP)
     try {
       Sound.resume();         // iOS requires user gesture to start AudioContext
       Sound.click();
@@ -5876,6 +5893,56 @@
     // per-card energy, CTA bloom). Self-stops when the overlay hides;
     // reduced-motion draws a single static frame instead of looping.
     startIntroVfx();
+    // ── BEAT 3 · LOGO SHINE SWEEP — one-shot GSAP glint across the wordmark,
+    // timed just after the logo has risen in (delay > the 640ms logo rise).
+    // Drives introOverlay._shine 0→1, which drawIntroVfx renders. Honors
+    // reduced-motion and the file's window.gsap-optional convention.
+    introOverlay._shine = -1;
+    if(window.gsap && window.gsap.fromTo && !isReduced()){
+      window.gsap.fromTo(introOverlay, { _shine: 0 }, {
+        _shine: 1, duration: 0.85, ease: 'power1.inOut', delay: 0.55,
+        onComplete(){ introOverlay._shine = -1; },
+      });
+    }
+  }
+
+  // ── BEAT 4 · IRIS-WIPE DISMISS — replaces the flat alpha fade with a
+  // cinematic circular iris that collapses to a point, clipping the intro and
+  // revealing the live reels beneath. Built as ONE gsap.timeline (gsap-timeline
+  // skill: defaults + position params). Reduced-motion / no-GSAP fall back to
+  // the render-loop alpha fade. Idempotent: a second tap is ignored.
+  function irisDismissIntro(){
+    if(introOverlay._dismissing) return;
+    introOverlay._dismissing = true;
+    const G = window.gsap;
+    if(isReduced() || !G || !G.timeline){
+      introOverlay._fadeStart = performance.now();   // render-loop alpha fade
+      return;
+    }
+    let iris = introOverlay._iris;
+    if(!iris){
+      iris = introOverlay._iris = new PIXI.Graphics();
+      stage.addChild(iris);
+    }
+    const W = app.screen.width, H = app.screen.height;
+    const R = Math.hypot(W, H) * 0.55;                  // reaches the corners
+    iris.clear().circle(0, 0, R).fill({ color: 0xffffff }); // hi-res circle at full size
+    iris.position.set(W / 2, H / 2);
+    iris.scale.set(1);
+    iris.visible = true;
+    introOverlay.mask = iris;
+    introOverlay._irisActive = true;
+    G.timeline({ defaults: { ease: 'power2.inOut' }, onComplete(){
+        introOverlay.visible = false;
+        introOverlay.mask = null;
+        iris.visible = false;
+        introOverlay._irisActive = false;
+        const cb = introOverlay._onDismiss; introOverlay._onDismiss = null;
+        if(cb) cb();
+      } })
+      .to(iris.scale, { x: 1.06, y: 1.06, duration: 0.12, ease: 'power2.out' }) // tiny anticipation breath
+      .to(iris.scale, { x: 0.0001, y: 0.0001, duration: 0.72 }, '>')            // collapse to a point
+      .to(introOverlay, { alpha: 0.62, duration: 0.5 }, '<0.3');                        // soften the trailing edge
   }
 
   // ── SOUND (procedural Web Audio) ──────────────────────────────
@@ -5909,10 +5976,11 @@
       try {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         this.master      = this.ctx.createGain(); this.master.gain.value = State.muted ? 0 : (this._vol == null ? 0.6 : this._vol);
-        this.busMusic    = this.ctx.createGain(); this.busMusic.gain.value    = 0.25;  // -12 dB
-        this.busGameplay = this.ctx.createGain(); this.busGameplay.gain.value = 0.50;  //  -6 dB
-        this.busSfx      = this.ctx.createGain(); this.busSfx.gain.value      = 0.50;  //  -6 dB
-        this.busWin      = this.ctx.createGain(); this.busWin.gain.value      = 1.00;  //   0 dB
+        this.busMusic    = this.ctx.createGain();
+        this.busGameplay = this.ctx.createGain();
+        this.busSfx      = this.ctx.createGain();
+        this.busWin      = this.ctx.createGain();
+        this.applyBusMix();   // one readable dB mix table (sets bus gains + _musicBase)
         this.busMusic.connect(this.master);
         this.busGameplay.connect(this.master);
         this.busSfx.connect(this.master);
@@ -5934,6 +6002,21 @@
       State.muted = this._vol <= 0.001;
       if(this.master && this.ctx) this.master.gain.setTargetAtTime(State.muted ? 0 : this._vol, this.ctx.currentTime, 0.02);
       return wasMuted !== State.muted;   // true if mute-state flipped (caller resyncs icons)
+    },
+    // ── PER-BUS MIX (a readable dB table behind the single master slider) ──
+    // The slider drives ONE master level; the relative balance of the 4 buses is a
+    // FIXED design mix in dB. db→linear: 10^(dB/20). Derives _musicBase so the
+    // ducker + bonus bed share one source of truth. Re-appliable without touching ensure().
+    _busMix: { music: -11, gameplay: -9, sfx: -8, win: -1 },
+    applyBusMix(){
+      if(!this.ctx) return;
+      const db2lin = (db) => Math.pow(10, db / 20);
+      const m = this._busMix;
+      this._musicBase = db2lin(m.music);                 // idle rest level the ducker returns to
+      if(this.busMusic)    this.busMusic.gain.value    = this._musicBase;
+      if(this.busGameplay) this.busGameplay.gain.value = db2lin(m.gameplay);
+      if(this.busSfx)      this.busSfx.gain.value      = db2lin(m.sfx);
+      if(this.busWin)      this.busWin.gain.value      = db2lin(m.win);
     },
 
     // ─── LOW-LEVEL SYNTH (used until samples ship) ───
@@ -5989,14 +6072,16 @@
     // ─── DUCKING AUTOMATION ───
     // When bus.win fires a celebration, duck bus.music by 8–16 dB so the
     // celebration cuts through. Per AUDIO_HANDOFF.md §3.3.
+    _musicBase: 0.25,   // live busMusic rest level; the duck restores to THIS, not a stale literal
     _duckMusic(tier){
       if(!this.ctx || !this.busMusic) return;
       if(tier < 3) return;     // small wins don't duck
-      const duckDb   = tier >= 6 ? -16 : tier >= 5 ? -12 : -8;
+      // deeper cinematic duck now that real masters play (was -8/-12/-16, muddy)
+      const duckDb   = tier >= 6 ? -20 : tier >= 5 ? -15 : -10;
       const holdMs   = tier >= 6 ? 4500 : tier >= 5 ? 3500 : 2200;
-      const releaseMs = 900;
+      const releaseMs = 1100;                            // slower release = elegant, not a gate-pump
       const now = this.ctx.currentTime;
-      const base = 0.25;                                 // idle bus base -12 dB
+      const base = this._musicBase;                      // LIVE rest level (idle or bonus)
       const target = base * Math.pow(10, duckDb / 20);
       const g = this.busMusic.gain;
       g.cancelScheduledValues(now);
@@ -10664,10 +10749,11 @@
       // off the same fade-out path a tap would trigger.
       if(introOverlay._autoMs && !introOverlay._dismissing &&
          (now - introOverlay._shownAt) > introOverlay._autoMs){
-        introOverlay._dismissing = true;
-        introOverlay._fadeStart = now;
+        irisDismissIntro();    // Beat 4 — repeat-session auto-dismiss uses the iris too
       }
-      if(introOverlay._dismissing){
+      // When the GSAP iris-wipe is running it owns the dismiss animation; the
+      // render-loop alpha fade below is only the reduced-motion / no-GSAP path.
+      if(introOverlay._dismissing && !introOverlay._irisActive){
         const t = Math.min(1, (now - introOverlay._fadeStart) / 240);
         introOverlay.alpha = 1 - t;
         if(t >= 1){
