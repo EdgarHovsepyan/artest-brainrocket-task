@@ -557,14 +557,25 @@ export class BettingBarMobile extends Component {
     this.events.on(ev, cb);
     return this;
   }
-  fit(viewW: number, viewH: number): void {
+  fit(viewW: number, viewH: number, topY?: number): void {
     // Parent is the Canvas root — origin at SCREEN CENTRE, not bottom-left.
-    // The bar is a 540x684 anchor-(0,1) surface: centre it by offsetting half
-    // its scaled size from the canvas origin (the old bottom-left math parked
-    // the whole bar half a viewport to the right).
-    const s = Math.min(viewW / W, viewH / H);
+    // The bar is a 540x684 anchor-(0,1) surface.
+    // Portrait: centred overlay (the layout is designed for it — the reels show
+    // through the transparent upper half). Landscape: the same overlay would sit
+    // ON TOP of the board, so the caller passes the board's bottom edge (canvas
+    // coords) and the bar fits into the strip between that edge and the screen
+    // bottom instead.
+    const portrait = viewH > viewW * 1.05;
+    if (portrait || topY == null) {
+      const s = Math.min(viewW / W, viewH / H);
+      this.node.setScale(s, s, 1);
+      this.node.setPosition(new Vec3((-W * s) / 2, (H * s) / 2, 0));
+      return;
+    }
+    const avail = Math.max(120, topY + viewH / 2);
+    const s = Math.min(viewW / W, avail / H);
     this.node.setScale(s, s, 1);
-    this.node.setPosition(new Vec3((-W * s) / 2, (H * s) / 2, 0));
+    this.node.setPosition(new Vec3((-W * s) / 2, topY, 0));
   }
   private fmt(n: number): string {
     // Money renders with EXACTLY two decimals everywhere (approval gate N3/N4:

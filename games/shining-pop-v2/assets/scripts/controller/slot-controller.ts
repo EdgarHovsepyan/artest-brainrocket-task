@@ -137,14 +137,25 @@ export class SlotController extends Component {
       // Code-created nodes default to the DEFAULT layer, which the 2D UI renderer skips
       // (→ black screen). Force the whole built tree onto UI_2D so it actually draws.
       this.relayerUI(this.node);
-      const vs = view.getVisibleSize();
-      this.bar.fit(vs.width, vs.height);
+      this.fitBar();
       this.syncHud();
       this.bar.setLastWin(0);
     }, 0);
+    view.setResizeCallback(() => this.fitBar());
 
     this.view.setInteractable(true);
     input.on(Input.EventType.KEY_DOWN, this.onKey, this);
+  }
+
+  /** Fit the bar to the viewport. On landscape, hand it the board's bottom edge
+   *  (canvas coords) so the controls slot UNDER the reels instead of over them. */
+  private fitBar(): void {
+    const vs = view.getVisibleSize();
+    const { designWidth, designHeight, reelCenterY, cell, gap } = VIEW_CONFIG.layout;
+    const boardScale = Math.min(vs.width / designWidth, vs.height / designHeight);
+    const gh = 3 * cell + 2 * gap;
+    const boardBottomY = (reelCenterY - gh / 2 - 28) * boardScale;
+    this.bar.fit(vs.width, vs.height, boardBottomY);
   }
 
   /** Recursively move a node subtree onto the UI_2D layer so the UI renderer draws it. */
