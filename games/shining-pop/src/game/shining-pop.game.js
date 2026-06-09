@@ -6107,6 +6107,20 @@
     },
     _startRush(){
       if(!this.ctx || this.rushSource) return;
+      // Prefer the ElevenLabs reel-spin loop master (the "spin music"). Falls back
+      // to the synth whoosh below if the sample isn't decoded yet.
+      const _rlBuf = this.buffers && this.buffers['reel_loop'];
+      if(_rlBuf){
+        const ts = this.ctx.currentTime;
+        const src = this.ctx.createBufferSource(); src.buffer = _rlBuf; src.loop = true;
+        const sg = this.ctx.createGain();
+        sg.gain.setValueAtTime(0, ts);
+        sg.gain.linearRampToValueAtTime(0.5, ts + 0.15);   // fade in, sits under the music
+        src.connect(sg); sg.connect(this.busGameplay);
+        src.start(ts);
+        this.rushSource = { _sample: true, src, gain: sg };
+        return;
+      }
       // ELEGANT reel-rush (2026-06) — soft AIRY whoosh, NOT the old buzzy resonant
       // sawtooth drone the user disliked: a band-passed noise bed (smooth "spinning
       // air") + a faint detuned-triangle whir for motion. Gentle, premium, sits
@@ -6139,11 +6153,13 @@
     },
     _stopRush(){
       if(!this.rushSource || !this.ctx) return;
-      const { osc1, osc2, noise, gain } = this.rushSource;
-      const now = this.ctx.currentTime;
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.linearRampToValueAtTime(0, now + 0.18);
-      try { osc1.stop(now + 0.22); osc2.stop(now + 0.22); if(noise) noise.stop(now + 0.22); } catch(e){}
+      const rs = this.rushSource, now = this.ctx.currentTime;
+      rs.gain.gain.cancelScheduledValues(now);
+      rs.gain.gain.linearRampToValueAtTime(0, now + 0.18);
+      try {
+        if(rs._sample){ rs.src.stop(now + 0.22); }
+        else { rs.osc1.stop(now + 0.22); rs.osc2.stop(now + 0.22); if(rs.noise) rs.noise.stop(now + 0.22); }
+      } catch(e){}
       this.rushSource = null;
     },
 
@@ -6643,7 +6659,20 @@
   };
   _wrapSample('click', 'ui_click', 'busSfx', 0.7);
   _wrapSample('spinStart', 'spin_start', 'busSfx', 0.8);
-  _wrapSample('reelStop', 'reel_stop', 'busSfx', 0.7);
+  // reelStop — turbo mode plays the snappier turbo_stop master, else reel_stop.
+  // (Manual wrap instead of _wrapSample so the clip id can switch on State.turbo.)
+  if (typeof Sound.reelStop === 'function') {
+    const _origReelStop = Sound.reelStop.bind(Sound);
+    Sound.reelStop = function (idx, topSym) {
+      this.ensure();
+      const id = State.turbo ? 'turbo_stop' : 'reel_stop';
+      if (this._playSample(id, 'busSfx', 0.7)) {
+        if (idx === REELS - 1) this._stopRush();
+        return;
+      }
+      return _origReelStop(idx, topSym);
+    };
+  }
   _wrapSample('feature', 'bonus_intro', 'busWin', 0.95);
   _wrapSample('retrigger', 'retrigger', 'busWin', 0.9);
   if (typeof Sound.win === 'function') {
@@ -6655,6 +6684,17 @@
       return _win(tier);
     };
   }
+
+  // ── BET TICK — dedicated bet-change sound (ui_bet master), throttled so a
+  // rapid +/- hold ticks crisply without overlapping voices. Synth `tick` fallback.
+  Sound.bet = function () {
+    this.ensure();
+    const t = (this.ctx && this.ctx.currentTime) || 0;
+    if (this._lastBetAt && t - this._lastBetAt < 0.03) return;
+    this._lastBetAt = t;
+    if (this._playSample('ui_bet', 'busSfx', 0.6)) return;
+    this.tick();
+  };
 
   // ── DEV: expose Sound for audio debugging (localhost / ?debug only) ──
   try {
@@ -6688,6 +6728,7 @@
     if(newIdx<0 || newIdx>=State.betLevels.length) return;
     State.betIdx = newIdx;
     State.betX6 = State.betLevels[State.betIdx];
+    try { Sound.bet(); } catch(e){}   // dedicated bet-change tick (ui_bet master)
     updateHUD();
   }
   // Steppers that get a render-loop press-scale lerp (2026-05-31 — the
