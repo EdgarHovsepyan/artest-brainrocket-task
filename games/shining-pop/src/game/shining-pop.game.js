@@ -6656,6 +6656,30 @@
     };
   }
 
+  // ── DEV: expose Sound for audio debugging (localhost / ?debug only) ──
+  try {
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+        || location.protocol === 'file:' || /[?&]debug=/.test(location.search)) {
+      window.__SND = Sound;
+    }
+  } catch (e) {}
+  // ── ROBUST AUDIO BOOTSTRAP (2026-06-10) — the ElevenLabs bank must start
+  // loading on the FIRST user gesture ANYWHERE, not only the intro tap. A click
+  // that misses the overlay (or any keydown) otherwise leaves the whole game on
+  // the synth fallback. One-shot, capture-phase, self-removing.
+  (function () {
+    const kick = () => { try { Sound.ensure(); Sound.resume(); } catch (e) {} };
+    const onGesture = () => {
+      kick();
+      window.removeEventListener('pointerdown', onGesture, true);
+      window.removeEventListener('keydown', onGesture, true);
+      window.removeEventListener('touchstart', onGesture, true);
+    };
+    window.addEventListener('pointerdown', onGesture, true);
+    window.addEventListener('keydown', onGesture, true);
+    window.addEventListener('touchstart', onGesture, true);
+  })();
+
   // ── BET LOGIC ─────────────────────────────────────────────────
   function bumpBet(dir){
     if(State.phase !== Phase.IDLE) return;
