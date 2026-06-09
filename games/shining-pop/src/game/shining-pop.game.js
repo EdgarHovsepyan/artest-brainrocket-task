@@ -6007,7 +6007,7 @@
     // The slider drives ONE master level; the relative balance of the 4 buses is a
     // FIXED design mix in dB. db→linear: 10^(dB/20). Derives _musicBase so the
     // ducker + bonus bed share one source of truth. Re-appliable without touching ensure().
-    _busMix: { music: -11, gameplay: -9, sfx: -8, win: -1 },
+    _busMix: { music: -6, gameplay: -10, sfx: -8, win: -2 },   // music clearly present (was -11, inaudible); rush sits under it
     applyBusMix(){
       if(!this.ctx) return;
       const db2lin = (db) => Math.pow(10, db / 20);
@@ -6107,33 +6107,43 @@
     },
     _startRush(){
       if(!this.ctx || this.rushSource) return;
-      // Sustained pad — sawtooth + low-pass filter sweeping slowly. Connect
-      // to bus.gameplay so it lives independent of music + sfx.
+      // ELEGANT reel-rush (2026-06) — soft AIRY whoosh, NOT the old buzzy resonant
+      // sawtooth drone the user disliked: a band-passed noise bed (smooth "spinning
+      // air") + a faint detuned-triangle whir for motion. Gentle, premium, sits
+      // UNDER the music. On busGameplay so it's independent of music + sfx.
       const t0 = this.ctx.currentTime;
-      const osc1 = this.ctx.createOscillator();
-      const osc2 = this.ctx.createOscillator();
-      osc1.type = 'sawtooth'; osc1.frequency.value = 110;
-      osc2.type = 'sawtooth'; osc2.frequency.value = 165;
-      const filt = this.ctx.createBiquadFilter();
-      filt.type = 'lowpass'; filt.frequency.value = 800; filt.Q.value = 6;
-      // Slow filter sweep gives the "rolling" sensation
-      filt.frequency.setValueAtTime(700, t0);
-      filt.frequency.linearRampToValueAtTime(1400, t0 + 0.8);
-      filt.frequency.linearRampToValueAtTime(900, t0 + 1.6);
+      // (1) noise bed — 2.2s looped, band-passed + slow sweep = the rolling whoosh
+      const dur = 2.2, sr = this.ctx.sampleRate;
+      const buf = this.ctx.createBuffer(1, Math.floor(sr * dur), sr);
+      const ch = buf.getChannelData(0);
+      for(let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * 0.5;
+      const noise = this.ctx.createBufferSource(); noise.buffer = buf; noise.loop = true;
+      const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.Q.value = 0.8;
+      filt.frequency.setValueAtTime(900, t0);
+      filt.frequency.linearRampToValueAtTime(1700, t0 + 0.7);
+      filt.frequency.linearRampToValueAtTime(1150, t0 + 1.5);
+      const ng = this.ctx.createGain(); ng.gain.value = 0.07;
+      // (2) faint triangle whir — soft tonal movement, slight detune (no harsh saw)
+      const osc1 = this.ctx.createOscillator(); osc1.type = 'triangle'; osc1.frequency.value = 220;
+      const osc2 = this.ctx.createOscillator(); osc2.type = 'triangle'; osc2.frequency.value = 223.5;
+      const of = this.ctx.createBiquadFilter(); of.type = 'lowpass'; of.frequency.value = 1500; of.Q.value = 0.9;
+      const og = this.ctx.createGain(); og.gain.value = 0.05;
       const g = this.ctx.createGain();
       g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(0.18, t0 + 0.2);
-      osc1.connect(filt); osc2.connect(filt); filt.connect(g); g.connect(this.busGameplay);
-      osc1.start(t0); osc2.start(t0);
-      this.rushSource = { osc1, osc2, filt, gain: g };
+      g.gain.linearRampToValueAtTime(0.11, t0 + 0.18);   // softer than the old 0.18 drone
+      noise.connect(filt); filt.connect(ng); ng.connect(g);
+      osc1.connect(of); osc2.connect(of); of.connect(og); og.connect(g);
+      g.connect(this.busGameplay);
+      noise.start(t0); osc1.start(t0); osc2.start(t0);
+      this.rushSource = { osc1, osc2, noise, filt, gain: g };
     },
     _stopRush(){
       if(!this.rushSource || !this.ctx) return;
-      const { osc1, osc2, gain } = this.rushSource;
+      const { osc1, osc2, noise, gain } = this.rushSource;
       const now = this.ctx.currentTime;
       gain.gain.cancelScheduledValues(now);
       gain.gain.linearRampToValueAtTime(0, now + 0.18);
-      try { osc1.stop(now + 0.22); osc2.stop(now + 0.22); } catch(e){}
+      try { osc1.stop(now + 0.22); osc2.stop(now + 0.22); if(noise) noise.stop(now + 0.22); } catch(e){}
       this.rushSource = null;
     },
 
