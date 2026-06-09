@@ -2262,6 +2262,16 @@
       persistSave();
       syncDeliveredBar();
     });
+    deliveredBar.on2('volume', (v) => {
+      if(STAKE.replay) return;
+      const flipped = Sound.setVolume(v);   // fires ~60/s while dragging — keep light
+      if(flipped){
+        btnSound._icon.texture = tex(State.muted ? 'icMute' : 'icSound');
+        btnSound._setActive(!State.muted);
+        persistSave();
+        syncDeliveredBar();
+      }
+    });
     deliveredBar.on2('menu', () => openDrawer('settings'));
   }
   // ── DELIVERED BETTING-PANEL COMPONENT (LANDSCAPE) ─────────────────────────
@@ -2306,6 +2316,17 @@
       btnSound._setActive(!State.muted);
       persistSave();
       syncDeliveredBar();
+    });
+    // Volume slider (sound-icon popup) → master level; resync icons if mute flipped.
+    deliveredBarWeb.on2('volume', (v) => {
+      if(STAKE.replay) return;
+      const flipped = Sound.setVolume(v);   // fires ~60/s while dragging — keep light
+      if(flipped){
+        btnSound._icon.texture = tex(State.muted ? 'icMute' : 'icSound');
+        btnSound._setActive(!State.muted);
+        persistSave();
+        syncDeliveredBar();
+      }
     });
     deliveredBarWeb.on2('menu', () => openDrawer('settings'));
     deliveredBarWeb.on2('buy', () => { if(_buyAllowed()) showBuyBonusModal(); });
@@ -5882,7 +5903,7 @@
       if(this.ctx) return;
       try {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        this.master      = this.ctx.createGain(); this.master.gain.value = State.muted ? 0 : 0.6;
+        this.master      = this.ctx.createGain(); this.master.gain.value = State.muted ? 0 : (this._vol == null ? 0.6 : this._vol);
         this.busMusic    = this.ctx.createGain(); this.busMusic.gain.value    = 0.25;  // -12 dB
         this.busGameplay = this.ctx.createGain(); this.busGameplay.gain.value = 0.50;  //  -6 dB
         this.busSfx      = this.ctx.createGain(); this.busSfx.gain.value      = 0.50;  //  -6 dB
@@ -5899,7 +5920,16 @@
     // State.muted, but the LOOPING music + reel-rush voices keep running, so
     // muting only swapped the icon while the drone kept playing. Ramping the
     // master bus to 0 silences EVERYTHING; unmute restores it.
-    setMuted(m){ if(this.master && this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.6, this.ctx.currentTime, 0.02); },
+    _vol: 0.6,   // chosen master level (0..1) — restored on unmute, driven by the volume slider
+    setMuted(m){ if(this.master && this.ctx) this.master.gain.setTargetAtTime(m ? 0 : (this._vol == null ? 0.6 : this._vol), this.ctx.currentTime, 0.02); },
+    // Volume slider → master level. v in 0..1. Setting >0 also unmutes; 0 mutes.
+    setVolume(v){
+      this._vol = Math.max(0, Math.min(1, v));
+      const wasMuted = State.muted;
+      State.muted = this._vol <= 0.001;
+      if(this.master && this.ctx) this.master.gain.setTargetAtTime(State.muted ? 0 : this._vol, this.ctx.currentTime, 0.02);
+      return wasMuted !== State.muted;   // true if mute-state flipped (caller resyncs icons)
+    },
 
     // ─── LOW-LEVEL SYNTH (used until samples ship) ───
     // Single oscillator with ADSR-shaped gain. Connect into any bus.

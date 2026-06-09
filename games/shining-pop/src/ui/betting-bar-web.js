@@ -128,7 +128,11 @@ export class BettingBarWeb extends PIXI.Container {
     const menuB = new PIXI.Container(); menuB.addChild(menu); menuB.eventMode = 'static'; menuB.cursor = 'pointer'; menuB.hitArea = new PIXI.Rectangle(20, 0, 70, 76); menuB.on('pointertap', () => this._emit('menu')); acc.addChild(menuB);
     const snd = new PIXI.Graphics().moveTo(112, 32).lineTo(118, 32).lineTo(126, 25).lineTo(126, 51).lineTo(118, 44).lineTo(112, 44).fill(COL.icon);
     snd.arc(120, 38, 11, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon }); snd.arc(120, 38, 17, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon });
-    const sndB = new PIXI.Container(); sndB.addChild(snd); sndB.eventMode = 'static'; sndB.cursor = 'pointer'; sndB.hitArea = new PIXI.Rectangle(100, 12, 44, 52); sndB.on('pointertap', () => this._emit('sound')); acc.addChild(sndB);
+    const sndSlash = new PIXI.Graphics().moveTo(106, 24).lineTo(134, 52).stroke({ width: 3, color: COL.icon, cap: 'round' }); sndSlash.visible = false; // OFF-state slash
+    const sndB = new PIXI.Container(); sndB.addChild(snd, sndSlash); sndB.eventMode = 'static'; sndB.cursor = 'pointer'; sndB.hitArea = new PIXI.Rectangle(100, 12, 44, 52);
+    sndB.on('pointerdown', () => sndB.scale.set(0.9)); sndB.on('pointerup', () => sndB.scale.set(1)); sndB.on('pointerupoutside', () => sndB.scale.set(1));
+    sndB.on('pointertap', () => { if (this._volPanel) this._volPanel.visible = !this._volPanel.visible; });
+    acc.addChild(sndB); acc._snd = snd; acc._sndSlash = sndSlash;
     acc.addChild(new PIXI.Graphics().moveTo(170, 14).lineTo(170, 62).stroke({ width: 1.6, color: COL.divider, alpha: 0.3 }));
     const blbl = T('BALANCE', 17, COL.label, 700, 0, false, 2.0); blbl.position.set(192, 13); acc.addChild(blbl);
     const bval = T('0', 28, COL.value, 700, 0, false); bval.position.set(192, 33); acc.addChild(bval);
@@ -209,6 +213,34 @@ export class BettingBarWeb extends PIXI.Container {
     });
     hit(auto, new PIXI.Circle(0, 0, 30), () => this._emit('autoplay')); this.addChild(auto); E.autoplay = auto;
     const spin = this._spin(2330, 186, 70); hit(spin, new PIXI.Circle(0, 0, 70), () => { if (!spin._stop.visible) spin.spin(); this._emit('spin'); }); this.addChild(spin); E.spin = spin;
+
+    // ── VOLUME SLIDER — floats above the sound icon, toggled by the sound tap.
+    //    track + knob (drag/tap), a speaker mute toggle, a close X. Emits volume(0..1).
+    const vp = new PIXI.Container(); vp.position.set(70, 10); vp.visible = false; this.addChild(vp); this._volPanel = vp; E.volPanel = vp;
+    const VPW = 240, VPH = 98;
+    vp.addChild(panel(VPW, VPH, 20, G.panel, 2, false));
+    const vtl = T('VOLUME', 16, COL.label, 700, 0, false, 2); vtl.position.set(20, 14); vp.addChild(vtl);
+    const xg = new PIXI.Graphics().moveTo(-7, -7).lineTo(7, 7).moveTo(7, -7).lineTo(-7, 7).stroke({ width: 3, color: COL.icon, cap: 'round' });
+    const xb = new PIXI.Container(); xb.addChild(xg); xb.position.set(VPW - 22, 24); xb.eventMode = 'static'; xb.cursor = 'pointer'; xb.hitArea = new PIXI.Rectangle(-16, -16, 32, 32);
+    xb.on('pointertap', () => { vp.visible = false; }); vp.addChild(xb);
+    const TX = 60, TY = 66, TW = VPW - TX - 26;
+    vp.addChild(new PIXI.Graphics().roundRect(TX, TY - 5, TW, 10, 5).fill({ color: COL.dark, alpha: 0.85 }).roundRect(TX, TY - 5, TW, 10, 5).stroke({ width: 1, color: COL.edge, alpha: 0.5 }));
+    const vfill = new PIXI.Graphics(); vp.addChild(vfill);
+    const knob = new PIXI.Graphics().circle(0, 0, 12).fill(fg(G.active, 'v')).circle(0, 0, 12).stroke({ width: 2, color: COL.pillStroke }); knob.position.set(TX, TY); vp.addChild(knob);
+    const spk = new PIXI.Graphics().moveTo(22, TY - 5).lineTo(27, TY - 5).lineTo(33, TY - 11).lineTo(33, TY + 11).lineTo(27, TY + 5).lineTo(22, TY + 5).fill(COL.icon);
+    const spkB = new PIXI.Container(); spkB.addChild(spk); spkB.eventMode = 'static'; spkB.cursor = 'pointer'; spkB.hitArea = new PIXI.Rectangle(16, TY - 16, 30, 32); vp.addChild(spkB);
+    let vol = 0.6, lastNonZero = 0.6;
+    const vredraw = () => { knob.x = TX + TW * vol; vfill.clear().roundRect(TX, TY - 5, Math.max(0.001, TW * vol), 10, 5).fill(fg(G.active, 'h')); };
+    vredraw();
+    const setVol = (v, emit) => { vol = Math.max(0, Math.min(1, v)); if (vol > 0) lastNonZero = vol; vredraw(); if (emit) this._emit('volume', vol); };
+    vp._setVol = (v) => setVol(v, false);
+    spkB.on('pointertap', () => setVol(vol > 0.001 ? 0 : lastNonZero, true));
+    vp.eventMode = 'static'; vp.hitArea = new PIXI.Rectangle(0, 0, VPW, VPH);
+    let vdrag = false;
+    const vFromGlobal = (g) => { const p = vp.toLocal(g); setVol((p.x - TX) / TW, true); };
+    vp.on('pointerdown', (e) => { const p = vp.toLocal(e.global); if (p.y > TY - 26 && p.y < TY + 26 && p.x > TX - 18 && p.x < TX + TW + 18) { vdrag = true; vFromGlobal(e.global); } });
+    vp.on('globalpointermove', (e) => { if (vdrag) vFromGlobal(e.global); });
+    const vend = () => { vdrag = false; }; vp.on('pointerup', vend); vp.on('pointerupoutside', vend);
   }
 
   fitBottom(W, H, maxScale) {
@@ -242,8 +274,13 @@ export class BettingBarWeb extends PIXI.Container {
       car._snapTo(activeIdx || 0, true);
     }
   }
-  setSoundOn(on) { const a = this.elements.account; if (a) a.alpha = 1; void on; }
-  setSpinning(on) { const s = this.elements.spin; s._arrow.visible = !on; s._stop.visible = !!on; }
+  setSoundOn(on) {
+    const a = this.elements.account;
+    if (a && a._snd) { a._snd.alpha = on ? 1 : 0.5; if (a._sndSlash) a._sndSlash.visible = !on; }   // live ON/OFF state
+  }
+  // Reflect external master volume (0..1) onto the slider knob + the icon state.
+  setVolume(v) { if (this._volPanel && this._volPanel._setVol) this._volPanel._setVol(v); this.setSoundOn(v > 0.001); }
+  setSpinning(on) { if (on && this._volPanel) this._volPanel.visible = false; const s = this.elements.spin; s._arrow.visible = !on; s._stop.visible = !!on; }
   setAutoplay(count) {
     const au = this.elements.autoplay; const active = count != null && count !== false;
     au._count.text = (count === Infinity || count === 0) ? '∞' : String(count);
