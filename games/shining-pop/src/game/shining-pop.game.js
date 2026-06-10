@@ -9774,6 +9774,45 @@
   let _pendingResult = null;
   let _spinMode = 'base';
 
+  // ── ANTICIPATION GLOW (2026-06-10) — the missing VISUAL tension layer ────────
+  // The scatter crawl already slows reels 4-5, ducks the music and fires a
+  // sub-kick, but the bonus-deciding reels had NO on-screen cue. Premium slots
+  // GLOW the teasing reels so the player SEES the tension build. Self-contained
+  // additive Graphics framing the still-spinning columns: a faint candy column
+  // wash + a pulsing double halo + soft "incoming" bars top & bottom (the slam
+  // zone where the 3rd scatter lands). Stake-safe (Graphics + rAF, NO GLSL),
+  // interruptible (stop flag → 260 ms fade → self-destroy), idempotent (one
+  // instance), reduced-motion skips it. zIndex 50 = above the reels, below the
+  // win-hero pop (60) so a landing win still reads on top.
+  let _antGlowRec = null;
+  function startAnticipationGlow(fromReel){
+    if(isReduced() || _antGlowRec) return;                       // accessibility + idempotent
+    const g = new PIXI.Graphics(); g.blendMode = 'add'; g.zIndex = 50;
+    reelArea.addChild(g);
+    const rec = { g, t0: performance.now(), stopAt: 0, alive: true };
+    _antGlowRec = rec;
+    const x0 = GX + fromReel * CELL, wTot = (REELS - fromReel) * CELL;
+    function step(){
+      if(!rec.alive) return;
+      const now = performance.now();
+      let env = Math.min(1, (now - rec.t0) / 200);               // 200 ms fade-in
+      if(rec.stopAt) env *= Math.max(0, 1 - (now - rec.stopAt) / 260);   // 260 ms fade-out
+      if(rec.stopAt && env <= 0.001){ rec.alive = false; try { g.destroy(); } catch(e){} if(_antGlowRec === rec) _antGlowRec = null; return; }
+      const pulse = 0.5 + 0.5 * Math.sin((now - rec.t0) * 0.009);   // ~0.7 s breath
+      const a = env * (0.55 + 0.45 * pulse);
+      g.clear();
+      g.rect(x0, GY, wTot, GH).fill({ color: 0xff2f93, alpha: 0.05 * a });                                   // faint candy column wash
+      g.roundRect(x0 - 6, GY - 6, wTot + 12, GH + 12, 16).stroke({ color: 0xff2f93, width: 6, alpha: 0.22 * a }); // soft outer halo
+      g.roundRect(x0 - 2, GY - 2, wTot + 4,  GH + 4,  13).stroke({ color: 0xff8ad0, width: 3, alpha: 0.40 * a }); // crisp inner edge
+      const bh = CELL * 0.22;                                                                                  // "incoming" slam-zone bars
+      g.rect(x0, GY, wTot, bh).fill({ color: 0xffd9ec, alpha: 0.10 * a });
+      g.rect(x0, GY + GH - bh, wTot, bh).fill({ color: 0xffd9ec, alpha: 0.10 * a });
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function stopAnticipationGlow(){ if(_antGlowRec && !_antGlowRec.stopAt) _antGlowRec.stopAt = performance.now(); }
+
   function reelsSpinPromise(grid,anticipate){
     return new Promise(resolve => {
       // 3-state turbo: off (1.0× full cinematic), turbo (0.33×), max (0.20×).
@@ -9803,11 +9842,13 @@
       // the bonus-deciding reels crawl. Stopped when the reels resolve (below).
       if(anticipate && !isReduced()){
         try { Sound.anticipationStart(); } catch(e){}
+        try { startAnticipationGlow(3); } catch(e){}   // VISUAL tension halo on the crawling reels 4-5
       }
       _qStopped=false;        // arm quick-stop for THIS spin
       allReelsSpinning=true;
       onAllReelsStopped = () => {
         if(anticipate){ try { Sound.anticipationStop(); } catch(e){} }
+        try { stopAnticipationGlow(); } catch(e){}   // fade the tension halo as the reels resolve
         resolve();
       };
     });
@@ -9819,6 +9860,7 @@
     if(State.phase !== Phase.IDLE) return;
     if(STAKE.replay) return;
     try { Sound.anticipationStop(); } catch(e){}   // defensive — never leak a kick loop across spins
+    try { stopAnticipationGlow(); } catch(e){}     // defensive — never leak the tension halo across spins
     mode = mode || 'base';
     // Legacy alias: 'bonus' (older buy-modal path) → resolve to the SELECTED
     // tier so STANDARD/HOT/MEGA all converge through the same cost lookup.
