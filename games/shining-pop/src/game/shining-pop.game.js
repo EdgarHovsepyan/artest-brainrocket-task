@@ -131,11 +131,11 @@
     colors: {
       // ── Surface scale — navy slate (deep enough to feel premium,
       //     not pure black so it doesn't look like a TV-off-state)
-      surface0:    0x0f1320,   // deepest navy base
-      surface1:    0x1a2032,   // raised slate panel
-      surface2:    0x252c42,   // mid surface
-      surface3:    0x303855,   // highest elevation
-      sunken:      0x080b14,   // sunken input wells
+      surface0:    0x0a0518,   // deepest candy-night base (was navy 0x0f1320)
+      surface1:    0x19103e,   // raised candy-grape panel — matches the bar
+      surface2:    0x2e1c58,   // mid candy surface
+      surface3:    0x46297a,   // highest elevation (bar panel top)
+      sunken:      0x070314,   // sunken input wells
 
       primary:     0x15151c, primaryHover: 0x232330,
 
@@ -167,12 +167,12 @@
       blueBright:    0x6f9aff,  // (NEW) hover/active state
 
       // ── Cyan — info / settings / sound function-color
-      cyan:          0x65d4f0,
-      cyanBright:    0x8be4ff,  // (NEW) hover/active state
+      cyan:          0x8be4ff,  // candy cyan — matches the bar's cyan glass rim (was 0x65d4f0)
+      cyanBright:    0xbfe8ff,  // brighter candy cyan
 
       // ── Text scale
-      text:         0xf5f7fa,
-      textMuted:    0x8b95a8,
+      text:         0xfdf2ff,
+      textMuted:    0xb89cd8,   // candy lavender-muted (was slate 0x8b95a8)
       textDisabled: 0x556270,
       textInverse:  0x14141a,
 
@@ -3251,12 +3251,12 @@
   // as "a different app". SURF freezes the family ONCE; never hand-pick a panel/text
   // colour at a callsite again — reference SURF.*.
   const SURF = Object.freeze({
-    chrome: { accent: 0xff007f, bright: 0xff8ad0, tint: 0x9a3bd6, radius: 18, titleDivAt: 44 },
-    scrim:  0x05030a,  scrimA: 0.82,
-    title:    0xff8ad0, heading:  0xff8ad0, value:    0xffe6f4, label:    0xf5f7fa,
-    muted:    0x9a90b6, accent:   0xff007f, accentHi: 0xff5ab0, link:     0x65d4f0,
+    chrome: { accent: 0xff7ad0, bright: 0xffc8ef, tint: 0x6e3aa8, radius: 18, titleDivAt: 44 },
+    scrim:  0x0e0722,  scrimA: 0.82,
+    title:    0xffc8ef, heading:  0xffc8ef, value:    0xfff2fb, label:    0xfdf2ff,
+    muted:    0xb89cd8, accent:   0xff7ad0, accentHi: 0xff5ab0, link:     0x8be4ff,
     win:      0x52d189, loss: 0xff6b6b,
-    tileBg:   0x140d1c, tileBgHover: 0x241730, pillOff:  0x1a1330, pillStroke: 0x3a2550,
+    tileBg:   0x19103e, tileBgHover: 0x2e1c58, pillOff:  0x251544, pillStroke: 0x6e3aa8,
     family:   'Fredoka', familyDisplay: 'Luckiest Guy',
   });
   // Call from EVERY panel layout so the look is byte-identical (palette locked).
