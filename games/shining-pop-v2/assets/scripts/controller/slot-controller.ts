@@ -33,6 +33,7 @@ import {
   stopAutoplay,
 } from '../logic/autoplay';
 import { BET_LEVELS_CENTS, maxBet, minBet, snapBet, stepBet } from '../logic/bet-levels';
+import { installLifecycle, LifecycleHandle } from './lifecycle';
 import { BONUS_MODES, BonusMode } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
@@ -54,6 +55,7 @@ export class SlotController extends Component {
   private bar!: BettingBarMobile | BettingBarWeb;
   private barNode: Node | null = null;
   private barIsWeb: boolean | null = null;
+  private lifecycle: LifecycleHandle | null = null;
 
   private state: FlowState = 'idle';
   private canStop = false;
@@ -129,10 +131,20 @@ export class SlotController extends Component {
     this.scheduleOnce(() => this.relayerUI(this.node), 0);
     // ONE resize owner: cc.view holds a SINGLE callback, so the controller fans
     // out to the view AND the bar (setting it in both places clobbered the view's).
-    view.setResizeCallback(() => {
+    const handleResize = (): void => {
       this.view.refit();
       this.buildBar();
       this.fitBar();
+    };
+    view.setResizeCallback(handleResize);
+    // Lifecycle hooks: tab visibility + minimize freeze the tick and suspend
+    // audio (browsers throttle hidden tabs anyway; this is explicit + clean);
+    // online/offline shows a network modal; resize is debounced beyond cc.view.
+    this.lifecycle = installLifecycle({
+      onSuspend: () => this.view.audio.suspend(),
+      onResume: () => this.view.audio.resume(),
+      onResize: handleResize,
+      onNetwork: (online) => this.onNetworkChange(online),
     });
 
     this.view.setInteractable(true);
@@ -260,6 +272,26 @@ export class SlotController extends Component {
 
   onDestroy(): void {
     input.off(Input.EventType.KEY_DOWN, this.onKey, this);
+    this.lifecycle?.dispose();
+    this.lifecycle = null;
+  }
+
+  /** Network state changed: offline -> blocking modal; online -> dismiss it.
+   *  The modal blocks input to the background (master compliance: clear failure
+   *  state, dismissible "Retry" surface). */
+  private onNetworkChange(online: boolean): void {
+    if (online) {
+      this.view.dismissError();
+      return;
+    }
+    this.view.showError(
+      'Connection lost',
+      'Please check your network. The game will resume\nwhen the connection is restored.',
+      'RETRY',
+      () => {
+        if (typeof navigator !== 'undefined' && navigator.onLine) this.view.dismissError();
+      },
+    );
   }
 
   /** Master keyboard map: Space spin · A autoplay · T turbo · M mute · B buy · S settings. */

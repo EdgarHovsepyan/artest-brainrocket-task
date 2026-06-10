@@ -222,6 +222,44 @@ export class SlotView extends Component {
     return this.brandFrames[key] ?? null;
   }
 
+  /** Network/error modal: dismissible card centred over the dimmed game,
+   *  blocks input to background. Title + body + button label. Returns true if
+   *  newly shown (controller decides what to do on dismiss via callback). */
+  showError(title: string, body: string, buttonLabel: string, onAction: () => void): void {
+    this.closeOverlays();
+    const existing = this.node.getChildByName('errorModal');
+    existing?.destroy();
+    const w = 460;
+    const h = 220;
+    const layer = this.mkNode('errorModal', 2600, 2200, this.node);
+    const scrim = layer.addComponent(Graphics);
+    scrim.fillColor = new Color(0, 0, 0, 200);
+    scrim.rect(-1300, -1100, 2600, 2200);
+    scrim.fill();
+    // hit-blocking on the scrim
+    layer.on(Node.EventType.TOUCH_END, () => undefined);
+    const card = this.mkNode('errCard', w, h, layer);
+    this.surfChrome(card, w, h, 46);
+    this.mkLabel(title, 0, h / 2 - 30, 22, ACID, card, true);
+    this.mkLabel(body, 0, h / 2 - 78, 14, MUTED, card);
+    this.mkTextButton(
+      buttonLabel,
+      0,
+      -h / 2 + 38,
+      180,
+      44,
+      () => {
+        layer.destroy();
+        onAction();
+      },
+      card,
+    );
+  }
+
+  dismissError(): void {
+    this.node.getChildByName('errorModal')?.destroy();
+  }
+
   /** Master drawSurfChrome port — ONE premium panel language for every popup:
    *  violet glass gradient body, glossy top sheen, magenta bloom + hot border,
    *  cyan dispersion hairline, optional title divider. Gradients approximated

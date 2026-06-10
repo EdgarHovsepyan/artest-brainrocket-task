@@ -129,6 +129,15 @@ export class AudioManager {
     this.muted = m;
     this.applyGain();
   }
+  /** Tab/visibility lifecycle: suspend the whole audio graph (saves battery on
+   *  mobile, prevents background-tab playback) without losing user volume/mute. */
+  suspend(): void {
+    this.stopRush();
+    if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend().catch(() => undefined);
+  }
+  resume(): void {
+    if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume().catch(() => undefined);
+  }
   /** Master volume 0..1 — driven by the betting-bar volume slider. */
   setVolume(v: number): void {
     this.volume = Math.max(0, Math.min(1, v));
