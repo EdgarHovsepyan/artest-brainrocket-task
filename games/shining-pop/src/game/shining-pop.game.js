@@ -8834,6 +8834,28 @@
               _sx+2, cc.y-_hy, _sx+6, cc.y-_hy, _sx+15, cc.y+_hy, _sx+11, cc.y+_hy,
             ]).fill({ color:0xffffff, alpha:0.30*_swA*appear });
           }
+        } else {
+          // FRUIT CATCH-LIGHT (2026-06-10) — simple symbols (id<6) stay STATIC in the
+          // reel (no hero copy / no double-image, per the 2026-05-31 decision), yet
+          // they were the ONLY winners with zero surface life. Give every fruit winner
+          // the SAME signature raking glint the premium heroes get: one light bar rakes
+          // across the symbol face ONCE (120-520 ms). Drawn on winSheenG (top, additive)
+          // and clamped STRICTLY inside the cell (±half, size-proportional) so it never
+          // bleeds onto a neighbour at any CELL scale. Pure Graphics, one-shot, already
+          // gated by `vfx` (reduced-motion off). → "rich effect on every symbol".
+          const _fct = Math.max(0, ct);
+          const _fsw = (_fct - 120) / 400;
+          if(_fsw > 0 && _fsw < 1){
+            const _fa  = Math.sin(_fsw * Math.PI);                 // 0→1→0 envelope
+            const _fx  = cc.x - half*0.74 + _fsw*(half*1.48);      // travels INSIDE the cell
+            const _fhy = half*0.84, _bw = half*0.055, _sl = half*0.085;
+            winSheenG.poly([                                       // soft raked streak
+              _fx-_bw, cc.y-_fhy, _fx+_bw, cc.y-_fhy, _fx+_bw+_sl, cc.y+_fhy, _fx-_bw+_sl, cc.y+_fhy,
+            ]).fill({ color:0xffe6f4, alpha:0.15*_fa*appear });
+            winSheenG.poly([                                       // thin hot core inside the streak
+              _fx, cc.y-_fhy, _fx+_bw*0.6, cc.y-_fhy, _fx+_bw*0.6+_sl, cc.y+_fhy, _fx+_sl, cc.y+_fhy,
+            ]).fill({ color:0xffffff, alpha:0.22*_fa*appear });
+          }
         }
       }
 
@@ -9477,7 +9499,10 @@
     const backdropG = new PIXI.Graphics();
     const bloomG = new PIXI.Graphics(); bloomG.blendMode = 'add';
     const arcG   = new PIXI.Graphics(); arcG.blendMode = 'add';
-    const crownS = new PIXI.Sprite(SYM_TEX[7]); crownS.anchor.set(0.5);   // CROWN symbol (was the logo)
+    // HERO = the painted SHINING POP crown-crest (TEX.logo, 900px, clean + on-brand)
+    // — NOT the small keyed reel-symbol JPG (SYM_TEX[7]) which looked rough/haloed
+    // blown up to ceremony size ("bad crown asset" report). 2026-06-10.
+    const crownS = new PIXI.Sprite(TEX.logo); crownS.anchor.set(0.5);
     const crownMax = Math.min(W * 0.25, H * 0.33, 240);                   // 2× smaller hero (user 2026-06-01)
     const lk = Math.min(crownMax / crownS.texture.width, crownMax / crownS.texture.height);
     // ── MATERIAL "SHADER-LOOK" LAYERS (2026-06-01, user: "more glamour / shader
@@ -9489,18 +9514,21 @@
     //   • crownFxG    — additive surface FX (charge wash + raking specular glint +
     //                   twinkling gem facets) MASKED to the crown silhouette so it
     //                   reads as light ON the metal/crystal, not a floating box.
-    const crownRimC = new PIXI.Sprite(SYM_TEX[7]); crownRimC.anchor.set(0.5); crownRimC.tint = 0x7fe7ff; crownRimC.blendMode = 'add';
-    const crownRimM = new PIXI.Sprite(SYM_TEX[7]); crownRimM.anchor.set(0.5); crownRimM.tint = 0xff2f93; crownRimM.blendMode = 'add';
-    // back rim-light: a scaled-up cyan-white crown copy BEHIND everything so the
-    // dark silhouette edge always separates from the bg (core crown-on-black fix).
-    const crownRimBack = new PIXI.Sprite(SYM_TEX[7]); crownRimBack.anchor.set(0.5); crownRimBack.tint = 0xbff4ff; crownRimBack.blendMode = 'add';
+    const crownRimC = new PIXI.Sprite(TEX.logo); crownRimC.anchor.set(0.5); crownRimC.tint = 0x7fe7ff; crownRimC.blendMode = 'add';
+    const crownRimM = new PIXI.Sprite(TEX.logo); crownRimM.anchor.set(0.5); crownRimM.tint = 0xff2f93; crownRimM.blendMode = 'add';
+    // back rim-light: a scaled-up cyan-white HERO copy (TEX.logo — same crest as the
+    // hero, NOT the rough SYM_TEX[7] JPG) BEHIND everything so the silhouette edge
+    // always separates from the bg. MUST share the hero texture: crScl is derived
+    // from the logo's metrics (lk), so a crown-JPG copy would size/shape-mismatch and
+    // read as a second "bad crown" ghost behind the hero. 2026-06-10 consistency fix.
+    const crownRimBack = new PIXI.Sprite(TEX.logo); crownRimBack.anchor.set(0.5); crownRimBack.tint = 0xbff4ff; crownRimBack.blendMode = 'add';
     // PERF: the masked surface FX (charge wash + glint + gem facets) needs a mask,
     // which costs an extra GPU pass PER FRAME → skip it on weak GPUs. The cheap
     // chromatic rims (2 sprites) alone still give the crown its energised material
     // read, so low-end devices stay smooth. (mobile best-practice, 2026-06-01)
     const _crownSurf = !_gpuWeak;
     const crownFxG  = _crownSurf ? new PIXI.Graphics() : null;
-    const crownMask = _crownSurf ? new PIXI.Sprite(SYM_TEX[7]) : null;
+    const crownMask = _crownSurf ? new PIXI.Sprite(TEX.logo) : null;  // mask MUST be the hero texture (TEX.logo) — crScl is logo-derived; a crown-JPG mask clips the surface FX to a mismatched silhouette
     if(_crownSurf){ crownFxG.blendMode = 'add'; crownMask.anchor.set(0.5); crownFxG.mask = crownMask; }
     // CANDY LIGHT-POOL behind the crown — soft additive pink→light-pink glow so the
     // hero crown sits in candy light and never reads as a flat "crown on black box"
