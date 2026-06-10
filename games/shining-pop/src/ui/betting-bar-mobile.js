@@ -22,20 +22,22 @@ import * as PIXI from 'pixi.js';
 
 const DPR = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
 
-// CRYSTAL theme: indigo darks → violet/orchid → magenta, lavender highlights.
+// CANDY / cotton-candy theme (2026-06-10 master pass) — brighter glossy
+// grape-violet with candy-pink + cyan accents to MATCH Shining Pop (was a dark
+// crystal skin that clashed with the candy game). Mirrors betting-bar-skin.js.
 const G = {
-  stage: [[0, '#1a1240'], [0.7, '#0d0826'], [1, '#060418']],
-  panel: [[0, '#2a1e52'], [0.5, '#191140'], [1, '#0c0826']],
-  banner: [[0, '#171138'], [0.5, '#281c58'], [1, '#171138']],
-  active: [[0, '#f6c8ff'], [0.45, '#db5fd8'], [1, '#8e2ec4']],
-  ring: [[0, '#ecd6ff'], [0.34, '#b86fda'], [0.66, '#7a3cb2'], [1, '#34206a']],
-  spin: [[0, '#2a1f4e'], [0.6, '#15102e'], [1, '#09071e']],
-  divider: [[0, 'rgba(206,124,224,0)'], [0.5, 'rgba(220,110,220,0.78)'], [1, 'rgba(206,124,224,0)']],
-  glow: [[0, 'rgba(216,74,216,0.22)'], [0.55, 'rgba(216,74,216,0.08)'], [1, 'rgba(216,74,216,0)']],
+  stage: [[0, '#241652'], [0.7, '#120b2e'], [1, '#08051c']],
+  panel: [[0, '#46297a'], [0.5, '#2e1c58'], [1, '#19103e']],
+  banner: [[0, '#1c1346'], [0.5, '#34206a'], [1, '#1c1346']],
+  active: [[0, '#ffd9f4'], [0.45, '#ff5ab0'], [1, '#bf2496']],
+  ring: [[0, '#ffe8fb'], [0.34, '#ff7ad0'], [0.66, '#9a4fcf'], [1, '#3e2076']],
+  spin: [[0, '#34225e'], [0.6, '#1a1138'], [1, '#0c0826']],
+  divider: [[0, 'rgba(255,122,208,0)'], [0.5, 'rgba(255,122,208,0.85)'], [1, 'rgba(255,122,208,0)']],
+  glow: [[0, 'rgba(255,74,216,0.24)'], [0.55, 'rgba(255,74,216,0.09)'], [1, 'rgba(255,74,216,0)']],
 };
-// 2026-06-09 — all panel text + currency + icons = WHITE-SMOKE (user: kill purple
-// text). Labels are a muted white-smoke for hierarchy (NOT purple).
-const COL = { edge: 0xb86fda, label: 0xc9ced8, value: 0xf5f7fa, cur: 0xe9edf3, icon: 0xf5f7fa, divider: 0xb070da, gloss: 0xffffff };
+// Value + icons stay WHITE-SMOKE (user: kill purple text); edge -> candy pink,
+// labels warmer, plus a cyan candy-glass rim.
+const COL = { edge: 0xff7ad0, label: 0xe9d6f5, value: 0xfdf2ff, cur: 0xeaddf8, icon: 0xfdf2ff, divider: 0xcf78e0, gloss: 0xffffff, cyan: 0xbfe8ff };
 const FS = 1.1;   // global type-scale bump (user: "bigger all texts")
 const FONT = "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
 
@@ -57,17 +59,22 @@ function fgRad(stops, cx, cy) {
 function panel(w, h, rx, fill, ew, horiz, inRx) {
   const g = new PIXI.Graphics();
   g.roundRect(0, 0, w, h, rx).fill(fg(fill, horiz ? 'h' : 'v'));
-  if (inRx !== undefined) g.roundRect(2, 2, w - 4, h - 4, inRx).stroke({ width: 1.2, color: COL.gloss, alpha: 0.06 });
+  // glassy candy top-sheen — soft white highlight over the upper ~42% reads as a
+  // glossy hard-candy surface (the old flat 0.06 inner stroke read cheap).
+  g.roundRect(2.5, 2, w - 5, h * 0.42, Math.max(0, rx - 2)).fill({ color: COL.gloss, alpha: 0.12 });
+  if (inRx !== undefined) g.roundRect(2, 2, w - 4, h - 4, inRx).stroke({ width: 1.1, color: COL.cyan, alpha: 0.15 });
   if (ew) g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: COL.edge });
   return g;
 }
 function cbase(r, fill, sc, sw) {
   const g = new PIXI.Graphics();
   g.circle(0, 0, r).fill(fg(fill, 'v'));
+  // glassy candy top-sheen (upper-left highlight) → glossy button
+  g.ellipse(-r * 0.18, -r * 0.34, r * 0.62, r * 0.4).fill({ color: COL.gloss, alpha: 0.12 });
   if (sw) {
-    // inset strokes (no edge bleed) → crisper border: crystal rim + thin inner gloss
+    // inset strokes (no edge bleed) → crisper border: candy rim + cyan glass inner
     g.circle(0, 0, r - sw * 0.5).stroke({ width: sw, color: sc != null ? sc : COL.edge, alpha: 0.92 });
-    g.circle(0, 0, r - sw - 0.5).stroke({ width: 1, color: COL.gloss, alpha: 0.10 });
+    g.circle(0, 0, r - sw - 0.5).stroke({ width: 1, color: COL.cyan, alpha: 0.13 });
   }
   return g;
 }
@@ -201,7 +208,8 @@ export class BettingBarMobile extends PIXI.Container {
       .moveTo(448, 17).lineTo(453, 17).lineTo(459, 12).lineTo(459, 32).lineTo(453, 27).lineTo(448, 27).fill(COL.icon);
     snd.arc(458.39, 22, 7, -1.0297, 1.0297).stroke({ width: 2, color: COL.icon, cap: 'round' });
     snd.moveTo(466, 12).arc(459.37, 22, 12, -0.9851, 0.9851).stroke({ width: 2, color: COL.icon, cap: 'round' });
-    const sB = new PIXI.Container(); sB.addChild(snd); sB.eventMode = 'static'; sB.cursor = 'pointer'; sB.hitArea = new PIXI.Rectangle(444, 6, 34, 32); sB.on('pointertap', () => this._emit('sound')); bb.addChild(sB);
+    const sndSlash = new PIXI.Graphics().moveTo(446, 9).lineTo(473, 35).stroke({ width: 2.6, color: 0xff5ab0, cap: 'round' }); sndSlash.visible = false;
+    const sB = new PIXI.Container(); sB.addChild(snd, sndSlash); sB.eventMode = 'static'; sB.cursor = 'pointer'; sB.hitArea = new PIXI.Rectangle(444, 6, 34, 32); sB.on('pointertap', () => this._emit('sound')); bb.addChild(sB); sB._slash = sndSlash;
     const mn = new PIXI.Graphics(); [16, 22, 28].forEach((y) => mn.moveTo(478, y).lineTo(500, y)); mn.stroke({ width: 2.6, color: COL.icon, cap: 'round' });
     const mB = new PIXI.Container(); mB.addChild(mn); mB.eventMode = 'static'; mB.cursor = 'pointer'; mB.hitArea = new PIXI.Rectangle(472, 6, 36, 32); mB.on('pointertap', () => this._emit('menu')); bb.addChild(mB);
     bb.balanceLabel = blbl; bb.balanceValue = bval; bb.balanceCurrency = bcur; bb.betLabel = betlbl; bb.betValue = betval; bb.soundButton = sB; bb.menuButton = mB;
@@ -244,7 +252,7 @@ export class BettingBarMobile extends PIXI.Container {
     const b = this.elements.balanceBar; b.betValue.text = v; b.relayout();
   }
   setDemo(on) { this.elements.demoBadge.visible = !!on; }
-  setSoundOn(on) { this.elements.balanceBar.soundButton.alpha = on ? 1 : 0.4; }
+  setSoundOn(on) { const sb = this.elements.balanceBar.soundButton; sb.alpha = on ? 1 : 0.62; if (sb._slash) sb._slash.visible = !on; }
 
   // ── game-state extensions ────────────────────────────────────────────────
   setSpinning(on) { const s = this.elements.spinButton; s._arrow.visible = !on; s._stop.visible = !!on; }

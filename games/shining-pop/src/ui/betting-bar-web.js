@@ -17,20 +17,21 @@ import * as PIXI from 'pixi.js';
 
 const DPR = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
 
+// CANDY / cotton-candy theme (2026-06-10 master pass) — matches Shining Pop +
+// betting-bar-skin.js / -mobile.js (was a dark crystal skin that clashed).
 const G = {
-  stage: [[0, '#1a1240'], [0.7, '#0d0826'], [1, '#060418']],
-  panel: [[0, '#2a1e52'], [0.5, '#191140'], [1, '#0c0826']],
-  banner: [[0, '#171138'], [0.5, '#281c58'], [1, '#171138']],
-  active: [[0, '#f6c8ff'], [0.45, '#db5fd8'], [1, '#8e2ec4']],
-  ring: [[0, '#ecd6ff'], [0.34, '#b86fda'], [0.66, '#7a3cb2'], [1, '#34206a']],
-  spin: [[0, '#2a1f4e'], [0.6, '#15102e'], [1, '#09071e']],
+  stage: [[0, '#241652'], [0.7, '#120b2e'], [1, '#08051c']],
+  panel: [[0, '#46297a'], [0.5, '#2e1c58'], [1, '#19103e']],
+  banner: [[0, '#1c1346'], [0.5, '#34206a'], [1, '#1c1346']],
+  active: [[0, '#ffd9f4'], [0.45, '#ff5ab0'], [1, '#bf2496']],
+  ring: [[0, '#ffe8fb'], [0.34, '#ff7ad0'], [0.66, '#9a4fcf'], [1, '#3e2076']],
+  spin: [[0, '#34225e'], [0.6, '#1a1138'], [1, '#0c0826']],
 };
 const COL = {
-  // 2026-06-09 — all panel text + currency + icons = WHITE-SMOKE (user: kill the
-  // purple text). Labels are a muted white-smoke for hierarchy (NOT purple).
-  label: 0xc9ced8, value: 0xf5f7fa, cur: 0xe9edf3, icon: 0xf5f7fa,
-  edge: 0xb86fda, divider: 0xb070da, ringInner: 0xf0e0ff, centerRim: 0xe8d0ff,
-  activeEdge: 0x4a1f7a, dark: 0x1a0830, pillStroke: 0xf0d0ff, gloss: 0xffffff,
+  // value + icons stay WHITE-SMOKE (user: kill purple text); edge -> candy pink.
+  label: 0xe9d6f5, value: 0xfdf2ff, cur: 0xeaddf8, icon: 0xfdf2ff,
+  edge: 0xff7ad0, divider: 0xcf78e0, ringInner: 0xffe4fb, centerRim: 0xffd6f4,
+  activeEdge: 0x6e1f56, dark: 0x24082c, pillStroke: 0xffc8ef, gloss: 0xffffff, cyan: 0xbfe8ff,
 };
 const FS = 1.1;   // global type-scale bump (user: "bigger all texts")
 const FONT = "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
@@ -53,17 +54,20 @@ function fgRad(stops, cx, cy) {
 function panel(w, h, rx, fill, ew, horiz) {
   const g = new PIXI.Graphics();
   g.roundRect(0, 0, w, h, rx).fill(fg(fill, horiz ? 'h' : 'v'));
-  g.roundRect(2, 2, w - 4, h - 4, Math.max(0, rx - 2)).stroke({ width: 1.2, color: COL.gloss, alpha: 0.06 });
+  // glassy candy top-sheen — premium hard-candy surface (old flat 0.06 read cheap)
+  g.roundRect(2.5, 2, w - 5, h * 0.42, Math.max(0, rx - 2)).fill({ color: COL.gloss, alpha: 0.12 });
+  g.roundRect(2, 2, w - 4, h - 4, Math.max(0, rx - 2)).stroke({ width: 1.1, color: COL.cyan, alpha: 0.15 });
   if (ew) g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: COL.edge });
   return g;
 }
 function cbase(r, fill, sw) {
   const g = new PIXI.Graphics();
   g.circle(0, 0, r).fill(fg(fill, 'v'));
+  g.ellipse(-r * 0.18, -r * 0.34, r * 0.62, r * 0.4).fill({ color: COL.gloss, alpha: 0.12 });   // glassy candy sheen
   if (sw) {
-    // inset strokes (no edge bleed) → crisper border: crystal rim + thin inner gloss
+    // inset strokes (no edge bleed) → crisper border: candy rim + cyan glass inner
     g.circle(0, 0, r - sw * 0.5).stroke({ width: sw, color: COL.edge, alpha: 0.92 });
-    g.circle(0, 0, r - sw - 0.5).stroke({ width: 1, color: COL.gloss, alpha: 0.10 });
+    g.circle(0, 0, r - sw - 0.5).stroke({ width: 1, color: COL.cyan, alpha: 0.13 });
   }
   return g;
 }
