@@ -682,14 +682,16 @@ export class SlotView extends Component {
   }
 
   private buildTitle(): void {
-    const logo = this.mkNode('logo', 380, 240, this.node);
-    logo.setPosition(0, 318, 0);
+    const logo = this.mkNode('logo', 300, 150, this.node);
+    // Compact logo, sat just above the reel frame (was oversized + crowding the
+    // board). 232x108 keeps the wordmark legible without dominating the screen.
+    logo.setPosition(0, 312, 0);
     if (this.brandFrames.logo) {
       // The REAL game logo (master art, black-keyed offline).
       const sp = logo.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.spriteFrame = this.brandFrames.logo;
-      logo.getComponent(UITransform)!.setContentSize(300, 188);
+      logo.getComponent(UITransform)!.setContentSize(232, 145);
     } else {
       // Fallback: brand-family text block.
       const back = logo.addComponent(Graphics);
@@ -894,11 +896,24 @@ export class SlotView extends Component {
 
   private fit(): void {
     const vis = view.getVisibleSize();
-    const { designWidth, designHeight } = VIEW_CONFIG.layout;
-    const availH = Math.max(120, vis.height - this.bottomInset);
-    const s = Math.min(vis.width / designWidth, availH / designHeight);
+    const { designWidth, designHeight, reelCenterY } = VIEW_CONFIG.layout;
+    const availH = Math.max(160, vis.height - this.bottomInset);
+    // Fit + centre the CONTENT BAND, not the full 760 design. With the shared
+    // betting bar (externalControls) there is no bottom control deck, so the
+    // live content is just logo-top -> reels-bottom; fitting that band makes the
+    // reels fill the screen and removes the dead space the empty deck reserved.
+    // Logo top incl. breathing headroom (logo y312, ~145 tall, ×1.04) + margin
+    // so it never clips the screen top; reels keep a clean gap above the bar.
+    const contentTop = 410;
+    const contentBottom = this.externalControls
+      ? reelCenterY - this.gh / 2 - 34 // reels bottom + clean gap to the bar
+      : -designHeight / 2; // own-HUD build keeps the full design envelope
+    const contentH = contentTop - contentBottom;
+    const contentCenter = (contentTop + contentBottom) / 2;
+    const s = Math.min(vis.width / designWidth, availH / contentH);
     this.node.setScale(s, s, 1);
-    this.node.setPosition(0, this.bottomInset / 2, 0);
+    // Land the content centre at the centre of the area above the bar.
+    this.node.setPosition(0, this.bottomInset / 2 - contentCenter * s, 0);
   }
 
   // ---- buy menu (premium modal — flagship parity) ---------------------------
@@ -1319,10 +1334,17 @@ export class SlotView extends Component {
    *  AudioContext (master learning) — the controller wires that; this is the
    *  branded surface. */
   buildIntro(onDismiss: () => void): void {
-    const ov = this.mkNode('intro', 2600, 2200, this.node);
+    // Oversized so it covers any aspect even before the board fit settles.
+    const ov = this.mkNode('intro', 4000, 3200, this.node);
     const g = ov.addComponent(Graphics);
-    g.fillColor = new Color(6, 3, 12, 232);
-    g.rect(-1300, -1100, 2600, 2200);
+    // Softer dim (was 232 ≈ opaque) so the painted candy world reads THROUGH the
+    // gate — branded arrival over the real bg, not a flat black card.
+    g.fillColor = new Color(8, 4, 16, 150);
+    g.rect(-2000, -1600, 4000, 3200);
+    g.fill();
+    // Deeper centre pool behind the logo so the wordmark keeps its contrast.
+    g.fillColor = new Color(6, 3, 12, 90);
+    g.rect(-900, -520, 1800, 1040);
     g.fill();
     // Corner vignette so the eye pulls to the centre (matches the board ART-04).
     g.fillColor = new Color(0, 0, 0, 120);
@@ -1650,7 +1672,13 @@ export class SlotView extends Component {
   showWins(result: SpinResult): void {
     this.clearWins();
     const byReel = winningCellsByReel(result, GRID.reels);
-    this.reels.forEach((reel, i) => reel.highlight(byReel[i] ?? []));
+    // WAVE BLINK (slot-vfx): stagger the per-symbol pulse L->R by reel so the win
+    // reads as a wave, not a flash. The rich in-cell sheen/sparkle fires only on
+    // FOCUSED wins (<= 8 cells); on dense wins (full wild reel lights 20+ cells)
+    // the per-cell white sheens would stack into a wash, so those get pulse+glow.
+    const totalCells = byReel.reduce((sum, rows) => sum + (rows ? rows.length : 0), 0);
+    const rich = totalCells <= 8;
+    this.reels.forEach((reel, i) => reel.highlight(byReel[i] ?? [], i * 0.06, rich));
 
     this.winLines = result.lineWins.map((w) => ({ lineIndex: w.lineIndex, count: w.count }));
     if (this.winLines.length === 0) return;

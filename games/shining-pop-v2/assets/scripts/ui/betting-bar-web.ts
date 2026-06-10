@@ -455,16 +455,18 @@ export class BettingBarWeb extends Component {
     return Math.max(0, Math.min(this.levels.length - 1, i));
   }
   private restyleCells(): void {
+    // The mask window holds ~5 cells (active ±2). Cells at distance >=3 sit on
+    // the hard mask edge and would clip mid-glyph (the "5" the owner saw), so
+    // they FADE OUT entirely before the cut — the strip reads as a clean
+    // centred carousel at any selection instead of a lopsided clipped row.
     this.cells.forEach((c, i) => {
       const d = Math.abs(i - this.activeIdx);
       const on = d === 0;
-      // Active = bold dark text on the candy pill; neighbours fade smoothly.
       c.color = col(on ? C.dark : C.value);
-      // Falloff: 1.0 active, 0.72 neighbours, 0.6 further (less clutter).
-      const s = on ? 1.0 : d === 1 ? 0.72 : 0.6;
+      const s = on ? 1.0 : d === 1 ? 0.74 : d === 2 ? 0.56 : 0.5;
       c.node.setScale(s, s, 1);
       const op = c.node.getComponent(UIOpacity) ?? c.node.addComponent(UIOpacity);
-      op.opacity = on ? 255 : d === 1 ? 175 : 110;
+      op.opacity = on ? 255 : d === 1 ? 185 : d === 2 ? 95 : 0;
     });
   }
   private snapNearest(emit: boolean): void {
