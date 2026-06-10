@@ -144,3 +144,45 @@ flagship. Next session executes with the full build->boot->screenshot loop:
    96px cells may need ~6% inset).
 7. After bar reads right: re-screenshot vs the Pixi bar side-by-side and
    iterate until anatomy matches at a glance.
+
+### STATUS 2026-06-10 evening — EXECUTED (two sessions, swept commits 96260bd + 6345c7f + 33e0a7d)
+
+All 7 points shipped and verified on a live build (scene-graph eval + screenshots):
+
+1. ✅ SCALE — width-fit s=min(viewW/2400, 0.62, 0.42·viewH/300), bar docked; board
+   contain-fits ABOVE the solid band via `SlotView.setBottomInset`. Live: barScale
+   0.5333 @ 1280x720, board 0.8196 @ y+48.5.
+2. ✅ LABELS — explicit anchors everywhere; banner pairs now use the TRUE master
+   relayout(): caption+value measured (updateRenderData), centred as a pair,
+   value shrinks to fit the banner.
+3. ✅ CAROUSEL — GRAPHICS_RECT clips on web build; pill contrast in restyle();
+   FIXED the 12px drift (track lives under a 12px-inset mask → pill centre in
+   track space is 388, not 400). Live: drift exactly 0.
+4. ✅ CLICK FX — per-control press 0.94 + spring back (container-per-button);
+   every tap emits `ui:click` → controller routes to `audio.click()`. Carousel
+   surface is silent (bet:set already ticks). Spin 360° flourish kept + real
+   btn_spin art layered on the ring.
+5. ✅ BALANCE — measured width (updateRenderData + UITransform) + the master
+   shrink-if-wider-than-180px rule; USD rides the measured edge.
+6. ✅ REELS CONTAINER — master frame proportions ported: no hard bezel box,
+   layered soft pink halo, translucent glass (0.72), smoke-white outer rim +
+   pink inner edge, top bevel bands + bottom shadow; cookie tiles verified on
+   screen; symbol art inset to CELL·0.92 (`layout.symbolFill`).
+7. ✅ Verified on the rebuilt bundle (markers grep + live eval + screenshots).
+   Live Pixi side-by-side was NOT obtainable headless (shared preview-server
+   registry between parallel sessions + WebGL capture timeout) — parity was
+   proven numerically instead (coordinate-faithful port + measured geometry).
+
+Residuals / notes for the next session:
+
+- FS 1.1 type-scale bump (master "bigger all texts") not yet applied to the
+  Cocos bar — a fonts pass was in flight in the parallel session at write time.
+- Sound-glyph press-scale skipped: glyph draws in a full-bar Graphics canvas
+  (scaling pivots at bar origin); needs a local-node restructure first.
+- `build/web-mobile/application.js` is READ-LOCKED by an orphaned CocosCreator
+  handle (SIGTERM build collision) — until reboot, serve `build-qa/web-mobile`
+  (entry `shining-pop-v2-qa2`, :7461, in D:\.claude\launch.json). build-qa/ is
+  untracked; do NOT commit it; it goes stale the moment build/ rebuilds.
+- Two CLI builds at once SIGTERM each other's build-script worker and corrupt
+  ~/.CocosCreator state — serialize builds across sessions (check
+  `Win32_Process` for a `--build` CocosCreator first).
