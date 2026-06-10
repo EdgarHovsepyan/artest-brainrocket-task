@@ -580,20 +580,28 @@ export class BettingBarWeb extends Component {
     const ring = this.localNode(this.node, 2330, this.Y(186), R * 2.8, R * 2.8);
     this.spinRing = ring;
 
-    // ── Outer ambient halo: layered candy-pink fades that "breathe" behind the
-    //    ring (premium feel, master-equivalent of the FillGradient halo). The
-    //    Graphics has no blur so we stack low-alpha circles of decreasing
-    //    radius. Sells the spin ring as the most important control on the bar.
-    const haloG = ring.addComponent(Graphics);
-    for (let k = 6; k >= 1; k--) {
-      haloG.fillColor = col(C.active, 0.04 + (6 - k) * 0.014);
-      haloG.circle(0, 0, R + k * 6);
+    // ── Ambient halo (HU6 clean): many thin low-alpha rings instead of 6 chunky
+    //    discs — the cumulative alpha reads as ONE smooth candy-pink bloom, not
+    //    concentric bands. A breathing UIOpacity gives it life. Sells the spin
+    //    ring as the hero control without the "dirty ring" the discs produced.
+    const haloN = this.localNode(ring, 0, 0, R * 2.8, R * 2.8);
+    const haloG = haloN.addComponent(Graphics);
+    for (let k = 16; k >= 1; k--) {
+      haloG.fillColor = col(C.active, 0.018);
+      haloG.circle(0, 0, R + 2 + k * 2.2);
       haloG.fill();
     }
-    // Crisper inner halo close to the rim — catches the eye.
-    haloG.fillColor = col(C.active, 0.22);
-    haloG.circle(0, 0, R + 2);
+    haloG.fillColor = col(C.activeHi, 0.16);
+    haloG.circle(0, 0, R + 3);
     haloG.fill();
+    const haloOp = haloN.addComponent(UIOpacity);
+    haloOp.opacity = 180;
+    tween(haloOp)
+      .to(1.4, { opacity: 235 }, { easing: 'sineInOut' })
+      .to(1.4, { opacity: 150 }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
 
     // ── Ring body (gradient approximation via stacked offset circles).
     const bodyN = this.localNode(ring, 0, 0, R * 2, R * 2);
@@ -792,21 +800,85 @@ export class BettingBarWeb extends Component {
   private fmt(n: number): string {
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-  setBalance(n: number): void {
-    this.balValue.string = this.fmt(n);
+  /** HU2 odometer driven by the COMPONENT SCHEDULER (Cocos tween on a plain
+   *  object does not tick in this runtime — only Node tweens do — so the value
+   *  count-up is a per-frame schedule() lerp instead). Ease-out, duration scales
+   *  with the delta (log) + clamps; first-set / tiny deltas snap. */
+  private counters: Record<string, { shown: number; cb: ((dt: number) => void) | null }> = {
+    bal: { shown: 0, cb: null },
+    win: { shown: 0, cb: null },
+  };
+  private countTo(id: string, to: number, render: (v: number) => void, instant = false): void {
+    const c = this.counters[id];
+    if (c.cb) {
+      this.unschedule(c.cb);
+      c.cb = null;
+    }
+    const from = c.shown;
+    if (instant || Math.abs(to - from) < 0.005) {
+      c.shown = to;
+      render(to);
+      return;
+    }
+    const dur = Math.min(1.5, 0.32 + Math.log10(Math.abs(to - from) + 1) * 0.5);
+    let t = 0;
+    const cb = (dt: number): void => {
+      t += dt;
+      const p = Math.min(1, t / dur);
+      const e = 1 - (1 - p) * (1 - p); // quadOut
+      render(from + (to - from) * e);
+      if (p >= 1) {
+        c.shown = to;
+        render(to);
+        if (c.cb) this.unschedule(c.cb);
+        c.cb = null;
+      }
+    };
+    c.cb = cb;
+    this.schedule(cb, 0);
+  }
+  private balReady = false;
+  private renderBalance(v: number): void {
+    this.balValue.string = this.fmt(v);
     this.balValue.updateRenderData(true);
     const ut = this.balValue.node.getComponent(UITransform)!;
     const k = ut.width > 180 ? 180 / ut.width : 1;
     this.balValue.node.setScale(k, k, 1);
     this.balCur.node.setPosition(232 + ut.width * k + 10, this.Y(200), 0);
   }
+  setBalance(n: number): void {
+    this.countTo('bal', n, (v) => this.renderBalance(v), !this.balReady);
+    this.balReady = true;
+  }
   setCurrency(c: string): void {
     this.balCur.string = c;
   }
   setLastWin(n: number): void {
-    this.lastWinValue.string = this.fmt(n);
-    this.relayoutBanners();
+    // Classic 0 -> win tick: reset the shown value so it always counts up.
+    this.counters.win.shown = 0;
+    this.countTo('win', n, (v) => {
+      this.lastWinValue.string = this.fmt(v);
+      this.relayoutBanners();
+    });
+    // HU8: a credited win pops + flashes the LAST WIN value so the win reads on
+    // the bar, not just in the reel area (Node tween — these DO tick).
+    if (n > 0) {
+      const node = this.lastWinValue.node;
+      Tween.stopAllByTarget(node);
+      node.setScale(1, 1, 1);
+      tween(node)
+        .delay(0.05)
+        .to(0.16, { scale: new Vec3(1.22, 1.22, 1) }, { easing: 'backOut' })
+        .to(0.55, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
+        .start();
+      this.lastWinValue.color = col(C.activeHi);
+      this.unschedule(this._winColorReset);
+      this.scheduleOnce(this._winColorReset, 0.7);
+    }
   }
+  private _winColorReset = (): void => {
+    this.lastWinValue.color = col(C.value);
+  };
   setBet(n: number): void {
     this.totalBetValue.string = this.fmt(n);
     this.relayoutBanners();

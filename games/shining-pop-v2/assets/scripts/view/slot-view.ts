@@ -1458,6 +1458,7 @@ export class SlotView extends Component {
     ctaGroup.setPosition(0, -150, 0);
     const cg = ctaGroup.addComponent(Graphics);
     const drawCta = (glowA: number) => {
+      if (!cg.isValid) return; // guard: tween may tick a frame after destroy
       cg.clear();
       cg.fillColor = new Color(255, 90, 156, Math.round(40 + glowA * 50));
       cg.roundRect(-150, -34, 300, 68, 34);
@@ -1509,6 +1510,10 @@ export class SlotView extends Component {
     // Tap anywhere → a quick confirming flash + logo punch, then fade the gate.
     ov.once(Node.EventType.TOUCH_END, () => {
       this.audio.click();
+      // Stop the repeatForever glow proxy (a PLAIN-object tween that would
+      // otherwise keep ticking after ov.destroy() and redraw a destroyed
+      // Graphics → crash). Node tweens auto-stop on destroy; this one does not.
+      Tween.stopAllByTarget(glowProxy);
       Tween.stopAllByTarget(logoNode);
       tween(logoNode)
         .to(0.12, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'quadOut' })
