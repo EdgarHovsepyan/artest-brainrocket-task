@@ -21,6 +21,7 @@ import {
 import { SlotModel } from '../model/slot-model';
 import { SlotView } from '../view/slot-view';
 import { BettingBarMobile } from '../ui/betting-bar';
+import { BettingBarWeb } from '../ui/betting-bar-web';
 import {
   AUTOPLAY_COUNTS,
   AutoplayState,
@@ -50,7 +51,9 @@ export class SlotController extends Component {
 
   private model!: SlotModel;
   private view!: SlotView;
-  private bar!: BettingBarMobile;
+  private bar!: BettingBarMobile | BettingBarWeb;
+  private barNode: Node | null = null;
+  private barIsWeb: boolean | null = null;
 
   private state: FlowState = 'idle';
   private canStop = false;
@@ -119,29 +122,18 @@ export class SlotController extends Component {
       /* non-browser runtime */
     }
 
-    // Shared betting bar = the only on-screen controls; buy-bonus is game state.
-    const barNode = new Node('BettingBar');
-    this.node.addChild(barNode);
-    this.bar = barNode.addComponent(BettingBarMobile);
-    this.bar.on('spin', () => this.onSpinPressed());
-    this.bar.on('bet:inc', () => this.changeBet(1));
-    this.bar.on('bet:dec', () => this.changeBet(-1));
-    this.bar.on('turbo', () => this.toggleTurbo());
-    this.bar.on('autoplay', () => this.toggleAuto());
-    this.bar.on('sound', () => this.toggleSound());
-    this.bar.on('volume', (v: number) => this.view.setVolume(v));
-    this.bar.on('menu', () => this.view.openMenuHub());
-
-    // Defer HUD writes one frame so the bar's onLoad has built its labels.
-    this.scheduleOnce(() => {
-      // Code-created nodes default to the DEFAULT layer, which the 2D UI renderer skips
-      // (→ black screen). Force the whole built tree onto UI_2D so it actually draws.
-      this.relayerUI(this.node);
+    // Shared betting bar — WEB strip on landscape, the portrait overlay on
+    // mobile aspect (master parity: two bar layouts, one controller surface).
+    this.buildBar();
+    // Boot-time relayer for the whole built tree (view + intro + panels).
+    this.scheduleOnce(() => this.relayerUI(this.node), 0);
+    // ONE resize owner: cc.view holds a SINGLE callback, so the controller fans
+    // out to the view AND the bar (setting it in both places clobbered the view's).
+    view.setResizeCallback(() => {
+      this.view.refit();
+      this.buildBar();
       this.fitBar();
-      this.syncHud();
-      this.bar.setLastWin(0);
-    }, 0);
-    view.setResizeCallback(() => this.fitBar());
+    });
 
     this.view.setInteractable(true);
     input.on(Input.EventType.KEY_DOWN, this.onKey, this);
@@ -163,8 +155,43 @@ export class SlotController extends Component {
     }
   }
 
-  /** Fit the bar to the viewport. On landscape, hand it the board's bottom edge
-   *  (canvas coords) so the controls slot UNDER the reels instead of over them. */
+  /** (Re)create the bar variant for the current orientation and wire it. */
+  private buildBar(): void {
+    const vs = view.getVisibleSize();
+    const wantWeb = vs.width > vs.height * 1.05;
+    if (this.barNode && this.barIsWeb === wantWeb) return;
+    this.barNode?.destroy();
+    const barNode = new Node('BettingBar');
+    this.node.addChild(barNode);
+    this.bar = wantWeb
+      ? barNode.addComponent(BettingBarWeb)
+      : barNode.addComponent(BettingBarMobile);
+    this.barNode = barNode;
+    this.barIsWeb = wantWeb;
+    this.bar.on('spin', () => this.onSpinPressed());
+    this.bar.on('bet:inc', () => this.changeBet(1));
+    this.bar.on('bet:dec', () => this.changeBet(-1));
+    this.bar.on('turbo', () => this.toggleTurbo());
+    this.bar.on('autoplay', () => this.toggleAuto());
+    this.bar.on('sound', () => this.toggleSound());
+    this.bar.on('volume', (v: number) => this.view.setVolume(v));
+    this.bar.on('menu', () => this.view.openMenuHub());
+    // Defer state writes one frame so the bar's onLoad has built its labels.
+    this.scheduleOnce(() => {
+      // Code-created nodes default to the DEFAULT layer, which the 2D UI renderer
+      // skips (-> black screen). Force the built tree onto UI_2D so it draws.
+      this.relayerUI(barNode);
+      this.fitBar();
+      this.syncHud();
+      this.bar.setLastWin(0);
+      this.bar.setTurbo(this.turboMode);
+      this.bar.setSoundOn(!this.muted);
+      this.bar.setAutoplay(this.autoplay.active ? this.autoplay.remaining : null);
+    }, 0);
+  }
+
+  /** Fit the bar to the viewport. On portrait the mobile overlay centres; the
+   *  topY arg lets the mobile bar slot under the board if it ever runs landscape. */
   private fitBar(): void {
     const vs = view.getVisibleSize();
     const { designWidth, designHeight, reelCenterY, cell, gap } = VIEW_CONFIG.layout;

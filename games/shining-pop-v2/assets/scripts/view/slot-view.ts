@@ -180,9 +180,18 @@ export class SlotView extends Component {
   // ---- small node helpers ---------------------------------------------------
   private mkNode(name: string, w: number, h: number, parent: Node): Node {
     const n = new Node(name);
+    // Inherit the parent's render layer: nodes created AFTER the boot-time
+    // relayer pass (lazy panels, rebuilt panels) otherwise sit on DEFAULT,
+    // which the 2D UI renderer skips -> invisible UI.
+    n.layer = parent.layer;
     n.addComponent(UITransform).setContentSize(w, h);
     parent.addChild(n);
     return n;
+  }
+
+  /** Public refit hook — the controller owns cc.view's single resize callback. */
+  refit(): void {
+    this.fit();
   }
 
   private mkLabel(
@@ -319,7 +328,6 @@ export class SlotView extends Component {
     this.ceremony.build(this.node);
 
     this.fit();
-    view.setResizeCallback(() => this.fit());
   }
 
   private buildBackground(): void {
