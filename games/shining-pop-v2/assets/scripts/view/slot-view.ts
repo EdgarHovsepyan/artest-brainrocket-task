@@ -1294,6 +1294,7 @@ export class SlotView extends Component {
   /** Reduced-effects accessibility flag — gates particles + anticipation drag. */
   setReducedFx(on: boolean): void {
     this.reducedFx = on;
+    this.reels.forEach((r) => r.setReducedMotion(on));
   }
 
   // ---- public API the Controller drives ------------------------------------

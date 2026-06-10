@@ -55,6 +55,34 @@ export class ReelView extends Component {
   private startY = 0;
   /** One-shot settle, fired by the tween OR by quickStop — never twice. */
   private settle: (() => void) | null = null;
+  /** Velocity-coupled motion blur: last strip Y + current stretch (1 = none). */
+  private lastStripY = 0;
+  private blurStretch = 1;
+  private blurActive = false;
+  private reducedMotion = false;
+
+  /** WCAG reduced-motion gate (driven by SlotView.setReducedFx). */
+  setReducedMotion(on: boolean): void {
+    this.reducedMotion = on;
+  }
+
+  /** Per-frame velocity-stretch on the strip = vector motion blur (no shader).
+   *  Fast scroll stretches the column vertically + thins it horizontally, which
+   *  reads as the symbols smearing; springs back to 1 as the reel decelerates. */
+  update(dt: number): void {
+    if (!this.strip || dt <= 0) return;
+    const y = this.strip.position.y;
+    if (this.blurActive) {
+      const { triggerSpd, span, strengthYFrac, rampInDecay, rampOutDecay } = VIEW_CONFIG.spin.blur;
+      const cellsPerFrame = Math.abs(y - this.lastStripY) / (this.pitch || 1) / (dt * 60);
+      const target =
+        1 + Math.max(0, Math.min(1, (cellsPerFrame - triggerSpd) / span)) * (strengthYFrac * 8);
+      const decay = target > this.blurStretch ? rampInDecay : rampOutDecay;
+      this.blurStretch += (target - this.blurStretch) * decay;
+      this.strip.setScale(1 - (this.blurStretch - 1) * 0.5, this.blurStretch, 1);
+    }
+    this.lastStripY = y;
+  }
 
   /** Build the masked column + strip cells. `frames` is shared symbol art. */
   build(frames: SpriteFrame[]): void {
@@ -115,10 +143,16 @@ export class ReelView extends Component {
         this.settle = null;
         Tween.stopAllByTarget(strip);
         strip.setPosition(0, 0, 0);
+        this.blurActive = false;
+        this.blurStretch = 1;
+        strip.setScale(1, 1, 1); // clear any residual motion-blur stretch
         this.cells.forEach((c) => c.playLand(VIEW_CONFIG.spin.landSquash));
         resolve();
       };
       strip.setPosition(0, this.startY, 0);
+      this.lastStripY = this.startY;
+      this.blurStretch = 1;
+      this.blurActive = !this.reducedMotion;
       const t = tween(strip);
       // Anticipatory wind-up "slingshot": base spins only pull UP a touch, then
       // launch down — reads as loading the reel (a Signature game-feel touch).

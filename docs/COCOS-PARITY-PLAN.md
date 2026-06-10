@@ -20,17 +20,17 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 
 ## 2. Reels — feel & animation
 
-| Case                                                           | Pixi | Cocos | Notes                                                             |
-| -------------------------------------------------------------- | ---- | ----- | ----------------------------------------------------------------- |
-| Trapezoidal velocity curve (accel 0.10 / decel 0.34)           | ✅   | ✅    | view-config mirrors master                                        |
-| Stop stagger 88ms L→R, min spin 440ms                          | ✅   | ✅    |                                                                   |
-| Anticipatory wind-up kick before launch                        | ✅   | ✅    | OFF mode only                                                     |
-| Velocity-coupled motion blur                                   | ✅   | 🔶 M  | config staged (`spin.blur`), reel-view hook pending               |
-| Land squash + bottom→top symbol ripple per turbo mode          | ✅   | ✅    | `land` table                                                      |
-| Anticipation drag + glow on late reels (2+ early wilds)        | ✅   | ✅    | + anticipation audio                                              |
-| WILD landing strike (punch + hot glow + sample)                | —    | ✅    | Cocos-first; port BACK to Pixi                                    |
-| Reel window chrome: per-cell glass plates, cream candy borders | ✅   | 🔶 M  | v2 has glass columns; master's per-cell candy borders pending     |
-| 120 fps (uncapped frame rate)                                  | 🔶   | ✅    | Cocos `frameRate=120`; Pixi ticker check pending (Session 1 lane) |
+| Case                                                           | Pixi | Cocos | Notes                                                                        |
+| -------------------------------------------------------------- | ---- | ----- | ---------------------------------------------------------------------------- |
+| Trapezoidal velocity curve (accel 0.10 / decel 0.34)           | ✅   | ✅    | view-config mirrors master                                                   |
+| Stop stagger 88ms L→R, min spin 440ms                          | ✅   | ✅    |                                                                              |
+| Anticipatory wind-up kick before launch                        | ✅   | ✅    | OFF mode only                                                                |
+| Velocity-coupled motion blur                                   | ✅   | ✅    | vector velocity-stretch in ReelView.update (no shader); reduced-motion gated |
+| Land squash + bottom→top symbol ripple per turbo mode          | ✅   | ✅    | `land` table                                                                 |
+| Anticipation drag + glow on late reels (2+ early wilds)        | ✅   | ✅    | + anticipation audio                                                         |
+| WILD landing strike (punch + hot glow + sample)                | —    | ✅    | Cocos-first; port BACK to Pixi                                               |
+| Reel window chrome: per-cell glass plates, cream candy borders | ✅   | 🔶 M  | v2 has glass columns; master's per-cell candy borders pending                |
+| 120 fps (uncapped frame rate)                                  | 🔶   | ✅    | Cocos `frameRate=120`; Pixi ticker check pending (Session 1 lane)            |
 
 ## 3. Betting bars
 
@@ -56,7 +56,7 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 | Buy menu with mode costs                                | ✅   | ✅    |                                                   |
 | Scrollable panel bodies (long content)                  | ✅   | ⬜ M  | v2 content sized-to-fit; mask+drag scroll pending |
 | Reality Check (session timer popup)                     | ✅   | ⬜ M  | COMPLY table port                                 |
-| Error modal (dismissible, social-safe text)             | ✅   | ⬜ M  |                                                   |
+| Error modal (dismissible, social-safe text)             | ✅   | ✅    | SlotView.showError + network modal (QA hardening) |
 | One-overlay-at-a-time discipline                        | ✅   | ✅    | `closeOverlays()`                                 |
 
 ## 5. Win presentation & VFX
@@ -72,8 +72,8 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 | Sticky-lock held-glow confirmation                                           | —    | ✅    | Cocos-first                            |
 | Shard particle bursts from win cells                                         | ✅   | ✅    | reduced-FX gated                       |
 | Spine crown rig in MEGA ceremony                                             | ✅   | ⬜ L  | spine-pixi only; cc.Spine port + atlas |
-| Per-mode bonus atmosphere (standard/hot/mega washes)                         | ✅   | ⬜ M  | frost tints staged in config           |
-| Free-spin counter HUD (spins left + running total)                           | ✅   | ⬜ M  | approval point                         |
+| Per-mode bonus atmosphere (standard/hot/mega washes)                         | ✅   | ✅    | setBonusAtmosphere cross-fade wash     |
+| Free-spin counter HUD (spins left + running total)                           | ✅   | ✅    | setBonusHud strip above board          |
 
 ## 6. Audio
 
