@@ -1181,6 +1181,14 @@ export class SlotView extends Component {
         }
         return reel.spinTo(grid[i], dur, speedMul).then(() => {
           this.audio.reelStop(i, turbo);
+          const wildRows: number[] = [];
+          grid[i].forEach((id, row) => {
+            if (id === SYMBOLS.WILD) wildRows.push(row);
+          });
+          if (wildRows.length) {
+            reel.flashWilds(wildRows);
+            this.audio.wildLand();
+          }
           if (i >= 3) this.anticipation.clear();
         });
       }),

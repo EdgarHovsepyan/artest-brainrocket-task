@@ -153,9 +153,14 @@ export class ReelView extends Component {
 
   /** Bounce the given window rows — sticky wilds/crowns celebrating each free
    *  spin (they persist in the grid, so this reads as "locked + alive", not a
-   *  respin). Reuses the proven one-shot win pulse. */
+   *  respin). Held-glow lock confirmation, distinct from the win pulse. */
   bounceSticky(rows: number[]): void {
-    rows.forEach((row) => this.cells[row]?.playWin());
+    rows.forEach((row, i) => this.cells[row]?.playLock(i * 0.05));
+  }
+
+  /** Sharp WILD-landing strike on the given window rows (reel just settled). */
+  flashWilds(rows: number[]): void {
+    rows.forEach((row, i) => this.cells[row]?.flashWildLand(i * 0.04));
   }
 
   clearHighlight(): void {

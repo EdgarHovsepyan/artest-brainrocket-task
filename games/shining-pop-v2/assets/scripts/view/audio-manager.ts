@@ -270,6 +270,11 @@ export class AudioManager {
     this.voice(300, 0.1, 'square', 0.1);
   }
 
+  wildLand(): void {
+    if (this.playSample('wild_land', 'sfx', 0.8)) return;
+    this.voice(240, 0.14, 'triangle', 0.16);
+  }
+
   // ---- UI ------------------------------------------------------------------
   click(): void {
     if (this.playSample('ui_click', 'sfx', 0.7)) return;

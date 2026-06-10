@@ -46,7 +46,7 @@ export class SymbolView extends Component {
     lbl.fontSize = Math.round(size * 0.34);
     lbl.lineHeight = lbl.fontSize + 2;
     lbl.isBold = true;
-    lbl.color = new Color(234, 255, 0, 255);
+    lbl.color = new Color(245, 247, 250, 255); // white-smoke (brand: no acid yellow)
     this.label = lbl;
 
     // Win light-up: a bright ACID diamond light-frame (outline + faint fill, NEVER a
@@ -64,11 +64,11 @@ export class SymbolView extends Component {
       gg.lineTo(-r, 0);
       gg.close();
     };
-    gg.fillColor = new Color(234, 255, 0, 40);
+    gg.fillColor = new Color(255, 0, 127, 40); // brand magenta (was legacy acid yellow)
     diamond();
     gg.fill();
     gg.lineWidth = 4;
-    gg.strokeColor = new Color(234, 255, 0, 255);
+    gg.strokeColor = new Color(255, 90, 156, 255);
     diamond();
     gg.stroke();
     glowNode.setScale(0.8, 0.8, 1);
@@ -118,6 +118,52 @@ export class SymbolView extends Component {
         .to(half, { scale: new Vec3(0.8, 0.8, 1) }, { easing: 'quadIn' })
         .union()
         .repeat(3)
+        .start();
+    }
+  }
+
+  /** Sharp one-shot WILD-landing flash: scale punch + single hot glow strike.
+   *  Distinct from playWin (sustained pulse) — this is the "it just hit" beat. */
+  flashWildLand(delay = 0): void {
+    Tween.stopAllByTarget(this.node);
+    this.node.setScale(1, 1, 1);
+    tween(this.node)
+      .delay(delay)
+      .to(0.09, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'quadOut' })
+      .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .start();
+    if (this.glow && this.glowOp) {
+      Tween.stopAllByTarget(this.glow);
+      Tween.stopAllByTarget(this.glowOp);
+      this.glow.setScale(0.7, 0.7, 1);
+      this.glowOp.opacity = 0;
+      tween(this.glowOp).delay(delay).to(0.07, { opacity: 235 }).to(0.3, { opacity: 0 }).start();
+      tween(this.glow)
+        .delay(delay)
+        .to(0.34, { scale: new Vec3(1.5, 1.5, 1) }, { easing: 'quadOut' })
+        .start();
+    }
+  }
+
+  /** Sticky-lock confirmation: small settle pop + a HELD glow rim (reads as
+   *  "locked in", not a respin win). */
+  playLock(delay = 0): void {
+    Tween.stopAllByTarget(this.node);
+    this.node.setScale(1, 1, 1);
+    tween(this.node)
+      .delay(delay)
+      .to(0.08, { scale: new Vec3(1.14, 1.14, 1) }, { easing: 'quadOut' })
+      .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
+      .start();
+    if (this.glow && this.glowOp) {
+      Tween.stopAllByTarget(this.glow);
+      Tween.stopAllByTarget(this.glowOp);
+      this.glow.setScale(1, 1, 1);
+      tween(this.glowOp)
+        .delay(delay)
+        .to(0.1, { opacity: 150 })
+        .delay(0.45)
+        .to(0.35, { opacity: 0 })
         .start();
     }
   }

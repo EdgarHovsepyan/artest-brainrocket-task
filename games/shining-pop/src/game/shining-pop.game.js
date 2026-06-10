@@ -6203,60 +6203,51 @@
     },
     _startRush(){
       if(!this.ctx || this.rushSource) return;
-      // Prefer the ElevenLabs reel-spin loop master (the "spin music"). Falls back
-      // to the synth whoosh below if the sample isn't decoded yet.
-      const _rlBuf = this.buffers && this.buffers['reel_loop'];
-      if(_rlBuf){
-        const ts = this.ctx.currentTime;
-        const src = this.ctx.createBufferSource(); src.buffer = _rlBuf; src.loop = true;
-        // gentle lowpass tames harsh hiss so the whoosh sits UNDER the music
-        const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; lp.Q.value = 0.7;
-        const sg = this.ctx.createGain();
-        sg.gain.setValueAtTime(0, ts);
-        sg.gain.linearRampToValueAtTime(0.34, ts + 0.18);   // softer, sits under the music
-        src.connect(lp); lp.connect(sg); sg.connect(this.busGameplay);
-        src.start(ts);
-        this.rushSource = { _sample: true, src, gain: sg };
-        return;
-      }
-      // ELEGANT reel-rush (2026-06) — soft AIRY whoosh, NOT the old buzzy resonant
-      // sawtooth drone the user disliked: a band-passed noise bed (smooth "spinning
-      // air") + a faint detuned-triangle whir for motion. Gentle, premium, sits
-      // UNDER the music. On busGameplay so it's independent of music + sfx.
-      const t0 = this.ctx.currentTime;
-      // (1) noise bed — 2.2s looped, band-passed + slow sweep = the rolling whoosh
-      const dur = 2.2, sr = this.ctx.sampleRate;
-      const buf = this.ctx.createBuffer(1, Math.floor(sr * dur), sr);
-      const ch = buf.getChannelData(0);
-      for(let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * 0.5;
-      const noise = this.ctx.createBufferSource(); noise.buffer = buf; noise.loop = true;
-      const filt = this.ctx.createBiquadFilter(); filt.type = 'bandpass'; filt.Q.value = 0.8;
-      filt.frequency.setValueAtTime(900, t0);
-      filt.frequency.linearRampToValueAtTime(1700, t0 + 0.7);
-      filt.frequency.linearRampToValueAtTime(1150, t0 + 1.5);
-      const ng = this.ctx.createGain(); ng.gain.value = 0.07;
-      // (2) faint triangle whir — soft tonal movement, slight detune (no harsh saw)
-      const osc1 = this.ctx.createOscillator(); osc1.type = 'triangle'; osc1.frequency.value = 220;
-      const osc2 = this.ctx.createOscillator(); osc2.type = 'triangle'; osc2.frequency.value = 223.5;
-      const of = this.ctx.createBiquadFilter(); of.type = 'lowpass'; of.frequency.value = 1500; of.Q.value = 0.9;
-      const og = this.ctx.createGain(); og.gain.value = 0.05;
-      const g = this.ctx.createGain();
-      g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(0.11, t0 + 0.18);   // softer than the old 0.18 drone
-      noise.connect(filt); filt.connect(ng); ng.connect(g);
-      osc1.connect(of); osc2.connect(of); of.connect(og); og.connect(g);
-      g.connect(this.busGameplay);
-      noise.start(t0); osc1.start(t0); osc2.start(t0);
-      this.rushSource = { osc1, osc2, noise, filt, gain: g };
+      const ctx = this.ctx, t0 = ctx.currentTime;
+      // ── CUTE CANDY REEL-SPIN (2026-06-10, user: "remove the noise on the reels,
+      // cute happy effects") — REPLACES the noise whoosh / reel_loop sample with a
+      // soft TONAL candy loop: a mellow detuned-triangle whir bed + light bouncy
+      // major-triad "bubble" pips for a cheerful sense of motion. NO noise, NO
+      // sample (so nothing hisses). Sits UNDER the music; ends on the last reel.
+      // (1) mellow detuned-triangle whir bed — continuous, soft, with a playful
+      //     slow filter wobble (the "fun" wiggle, never harsh).
+      const o1 = ctx.createOscillator(); o1.type = 'triangle'; o1.frequency.value = 294;    // ~D4
+      const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 296.7;   // tiny detune = candy shimmer
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2000; lp.Q.value = 0.7;
+      const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 5.2;
+      const lfoG = ctx.createGain(); lfoG.gain.value = 520;
+      lfo.connect(lfoG); lfoG.connect(lp.frequency);
+      const padG = ctx.createGain(); padG.gain.setValueAtTime(0, t0); padG.gain.linearRampToValueAtTime(0.045, t0 + 0.16);
+      o1.connect(lp); o2.connect(lp); lp.connect(padG); padG.connect(this.busGameplay);
+      o1.start(t0); o2.start(t0); lfo.start(t0);
+      this.rushSource = { o1, o2, lfo, gain: padG, _pipT: 0 };
+      // (2) bouncy candy "bubble" pips — soft sine boops in a happy major bounce,
+      //     re-scheduled while the reels move (timer cleared in _stopRush).
+      const PAT = [523, 659, 784, 659];   // C5 E5 G5 E5 — cheerful major triad
+      let step = 0;
+      const pip = () => {
+        if(!this.rushSource || State.muted) return;
+        const t = ctx.currentTime + 0.02, f = PAT[step % PAT.length]; step++;
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.038, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+        o.connect(g); g.connect(this.busGameplay); o.start(t); o.stop(t + 0.2);
+        if(this.rushSource) this.rushSource._pipT = setTimeout(pip, 145);
+      };
+      pip();
     },
     _stopRush(){
       if(!this.rushSource || !this.ctx) return;
       const rs = this.rushSource, now = this.ctx.currentTime;
+      if(rs._pipT) clearTimeout(rs._pipT);                 // stop the bubble-pip scheduler
       rs.gain.gain.cancelScheduledValues(now);
       rs.gain.gain.linearRampToValueAtTime(0, now + 0.18);
       try {
         if(rs._sample){ rs.src.stop(now + 0.22); }
-        else { rs.osc1.stop(now + 0.22); rs.osc2.stop(now + 0.22); if(rs.noise) rs.noise.stop(now + 0.22); }
+        else {
+          if(rs.o1) rs.o1.stop(now + 0.22); if(rs.o2) rs.o2.stop(now + 0.22); if(rs.lfo) rs.lfo.stop(now + 0.22);
+          if(rs.osc1) rs.osc1.stop(now + 0.22); if(rs.osc2) rs.osc2.stop(now + 0.22); if(rs.noise) rs.noise.stop(now + 0.22);
+        }
       } catch(e){}
       this.rushSource = null;
     },
