@@ -216,6 +216,11 @@ export class SlotView extends Component {
     this.fit();
   }
 
+  /** Brand art lookup for sibling surfaces (the bar wears the real spin button). */
+  getBrandFrame(key: string): SpriteFrame | null {
+    return this.brandFrames[key] ?? null;
+  }
+
   /** Screen px reserved at the bottom for the web bar's solid band — the board
    *  contain-fits into the remaining area and centres above it. */
   setBottomInset(px: number): void {

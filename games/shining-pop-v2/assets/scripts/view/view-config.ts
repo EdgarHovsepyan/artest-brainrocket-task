@@ -7,6 +7,8 @@ export const VIEW_CONFIG = {
   layout: {
     /** Square symbol cell size. */
     cell: 96,
+    /** Symbol art fill fraction of the cell (master: CELL*0.92 contain-fit). */
+    symbolFill: 0.92,
     /** Gap between cells (and between reels). */
     gap: 8,
     /** Vertical centre of the reel block, relative to the canvas centre. */

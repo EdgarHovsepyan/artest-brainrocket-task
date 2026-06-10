@@ -21,6 +21,8 @@ import {
   Label,
   Mask,
   Node,
+  Sprite,
+  SpriteFrame,
   tween,
   Tween,
   UIOpacity,
@@ -80,6 +82,7 @@ export class BettingBarWeb extends Component {
   private spinArrow!: Node;
   private spinStop!: Node;
   private spinOp!: UIOpacity;
+  private spinRing!: Node;
   private autoGlyph!: Node;
   private autoCount!: Label;
   private turboGlyphOp!: UIOpacity;
@@ -460,6 +463,7 @@ export class BettingBarWeb extends Component {
 
     const R = 70;
     const ring = this.localNode(this.node, 2330, this.Y(186), R * 2, R * 2);
+    this.spinRing = ring;
     const rg = ring.addComponent(Graphics);
     rg.fillColor = col(C.ringMid);
     rg.circle(0, 0, R);
@@ -681,6 +685,15 @@ export class BettingBarWeb extends Component {
     }
   }
   setDemo(): void {}
+  /** Dress the spin control in the owner's real button art (over the vector ring). */
+  setSpinArt(frame: SpriteFrame | null): void {
+    if (!frame || !this.spinRing) return;
+    const art = this.localNode(this.spinRing, 0, 0, 122, 122);
+    const sp = art.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.spriteFrame = frame;
+    art.setSiblingIndex(0);
+  }
   setSoundOn(on: boolean): void {
     this.sndGlyphOp.opacity = on ? 255 : 128;
     this.sndSlash.active = !on;

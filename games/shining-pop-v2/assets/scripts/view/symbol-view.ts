@@ -34,6 +34,11 @@ export class SymbolView extends Component {
   build(size: number, frames: SpriteFrame[]): void {
     this.frames = frames;
 
+    const art = size * VIEW_CONFIG.layout.symbolFill;
+    (this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform)).setContentSize(
+      art,
+      art,
+    );
     const sp = this.node.addComponent(Sprite);
     sp.sizeMode = Sprite.SizeMode.CUSTOM;
     sp.type = Sprite.Type.SIMPLE;

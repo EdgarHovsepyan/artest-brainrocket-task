@@ -190,6 +190,10 @@ export class SlotController extends Component {
       this.bar.setTurbo(this.turboMode);
       this.bar.setSoundOn(!this.muted);
       this.bar.setAutoplay(this.autoplay.active ? this.autoplay.remaining : null);
+      if (this.barIsWeb) {
+        (this.bar as BettingBarWeb).setSpinArt(this.view.getBrandFrame('spinArt'));
+        this.relayerUI(barNode);
+      }
     }, 0);
   }
 

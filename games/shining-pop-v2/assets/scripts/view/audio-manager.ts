@@ -66,8 +66,9 @@ export class AudioManager {
   private musicSrc: AudioBufferSourceNode | null = null;
   private musicGain: GainNode | null = null;
   private musicId: 'main_base_loop' | 'bonus_loop' | null = null;
-  private rushSrc: AudioBufferSourceNode | null = null;
+  private rushOsc: OscillatorNode[] = [];
   private rushGain: GainNode | null = null;
+  private rushPip: number | null = null;
   private lastBetAt = 0;
 
   /** Lazily build the graph on first call (must follow a user gesture on web). */
@@ -192,34 +193,69 @@ export class AudioManager {
     this.voice(220, 0.08, 'triangle', 0.12);
   }
 
-  /** Looped rolling-air bed while reels move (sample reel_loop; synth fallback). */
+  /** Candy reel loop while reels move (master 2026-06-10 direction: NO noise
+   *  sample — a mellow detuned-triangle whir bed + bouncy major-triad sine
+   *  pips C-E-G-E, cheerful and non-fatiguing, sits under the music). */
   startRush(): void {
-    if (this.rushSrc || !this.ensure() || !this.ctx) return;
-    const src = this.playSample('reel_loop', 'gameplay', 0, true);
-    if (src) {
-      const t = this.ctx.currentTime;
-      const g = this.ctx.createGain();
-      // re-route through a dedicated gain for the fade-out on stop
-      src.disconnect();
-      src.connect(g);
-      g.connect(this.buses.gameplay!);
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.4, t + 0.18);
-      this.rushSrc = src;
-      this.rushGain = g;
-    }
+    if (this.rushGain || this.muted || !this.ensure() || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(1, t + 0.15);
+    g.connect(this.buses.gameplay!);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1300;
+    lp.Q.value = 0.8;
+    lp.connect(g);
+    const mk = (freq: number) => {
+      const o = this.ctx!.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      const og = this.ctx!.createGain();
+      og.gain.value = 0.045;
+      o.connect(og);
+      og.connect(lp);
+      o.start(t);
+      return o;
+    };
+    this.rushOsc = [mk(220), mk(223.5)];
+    this.rushGain = g;
+    const pips = [523.25, 659.25, 783.99, 659.25];
+    let step = 0;
+    this.rushPip = setInterval(() => {
+      if (!this.ctx || this.muted) return;
+      const pt = this.ctx.currentTime;
+      const o = this.ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = pips[step++ % pips.length];
+      const pg = this.ctx.createGain();
+      pg.gain.setValueAtTime(0, pt);
+      pg.gain.linearRampToValueAtTime(0.06, pt + 0.012);
+      pg.gain.exponentialRampToValueAtTime(0.0001, pt + 0.18);
+      o.connect(pg);
+      pg.connect(this.buses.gameplay!);
+      o.start(pt);
+      o.stop(pt + 0.2);
+    }, 240) as unknown as number;
   }
 
   stopRush(): void {
-    if (!this.rushSrc || !this.ctx) return;
-    const t = this.ctx.currentTime;
-    this.rushGain?.gain.setTargetAtTime(0, t, 0.07);
-    try {
-      this.rushSrc.stop(t + 0.25);
-    } catch {
-      /* already stopped */
+    if (!this.rushGain || !this.ctx) return;
+    if (this.rushPip != null) {
+      clearInterval(this.rushPip);
+      this.rushPip = null;
     }
-    this.rushSrc = null;
+    const t = this.ctx.currentTime;
+    this.rushGain.gain.setTargetAtTime(0, t, 0.07);
+    this.rushOsc.forEach((o) => {
+      try {
+        o.stop(t + 0.3);
+      } catch {
+        /* already stopped */
+      }
+    });
+    this.rushOsc = [];
     this.rushGain = null;
   }
 
