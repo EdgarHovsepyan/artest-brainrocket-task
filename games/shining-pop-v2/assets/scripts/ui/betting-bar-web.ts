@@ -136,11 +136,17 @@ export class BettingBarWeb extends Component {
     color: string,
     bold = true,
     parent: Node = this.node,
+    ax = 0,
   ): Label {
     const n = new Node('t');
     n.layer = this.node.layer;
     parent.addChild(n);
-    n.addComponent(UITransform).setContentSize(10, 10);
+    const ui = n.addComponent(UITransform);
+    ui.setContentSize(10, 10);
+    // Explicit anchor: ax=0 left / 0.5 centered / 1 right, vertically centred.
+    // (The default 0.5 anchor stacked every readout centred on its x — the
+    // owner's "elements rendering broken" report.)
+    ui.setAnchorPoint(ax, 0.5);
     n.setPosition(x, this.Y(y), 0);
     const l = n.addComponent(Label);
     l.string = text;
@@ -172,7 +178,16 @@ export class BettingBarWeb extends Component {
     g.stroke();
   }
 
-  private hitNode(x: number, y: number, w: number, h: number, cb: () => void): Node {
+  /** Invisible hit region. `visuals` get the master press feedback: scale-in
+   *  0.94 on touch, spring back on release (Emil's highest-ROI micro-interaction). */
+  private hitNode(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    cb: () => void,
+    visuals: Node[] = [],
+  ): Node {
     const n = new Node('hit');
     n.layer = this.node.layer;
     this.node.addChild(n);
@@ -180,7 +195,13 @@ export class BettingBarWeb extends Component {
     ui.setAnchorPoint(0, 1);
     ui.setContentSize(w, h);
     n.setPosition(x, this.Y(y), 0);
-    n.on(Node.EventType.TOUCH_END, cb);
+    n.on(Node.EventType.TOUCH_START, () => visuals.forEach((v) => v.setScale(0.94, 0.94, 1)));
+    const restore = () => visuals.forEach((v) => v.setScale(1, 1, 1));
+    n.on(Node.EventType.TOUCH_CANCEL, restore);
+    n.on(Node.EventType.TOUCH_END, () => {
+      restore();
+      cb();
+    });
     return n;
   }
 
@@ -231,13 +252,9 @@ export class BettingBarWeb extends Component {
     g.lineTo(210, this.Y(210));
     g.stroke();
 
-    this.lbl('BALANCE', 232, 168, 17, C.label);
-    this.balValue = this.lbl('0.00', 232, 192, 28, C.value);
-    this.balCur = this.lbl('USD', 320, 198, 16, C.cur, false);
-    [this.lbl('', 0, 0, 1, C.label)].forEach((l) => l.node.destroy());
-    [this.balValue, this.balCur, this.lastWinValue].forEach(() => undefined);
-    this.balValue.node.getComponent(UITransform)!.setAnchorPoint(0, 0.5);
-    this.balValue.horizontalAlign = Label.HorizontalAlign.LEFT;
+    this.lbl('BALANCE', 232, 167, 17, C.label);
+    this.balValue = this.lbl('0.00', 232, 195, 28, C.value);
+    this.balCur = this.lbl('USD', 330, 200, 16, C.cur, false);
   }
 
   private buildBanner(x: number, w: number, label: string, sink: (l: Label) => void): void {
@@ -252,10 +269,10 @@ export class BettingBarWeb extends Component {
     g.strokeColor = col(C.edge);
     g.roundRect(x + 1, this.Y(223), w - 2, 74, 37);
     g.stroke();
-    const cap = this.lbl(label, x + w / 2 - 70, 178, 18, C.label);
-    cap.horizontalAlign = Label.HorizontalAlign.RIGHT;
-    const val = this.lbl('0.00', x + w / 2 + 14, 178, 27, C.value);
-    val.horizontalAlign = Label.HorizontalAlign.LEFT;
+    // Pair layout (master relayout): caption right-anchored, value left-anchored,
+    // meeting at the panel centre with a fixed gutter.
+    this.lbl(label, x + w / 2 - 7, 186, 18, C.label, true, this.node, 1);
+    const val = this.lbl('0.00', x + w / 2 + 7, 186, 27, C.value);
     sink(val);
   }
 
@@ -351,105 +368,120 @@ export class BettingBarWeb extends Component {
     if (emit && changed) this.events.emit('bet:set', i);
   }
 
+  /** Child node with its own Graphics in LOCAL space (y-up, origin = centre). */
+  private localNode(parent: Node, x: number, y: number, w: number, h: number): Node {
+    const n = new Node('n');
+    n.layer = this.node.layer;
+    parent.addChild(n);
+    const ui = n.addComponent(UITransform);
+    ui.setAnchorPoint(0.5, 0.5);
+    ui.setContentSize(w, h);
+    n.setPosition(x, y, 0);
+    return n;
+  }
+
   private buildRightCluster(): void {
-    const circle = (cx: number, cy: number, r: number): Graphics => {
-      const g = this.gfx('c' + cx);
+    // Every control is its OWN centred node (master container-per-button): press
+    // feedback scales the button, not the shared canvas; state dimming hits the
+    // glyph child, not the circle base.
+    const circleBtn = (cx: number, cy: number, r: number): { node: Node; g: Graphics } => {
+      const n = this.localNode(this.node, cx, this.Y(cy), r * 2, r * 2);
+      const g = n.addComponent(Graphics);
       g.fillColor = col(C.panel);
-      g.circle(cx, this.Y(cy), r);
+      g.circle(0, 0, r);
       g.fill();
       g.fillColor = col(C.panelHi, 0.5);
-      g.circle(cx - r * 0.18, this.Y(cy - r * 0.3), r * 0.62);
+      g.circle(-r * 0.18, r * 0.3, r * 0.62);
       g.fill();
       g.lineWidth = 1.8;
       g.strokeColor = col(C.edge, 0.92);
-      g.circle(cx, this.Y(cy), r - 1);
+      g.circle(0, 0, r - 1);
       g.stroke();
-      return g;
+      return { node: n, g };
     };
 
-    const coins = circle(1980, 186, 38);
-    coins.fillColor = col('#9a4bd0');
-    coins.ellipse(1980, this.Y(197), 19, 6.5);
-    coins.fill();
-    coins.fillColor = col('#c06fda');
-    coins.ellipse(1980, this.Y(189), 19, 6.5);
-    coins.fill();
-    coins.fillColor = col('#e0a0ff');
-    coins.ellipse(1980, this.Y(181), 19, 6.5);
-    coins.fill();
-    this.hitNode(1942, 148, 76, 76, () => this.events.emit('betmenu'));
+    const coins = circleBtn(1980, 186, 38);
+    (
+      [
+        ['#9a4bd0', -11],
+        ['#c06fda', -3],
+        ['#e0a0ff', 5],
+      ] as [string, number][]
+    ).forEach(([hex, dy]) => {
+      coins.g.fillColor = col(hex);
+      coins.g.ellipse(0, dy, 19, 6.5);
+      coins.g.fill();
+    });
+    this.hitNode(1942, 148, 76, 76, () => this.events.emit('betmenu'), [coins.node]);
 
-    circle(2090, 186, 38);
-    const x2 = this.lbl('×2', 2090, 174, 25, C.value);
-    x2.horizontalAlign = Label.HorizontalAlign.CENTER;
-    x2.node.getComponent(UITransform)!.setAnchorPoint(0.5, 0.5);
-    this.hitNode(2052, 148, 76, 76, () => this.events.emit('bet:double'));
+    const gamble = circleBtn(2090, 186, 38);
+    this.lbl('×2', 0, 0, 25, C.value, true, gamble.node, 0.5);
+    this.hitNode(2052, 148, 76, 76, () => this.events.emit('bet:double'), [gamble.node]);
 
-    const turbo = circle(2200, 150, 30);
-    turbo.fillColor = col(C.active);
-    turbo.moveTo(2204, this.Y(138));
-    turbo.lineTo(2191, this.Y(153));
-    turbo.lineTo(2199, this.Y(153));
-    turbo.lineTo(2195, this.Y(164));
-    turbo.lineTo(2208, this.Y(148));
-    turbo.lineTo(2200, this.Y(148));
-    turbo.close();
-    turbo.fill();
-    this.turboGlyphOp = turbo.node.addComponent(UIOpacity);
-    const pipG = this.gfx('turboPip');
-    pipG.fillColor = col('#e9bf5a');
-    pipG.circle(2213, this.Y(137), 5);
-    pipG.fill();
-    this.turboPip = pipG.node;
-    this.turboPip.active = false;
-    this.hitNode(2170, 120, 60, 60, () => this.events.emit('turbo'));
+    const turbo = circleBtn(2200, 150, 30);
+    const tGlyph = this.localNode(turbo.node, 0, 0, 30, 30);
+    const tg = tGlyph.addComponent(Graphics);
+    tg.fillColor = col(C.active);
+    tg.moveTo(4, 12);
+    tg.lineTo(-9, -3);
+    tg.lineTo(-1, -3);
+    tg.lineTo(-5, -14);
+    tg.lineTo(8, 2);
+    tg.lineTo(0, 2);
+    tg.close();
+    tg.fill();
+    this.turboGlyphOp = tGlyph.addComponent(UIOpacity);
+    const pip = this.localNode(turbo.node, 13, 13, 12, 12);
+    const pg = pip.addComponent(Graphics);
+    pg.fillColor = col('#e9bf5a');
+    pg.circle(0, 0, 5);
+    pg.fill();
+    pip.active = false;
+    this.turboPip = pip;
+    this.hitNode(2170, 120, 60, 60, () => this.events.emit('turbo'), [turbo.node]);
 
-    const auto = circle(2200, 222, 30);
-    auto.lineWidth = 3;
-    auto.strokeColor = col('#e0a0ff');
-    auto.arc(2200, this.Y(222), 12, -1.23, -1.91 + Math.PI * 2, true);
-    auto.stroke();
-    auto.fillColor = col('#e0a0ff');
-    auto.moveTo(2202, this.Y(209));
-    auto.lineTo(2197, this.Y(215));
-    auto.lineTo(2195, this.Y(207));
-    auto.close();
-    auto.fill();
-    this.autoGlyph = auto.node;
-    const cnt = this.lbl('', 2200, 210, 22, C.value);
-    cnt.horizontalAlign = Label.HorizontalAlign.CENTER;
-    cnt.node.getComponent(UITransform)!.setAnchorPoint(0.5, 0.5);
-    this.autoCount = cnt;
+    const auto = circleBtn(2200, 222, 30);
+    const aGlyph = this.localNode(auto.node, 0, 0, 30, 30);
+    const ag2 = aGlyph.addComponent(Graphics);
+    ag2.lineWidth = 3;
+    ag2.strokeColor = col('#e0a0ff');
+    ag2.arc(0, 0, 12, -1.23, -1.91 + Math.PI * 2, true);
+    ag2.stroke();
+    ag2.fillColor = col('#e0a0ff');
+    ag2.moveTo(2, 13);
+    ag2.lineTo(-3, 7);
+    ag2.lineTo(-5, 15);
+    ag2.close();
+    ag2.fill();
+    this.autoGlyph = aGlyph;
+    this.autoCount = this.lbl('', 0, 0, 22, C.value, true, auto.node, 0.5);
     this.autoCount.node.active = false;
-    this.hitNode(2170, 192, 60, 60, () => this.events.emit('autoplay'));
+    this.hitNode(2170, 192, 60, 60, () => this.events.emit('autoplay'), [auto.node]);
 
     const R = 70;
-    const spin = this.gfx('spinRing');
-    spin.fillColor = col(C.ringMid);
-    spin.circle(2330, this.Y(186), R);
-    spin.fill();
-    spin.fillColor = col(C.ringHi, 0.85);
-    spin.circle(2330 - R * 0.16, this.Y(186 - R * 0.2), R * 0.92);
-    spin.fill();
-    spin.fillColor = col(C.ringLo);
-    spin.circle(2330 + R * 0.1, this.Y(186 + R * 0.16), R * 0.9);
-    spin.fill();
-    spin.fillColor = col(C.spinFace);
-    spin.circle(2330, this.Y(186), R * 0.7857);
-    spin.fill();
-    spin.lineWidth = R * 0.031;
-    spin.strokeColor = col(C.centerRim, 0.4);
-    spin.circle(2330, this.Y(186), R * 0.7857);
-    spin.stroke();
-    spin.fillColor = col('#ffffff', 0.07);
-    spin.ellipse(2330 - R * 0.23, this.Y(186 - R * 0.26), R * 0.245, R * 0.105);
-    spin.fill();
+    const ring = this.localNode(this.node, 2330, this.Y(186), R * 2, R * 2);
+    const rg = ring.addComponent(Graphics);
+    rg.fillColor = col(C.ringMid);
+    rg.circle(0, 0, R);
+    rg.fill();
+    rg.fillColor = col(C.ringHi, 0.85);
+    rg.circle(-R * 0.16, R * 0.2, R * 0.92);
+    rg.fill();
+    rg.fillColor = col(C.ringLo);
+    rg.circle(R * 0.1, -R * 0.16, R * 0.9);
+    rg.fill();
+    rg.fillColor = col(C.spinFace);
+    rg.circle(0, 0, R * 0.7857);
+    rg.fill();
+    rg.lineWidth = R * 0.031;
+    rg.strokeColor = col(C.centerRim, 0.4);
+    rg.circle(0, 0, R * 0.7857);
+    rg.stroke();
+    rg.fillColor = col('#ffffff', 0.07);
+    rg.ellipse(-R * 0.23, R * 0.26, R * 0.245, R * 0.105);
+    rg.fill();
 
-    const arrowNode = new Node('spinArrow');
-    arrowNode.layer = this.node.layer;
-    this.node.addChild(arrowNode);
-    arrowNode.addComponent(UITransform).setContentSize(10, 10);
-    arrowNode.setPosition(2330, this.Y(186), 0);
+    const arrowNode = this.localNode(ring, 0, 0, R, R);
     const ag = arrowNode.addComponent(Graphics);
     const ar = R * 0.4;
     ag.lineWidth = R * 0.107;
@@ -464,11 +496,7 @@ export class BettingBarWeb extends Component {
     ag.fill();
     this.spinArrow = arrowNode;
 
-    const stopNode = new Node('spinStop');
-    stopNode.layer = this.node.layer;
-    this.node.addChild(stopNode);
-    stopNode.addComponent(UITransform).setContentSize(10, 10);
-    stopNode.setPosition(2330, this.Y(186), 0);
+    const stopNode = this.localNode(ring, 0, 0, R, R);
     const sg = stopNode.addComponent(Graphics);
     sg.fillColor = col(C.value, 0.98);
     sg.roundRect(-R * 0.26, -R * 0.26, R * 0.52, R * 0.52, R * 0.12);
@@ -476,20 +504,25 @@ export class BettingBarWeb extends Component {
     stopNode.active = false;
     this.spinStop = stopNode;
 
-    this.spinOp = spin.node.addComponent(UIOpacity);
-    const spinHit = this.hitNode(2330 - R, 186 - R, R * 2, R * 2, () => {
-      if (!this.spinStop.active) {
-        Tween.stopAllByTarget(this.spinArrow);
-        this.spinArrow.angle = 0;
-        tween(this.spinArrow)
-          .to(0.7, { angle: -360 }, { easing: 'quadOut' })
-          .call(() => (this.spinArrow.angle = 0))
-          .start();
-      }
-      this.events.emit('spin');
-    });
-    spinHit.on(Node.EventType.TOUCH_START, () => this.spinArrow.setScale(0.94, 0.94, 1));
-    spinHit.on(Node.EventType.TOUCH_END, () => this.spinArrow.setScale(1, 1, 1));
+    this.spinOp = ring.addComponent(UIOpacity);
+    this.hitNode(
+      2330 - R,
+      186 - R,
+      R * 2,
+      R * 2,
+      () => {
+        if (!this.spinStop.active) {
+          Tween.stopAllByTarget(this.spinArrow);
+          this.spinArrow.angle = 0;
+          tween(this.spinArrow)
+            .to(0.7, { angle: -360 }, { easing: 'quadOut' })
+            .call(() => (this.spinArrow.angle = 0))
+            .start();
+        }
+        this.events.emit('spin');
+      },
+      [ring],
+    );
   }
 
   private buildVolumePanel(): void {
@@ -590,10 +623,14 @@ export class BettingBarWeb extends Component {
     return this;
   }
 
-  fit(viewW: number, viewH: number): void {
-    const s = Math.min(viewW / W, (viewH * 0.3) / H);
+  /** Master fitBottom rule: WIDTH-fit (capped), docked to the screen bottom.
+   *  Returns the board inset in screen px — the solid control band's height
+   *  (the upper 118 design px is a soft gradient the reels may overlap). */
+  fit(viewW: number, viewH: number): number {
+    const s = Math.min(viewW / W, 0.62, (viewH * 0.42) / H);
     this.node.setScale(s, s, 1);
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + H * s, 0));
+    return (H - 118) * s;
   }
 
   private fmt(n: number): string {
@@ -601,7 +638,9 @@ export class BettingBarWeb extends Component {
   }
   setBalance(n: number): void {
     this.balValue.string = this.fmt(n);
-    this.balCur.node.setPosition(244 + this.balValue.string.length * 15, this.Y(198), 0);
+    this.balValue.updateRenderData(true);
+    const w = this.balValue.node.getComponent(UITransform)!.width;
+    this.balCur.node.setPosition(232 + w + 10, this.Y(200), 0);
   }
   setCurrency(c: string): void {
     this.balCur.string = c;

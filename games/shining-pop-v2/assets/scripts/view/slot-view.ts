@@ -216,6 +216,13 @@ export class SlotView extends Component {
     this.fit();
   }
 
+  /** Screen px reserved at the bottom for the web bar's solid band — the board
+   *  contain-fits into the remaining area and centres above it. */
+  setBottomInset(px: number): void {
+    this.bottomInset = px;
+    this.fit();
+  }
+
   private mkLabel(
     text: string,
     x: number,
@@ -650,11 +657,15 @@ export class SlotView extends Component {
   }
 
   // ---- responsive contain-fit ----------------------------------------------
+  private bottomInset = 0;
+
   private fit(): void {
     const vis = view.getVisibleSize();
     const { designWidth, designHeight } = VIEW_CONFIG.layout;
-    const s = Math.min(vis.width / designWidth, vis.height / designHeight);
+    const availH = Math.max(120, vis.height - this.bottomInset);
+    const s = Math.min(vis.width / designWidth, availH / designHeight);
     this.node.setScale(s, s, 1);
+    this.node.setPosition(0, this.bottomInset / 2, 0);
   }
 
   // ---- buy menu -------------------------------------------------------------

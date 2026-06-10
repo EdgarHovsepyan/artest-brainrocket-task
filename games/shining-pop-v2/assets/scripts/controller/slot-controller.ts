@@ -193,15 +193,22 @@ export class SlotController extends Component {
     }, 0);
   }
 
-  /** Fit the bar to the viewport. On portrait the mobile overlay centres; the
-   *  topY arg lets the mobile bar slot under the board if it ever runs landscape. */
+  /** Fit the bar to the viewport. The web bar returns its solid-band height and
+   *  the board contain-fits ABOVE it (master fitBottom contract); the portrait
+   *  mobile overlay centres and the board keeps the full viewport. */
   private fitBar(): void {
     const vs = view.getVisibleSize();
+    if (this.barIsWeb) {
+      const inset = (this.bar as BettingBarWeb).fit(vs.width, vs.height);
+      this.view.setBottomInset(inset);
+      return;
+    }
+    this.view.setBottomInset(0);
     const { designWidth, designHeight, reelCenterY, cell, gap } = VIEW_CONFIG.layout;
     const boardScale = Math.min(vs.width / designWidth, vs.height / designHeight);
     const gh = 3 * cell + 2 * gap;
     const boardBottomY = (reelCenterY - gh / 2 - 28) * boardScale;
-    this.bar.fit(vs.width, vs.height, boardBottomY);
+    (this.bar as BettingBarMobile).fit(vs.width, vs.height, boardBottomY);
   }
 
   /** Recursively move a node subtree onto the UI_2D layer so the UI renderer draws it. */
