@@ -15,6 +15,7 @@ import {
   Sprite,
   SpriteFrame,
   tween,
+  Tween,
   UIOpacity,
   UITransform,
   Vec3,
@@ -130,6 +131,11 @@ export class SlotView extends Component {
   private quickBetPanel: Node | null = null;
   private betSelectCb: ((cents: number) => void) | null = null;
   private reducedFx = false;
+  private bonusHud: Node | null = null;
+  private bonusHudSpins: Label | null = null;
+  private bonusHudWin: Label | null = null;
+  private bonusWash: Node | null = null;
+  private bonusWashOp: UIOpacity | null = null;
 
   private spinCb: (() => void) | null = null;
   private buyCb: ((mode: string) => void) | null = null;
@@ -220,6 +226,76 @@ export class SlotView extends Component {
   /** Brand art lookup for sibling surfaces (the bar wears the real spin button). */
   getBrandFrame(key: string): SpriteFrame | null {
     return this.brandFrames[key] ?? null;
+  }
+
+  /** Per-mode bonus atmosphere wash (master parity: pink-shimmer / hot-magenta
+   *  / electric-violet). Tints the world without re-rendering it. */
+  setBonusAtmosphere(mode: 'idle' | 'wilds' | 'crowns' | 'reels'): void {
+    const tints: Record<typeof mode, [number, number, number, number]> = {
+      idle: [0, 0, 0, 0],
+      wilds: [255, 90, 156, 26],
+      crowns: [255, 0, 127, 38],
+      reels: [186, 60, 218, 44],
+    };
+    const [r, g, b, a] = tints[mode];
+    if (!this.bonusWash) {
+      this.bonusWash = this.mkNode('bonus_wash', 2600, 2200, this.node);
+      this.bonusWash.addComponent(Graphics);
+      this.bonusWashOp = this.bonusWash.addComponent(UIOpacity);
+      this.bonusWashOp.opacity = 0;
+      this.bonusWash.setSiblingIndex(2); // above the painted bg, under the reels
+    }
+    const gg = this.bonusWash.getComponent(Graphics)!;
+    gg.clear();
+    gg.fillColor = new Color(r, g, b, a);
+    gg.rect(-1300, -1100, 2600, 2200);
+    gg.fill();
+    Tween.stopAllByTarget(this.bonusWashOp!);
+    tween(this.bonusWashOp!)
+      .to(0.45, { opacity: mode === 'idle' ? 0 : 255 }, { easing: 'sineInOut' })
+      .start();
+  }
+
+  /** Free-spin HUD: spins remaining + running total. Approval point — the
+   *  player must always know where they are in the bonus. */
+  setBonusHud(spinIdx: number | null, totalSpins: number, runningCents: number): void {
+    if (spinIdx == null) {
+      if (this.bonusHud) {
+        const op = this.bonusHud.getComponent(UIOpacity) ?? this.bonusHud.addComponent(UIOpacity);
+        const node = this.bonusHud;
+        Tween.stopAllByTarget(op);
+        tween(op)
+          .to(0.25, { opacity: 0 })
+          .call(() => node.destroy())
+          .start();
+        this.bonusHud = null;
+        this.bonusHudSpins = null;
+        this.bonusHudWin = null;
+      }
+      return;
+    }
+    if (!this.bonusHud) {
+      const hud = this.mkNode('bonus_hud', 540, 80, this.node);
+      hud.setPosition(0, 388, 0);
+      this.surfChrome(hud, 540, 76, 0);
+      this.mkLabel('FREE SPINS', -120, 14, 13, MUTED, hud);
+      this.bonusHudSpins = this.mkLabel('1 / 8', -120, -14, 22, ACID, hud, true);
+      this.mkLabel('TOTAL WIN', 130, 14, 13, MUTED, hud);
+      this.bonusHudWin = this.mkLabel('0.00', 130, -14, 22, ACID, hud, true);
+      const op = hud.addComponent(UIOpacity);
+      op.opacity = 0;
+      tween(op).to(0.3, { opacity: 255 }, { easing: 'sineOut' }).start();
+      this.bonusHud = hud;
+    }
+    if (this.bonusHudSpins) this.bonusHudSpins.string = `${spinIdx + 1} / ${totalSpins}`;
+    if (this.bonusHudWin) {
+      this.bonusHudWin.string = (runningCents / 100).toFixed(2);
+      Tween.stopAllByTarget(this.bonusHudWin.node);
+      this.bonusHudWin.node.setScale(1.2, 1.2, 1);
+      tween(this.bonusHudWin.node)
+        .to(0.25, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .start();
+    }
   }
 
   /** Network/error modal: dismissible card centred over the dimmed game,

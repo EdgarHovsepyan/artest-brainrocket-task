@@ -479,10 +479,16 @@ export class SlotController extends Component {
     const outcome = this.model.buyBonus(mode);
     this.view.audio.buyConfirm();
     this.view.audio.bonusIntro();
+    this.view.setBonusAtmosphere(mode);
     this.view.setBalance(outcome.balanceCents);
     this.bar.setBalance(outcome.balanceCents / 100);
 
-    for (const step of outcome.bonus.steps) {
+    const lineBetCents = this.model.bet / 10;
+    let runningCents = 0;
+    const totalSpins = outcome.bonus.steps.length;
+    this.view.setBonusHud(0, totalSpins, 0);
+    for (let i = 0; i < outcome.bonus.steps.length; i++) {
+      const step = outcome.bonus.steps[i];
       this.view.clearWins();
       await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul);
       // Sticky wilds / crowns persist in the grid — bounce them so they read as
@@ -490,10 +496,14 @@ export class SlotController extends Component {
       this.view.pulseSticky(step.sticky);
       if (step.sticky.length > 0) this.view.audio.stickyLock();
       if (step.payout > 0) this.view.showWins(evaluateSpin(step.grid));
+      runningCents += Math.round(step.payout * lineBetCents);
+      this.view.setBonusHud(i, totalSpins, runningCents);
       await this.wait(VIEW_CONFIG.bonus.stepPauseMs);
     }
 
     this.view.audio.bonusEnd();
+    this.view.setBonusHud(null, 0, 0);
+    this.view.setBonusAtmosphere('idle');
     this.view.countUp(outcome.winCents);
     // BonusOutcome has no betCents — passing it was undefined at runtime and
     // corrupted the ceremony's win-vs-bet tier scaling. Tier against the live bet.
