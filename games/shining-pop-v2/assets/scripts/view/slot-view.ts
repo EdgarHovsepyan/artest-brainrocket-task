@@ -98,6 +98,7 @@ export type SettingsKey = 'sound' | 'turboMode' | 'reducedFx';
 export class SlotView extends Component {
   private frames: SpriteFrame[] = [];
   private spinFrames: Record<string, SpriteFrame> = {};
+  private brandFrames: Record<string, SpriteFrame> = {};
 
   private reels: ReelView[] = [];
   private spinButton: Button | null = null;
@@ -169,6 +170,21 @@ export class SlotView extends Component {
         new Promise<void>((res) =>
           resources.load(`ui2/${name}/spriteFrame`, SpriteFrame, (err, sf) => {
             if (!err && sf) this.spinFrames[name] = sf;
+            res();
+          }),
+        ),
+      );
+    });
+    // Brand assets ported from the master: the real logo (black-keyed) + the
+    // painted candy background. Missing files fall back to procedural art.
+    [
+      ['ui2/logo', 'logo'],
+      ['bg/bg', 'bg'],
+    ].forEach(([path, key]) => {
+      jobs.push(
+        new Promise<void>((res) =>
+          resources.load(`${path}/spriteFrame`, SpriteFrame, (err, sf) => {
+            if (!err && sf) this.brandFrames[key] = sf;
             res();
           }),
         ),
@@ -336,17 +352,32 @@ export class SlotView extends Component {
     bg.fillColor = new Color(10, 6, 16, 255); // deep violet base (#0a0610)
     bg.rect(-1300, -1100, 2600, 2200);
     bg.fill();
-    // Vertical depth wash — three stacked translucent bands approximate the
-    // master's painted gradient (lighter horizon behind the reels, dark floor).
-    bg.fillColor = new Color(40, 22, 78, 70); // indigo horizon
-    bg.rect(-1300, -120, 2600, 620);
-    bg.fill();
-    bg.fillColor = new Color(25, 17, 64, 90); // mid violet
-    bg.rect(-1300, -560, 2600, 440);
-    bg.fill();
-    bg.fillColor = new Color(4, 2, 8, 130); // floor shadow
-    bg.rect(-1300, -1100, 2600, 460);
-    bg.fill();
+    if (this.brandFrames.bg) {
+      // The master's painted candy world, cover-fit over the whole bleed area
+      // (2752x1536 source). Procedural depth bands are skipped — the painting
+      // carries its own light; bokeh + vignette still layer on top.
+      const ratio = 2752 / 1536;
+      const w = Math.max(2600, 2200 * ratio);
+      const photo = this.mkNode('bg_art', w, w / ratio, this.node);
+      const sp = photo.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.spriteFrame = this.brandFrames.bg;
+      photo.getComponent(UITransform)!.setContentSize(w, w / ratio);
+      const op = photo.addComponent(UIOpacity);
+      op.opacity = 235;
+    } else {
+      // Vertical depth wash — three stacked translucent bands approximate the
+      // master's painted gradient (lighter horizon behind the reels, dark floor).
+      bg.fillColor = new Color(40, 22, 78, 70); // indigo horizon
+      bg.rect(-1300, -120, 2600, 620);
+      bg.fill();
+      bg.fillColor = new Color(25, 17, 64, 90); // mid violet
+      bg.rect(-1300, -560, 2600, 440);
+      bg.fill();
+      bg.fillColor = new Color(4, 2, 8, 130); // floor shadow
+      bg.rect(-1300, -1100, 2600, 460);
+      bg.fill();
+    }
 
     // Bokeh field — deterministic scatter of soft candy diamonds (no circles).
     // Seeded RNG so every boot composes identically.
@@ -418,27 +449,35 @@ export class SlotView extends Component {
   }
 
   private buildTitle(): void {
-    // Brand-family logo block (master parity: stacked playful logo, not "SLOT").
-    const logo = this.mkNode('logo', 360, 110, this.node);
-    logo.setPosition(0, 322, 0);
-    const back = logo.addComponent(Graphics);
-    back.fillColor = new Color(255, 0, 127, 26); // soft magenta plate behind the logo
-    back.roundRect(-185, -40, 370, 84, 18);
-    back.fill();
-    const shining = this.mkLabel('SHINING', 0, 22, 30, new Color(245, 247, 250, 255), logo);
-    shining.isItalic = true;
-    const pop = this.mkLabel('POP  V2', 0, -12, 34, ACID, logo);
-    pop.isItalic = true;
-    const gg = this.mkNode('logo_gems', 10, 10, logo).addComponent(Graphics);
-    [-208, 208].forEach((x) => {
-      gg.fillColor = new Color(255, 90, 156, 200);
-      gg.moveTo(x, 14);
-      gg.lineTo(x + 9, 2);
-      gg.lineTo(x, -10);
-      gg.lineTo(x - 9, 2);
-      gg.close();
-      gg.fill();
-    });
+    const logo = this.mkNode('logo', 380, 240, this.node);
+    logo.setPosition(0, 318, 0);
+    if (this.brandFrames.logo) {
+      // The REAL game logo (master art, black-keyed offline).
+      const sp = logo.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.spriteFrame = this.brandFrames.logo;
+      logo.getComponent(UITransform)!.setContentSize(300, 188);
+    } else {
+      // Fallback: brand-family text block.
+      const back = logo.addComponent(Graphics);
+      back.fillColor = new Color(255, 0, 127, 26);
+      back.roundRect(-185, -40, 370, 84, 18);
+      back.fill();
+      const shining = this.mkLabel('SHINING', 0, 22, 30, new Color(245, 247, 250, 255), logo);
+      shining.isItalic = true;
+      const pop = this.mkLabel('POP  V2', 0, -12, 34, ACID, logo);
+      pop.isItalic = true;
+      const gg = this.mkNode('logo_gems', 10, 10, logo).addComponent(Graphics);
+      [-208, 208].forEach((x) => {
+        gg.fillColor = new Color(255, 90, 156, 200);
+        gg.moveTo(x, 14);
+        gg.lineTo(x + 9, 2);
+        gg.lineTo(x, -10);
+        gg.lineTo(x - 9, 2);
+        gg.close();
+        gg.fill();
+      });
+    }
     tween(logo)
       .to(1.8, { scale: new Vec3(1.025, 1.025, 1) }, { easing: 'sineInOut' })
       .to(1.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
@@ -448,7 +487,7 @@ export class SlotView extends Component {
     this.mkLabel(
       `MAX WIN ${maxWinMultiple().toLocaleString('en-US')}× · 10 LINES · WILD STRIKE`,
       0,
-      258,
+      230,
       12,
       MUTED,
     );

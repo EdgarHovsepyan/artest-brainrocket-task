@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PAYTABLE, SYMBOLS, WILD_STRIKE } from '../assets/scripts/logic/game-config';
 import {

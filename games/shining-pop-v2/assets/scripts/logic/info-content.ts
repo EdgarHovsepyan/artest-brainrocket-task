@@ -6,17 +6,18 @@
 import { PAYTABLE, SETTINGS, SYMBOLS, WILD_STRIKE } from './game-config';
 import { SymbolId } from './types';
 
-/** Display names matching the shipped symbol art (sym_* resources). */
+/** Display names matching the shipped symbol art (the master's candy set,
+ *  black-keyed offline; resource filenames keep their original ids/UUIDs). */
 export const SYMBOL_DISPLAY: Record<SymbolId, string> = {
   0: 'WILD',
   1: 'CROWN',
-  2: 'HEART',
-  3: 'DIAMOND',
-  4: 'HORSESHOE',
-  5: 'A',
-  6: 'K',
-  7: 'Q',
-  8: 'J',
+  2: 'SEVEN',
+  3: 'BELL',
+  4: 'MELON',
+  5: 'GRAPES',
+  6: 'PLUM',
+  7: 'LEMON',
+  8: 'CHERRY',
   9: '10',
 };
 
