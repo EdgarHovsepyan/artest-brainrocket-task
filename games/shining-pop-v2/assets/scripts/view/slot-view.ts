@@ -1243,20 +1243,14 @@ export class SlotView extends Component {
       .start();
   }
 
-  /** Big-win ceremony (tiered). Returns false for small wins (HUD count-up only). */
+  /** Big-win ceremony (tiered). Returns false for small wins (HUD count-up only).
+   *  Audio is the CONTROLLER's job (it owns the LDW gate) — no sound here. */
   playCeremony(winCents: number, betCents: number, multiplier: number): boolean {
-    const shown = this.ceremony.show(winCents, betCents, multiplier);
-    if (shown) {
-      const tier =
-        winCents / Math.max(1, betCents) >= 50 ? 3 : winCents / Math.max(1, betCents) >= 20 ? 2 : 1;
-      this.audio.win(tier);
-    }
-    return shown;
+    return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }
 
   showFeatureUnlocked(name: string): void {
     this.ceremony.showFeatureUnlocked(name);
-    this.audio.win(2);
   }
 
   /** Shard burst from the winning cells, scaled by win/total-bet multiple. */

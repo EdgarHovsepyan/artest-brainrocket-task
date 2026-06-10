@@ -145,6 +145,22 @@ export class SlotController extends Component {
 
     this.view.setInteractable(true);
     input.on(Input.EventType.KEY_DOWN, this.onKey, this);
+
+    // DEV-ONLY remote control (?debug) — master parity with window.__dbg: lets
+    // headless QA force ceremonies/panels without playing for the trigger.
+    try {
+      if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
+        (window as unknown as Record<string, unknown>).__v2 = {
+          view: this.view,
+          spin: () => this.onSpinPressed(),
+          ceremony: (mult = 25, wild = 1) =>
+            this.view.playCeremony(this.model.bet * mult, this.model.bet, wild),
+          feature: (name = 'STICKY WILDS') => this.view.showFeatureUnlocked(name),
+        };
+      }
+    } catch {
+      /* non-browser runtime */
+    }
   }
 
   /** Fit the bar to the viewport. On landscape, hand it the board's bottom edge
