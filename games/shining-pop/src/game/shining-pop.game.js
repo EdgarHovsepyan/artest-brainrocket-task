@@ -9208,6 +9208,62 @@
   // The downstream banner/FS timing is preserved (~1.5 s, vs portal 0.88 s). The
   // single Sound.feature() is already fired by the caller (line ~7990); here we
   // only layer a distinct icy crystalline accent so each tier sounds different.
+  // ── CANDY-EXPLOSION BONUS INTRO (2026-06-10, user pick: "energetic candy burst")
+  // 4 beats, layered BEFORE the per-tier ceremony: darken → candy particle burst
+  // from centre → white flash + shake → "FREE SPINS ×N" title-card slam. Stake-safe
+  // (Graphics + rAF, NO GLSL), particle count tier-capped, reduced-motion skips it,
+  // self-destroying so it can't orphan. Returns a Promise the bonus flow awaits.
+  function playCandyBurstIntro(count, mode){
+    if(isReduced() || !app) return Promise.resolve();
+    const W = app.screen.width, H = app.screen.height, cx = W / 2, cy = H / 2;
+    const ov = new PIXI.Container(); ov.eventMode = 'none'; stage.addChild(ov);
+    const dim = new PIXI.Graphics().rect(-30, -30, W + 60, H + 60).fill({ color: 0x0e0722, alpha: 0 }); ov.addChild(dim);
+    const partG = new PIXI.Graphics(); partG.blendMode = 'add'; ov.addChild(partG);
+    const flash = new PIXI.Graphics().rect(-30, -30, W + 60, H + 60).fill({ color: 0xffffff }); flash.alpha = 0; ov.addChild(flash);
+    const card = new PIXI.Container(); card.position.set(cx, cy); card.alpha = 0; card.scale.set(0.2); ov.addChild(card);
+    const big = Math.min(W * 0.12, 104);
+    const t1 = new PIXI.Text({ text: 'FREE SPINS', style: { fontFamily: THEME.type.familyDisplay, fontSize: big * 0.7, fill: 0xffe24a, align: 'center', stroke: { color: 0xd1356f, width: 7, join: 'round' } } });
+    t1.anchor.set(0.5); t1.position.set(0, -big * 0.42); card.addChild(t1);
+    const t2 = new PIXI.Text({ text: '×' + (count || 10), style: { fontFamily: THEME.type.familyDisplay, fontSize: big, fill: 0xff7ad0, align: 'center', stroke: { color: 0xffffff, width: 8, join: 'round' } } });
+    t2.anchor.set(0.5); t2.position.set(0, big * 0.4); card.addChild(t2);
+    const CAND = [0xff5ab0, 0x8be4ff, 0xffe24a, 0xb86fda, 0xffffff, 0xff7ad0];
+    const N = _gpuWeak ? 18 : (H > W * 1.05 ? 26 : 42);
+    const P = [];
+    for(let i = 0; i < N; i++){
+      const a = (i / N) * Math.PI * 2 + (vrnd() - 0.5) * 0.6, sp = 8 + vrnd() * 13;
+      P.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 4, r: 5 + vrnd() * 9, col: CAND[i % CAND.length], dia: vrnd() < 0.5 });
+    }
+    const backOut = (t) => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+    let burst = false, shake = 0;
+    const t0 = performance.now(), DUR = 1350;
+    try { if(Sound._duckMusic) Sound._duckMusic(5); } catch(e){}
+    return new Promise((res) => {
+      const tick = () => {
+        if(!ov.parent){ res(); return; }   // destroyed elsewhere → bail
+        const t = (performance.now() - t0) / DUR;
+        dim.alpha = Math.min(0.5, (t / 0.12) * 0.5);
+        if(t >= 0.12){
+          if(!burst){ burst = true; shake = 16; flash.alpha = 0.9; }
+          partG.clear();
+          const al = Math.max(0, 1 - (t - 0.12) / 0.62);
+          for(const p of P){
+            p.vy += 0.5; p.x += p.vx; p.y += p.vy; p.vx *= 0.985;
+            if(al <= 0) continue;
+            if(p.dia){ const s = p.r; partG.poly([p.x, p.y - s, p.x + s * 0.6, p.y, p.x, p.y + s, p.x - s * 0.6, p.y]).fill({ color: p.col, alpha: al }); }
+            else partG.circle(p.x, p.y, p.r).fill({ color: p.col, alpha: al });
+          }
+          flash.alpha = Math.max(0, flash.alpha - 0.07);
+          shake *= 0.86; ov.position.set((vrnd() - 0.5) * shake, (vrnd() - 0.5) * shake);
+        }
+        if(t >= 0.30){ const tt = Math.min(1, (t - 0.30) / 0.32); card.alpha = Math.min(1, tt * 2.5); card.scale.set(0.2 + 0.8 * backOut(tt)); }
+        if(t >= 0.84){ ov.alpha = Math.max(0, 1 - (t - 0.84) / 0.16); }
+        if(t >= 1){ try { ov.destroy({ children: true }); } catch(e){} res(); return; }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
   async function playStandardFsCeremony(){
     if(isReduced()){ return new Promise(res => setTimeout(res, 220)); }
     const W = app.screen.width, H = app.screen.height;
@@ -9974,6 +10030,8 @@
       //   STANDARD → crystal-bloom · HOT → plasma-ignition · MEGA → arcane crown.
       // playFsTransition (generic portal) is kept as a defensive fallback only.
       const _fsMode = (result.fs && result.fs._mode) || mode;
+      // Energetic candy-explosion opener before the per-tier ceremony (user pick).
+      try { await playCandyBurstIntro(result.fs && result.fs.total, _fsMode); } catch(e){}
       if(_fsMode === 'bonus_mega'){
         await playMegaLogoCeremony();
       } else if(_fsMode === 'bonus_hot'){
