@@ -119,3 +119,28 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 4. **Motion blur hook** — M.
 5. **7-preset sweep + demo ribbon + keyboard I** — S+S+M.
 6. **Replay + resume + scatter trigger + i18n + Spine crown** — the L items, one each per session.
+
+## PRIORITY CASE — betting bar quality rewrite (owner review: renders badly)
+
+Owner verdict on the Cocos web bar: element rendering broken/low quality vs the
+flagship. Next session executes with the full build->boot->screenshot loop:
+
+1. SCALE: fit() caps bar at 30% viewport height -> elements render tiny at
+   1280x720. Use the master rule instead: fitBottom = width-fit (s = viewW/2400,
+   cap ~0.62), bar overlays the bottom, board fits ABOVE barTopY (=y+118\*s).
+2. LABEL GEOMETRY: lbl() uses contentSize(10,10) + default anchors -> baselines
+   and centering drift (BALANCE/value/USD overlap, banner pairs misalign).
+   Give every label a real contentSize + explicit anchor; banner pairs need the
+   master relayout() (label+value measured, centered as a pair, value shrinks).
+3. CAROUSEL: verify Mask.Type.GRAPHICS_RECT clips on 3.8.8 web; cells need
+   anchored centers; restyle() pill contrast (dark text on candy pill).
+4. CLICK FX: every control gets press scale-in 0.95 + release back (master
+   hit() pattern) + ui_click; spin arrow 360 flourish exists - keep.
+5. BALANCE: replace string-length currency offset with measured label width
+   (force updateRenderData then use UITransform width).
+6. REELS CONTAINER: owner wants the flagship container look — dark glass
+   window, per-cell cookie tiles (shipped 9b765b0, verify on screen), plus the
+   master's outer frame proportions; check symbol cell padding (540px art in
+   96px cells may need ~6% inset).
+7. After bar reads right: re-screenshot vs the Pixi bar side-by-side and
+   iterate until anatomy matches at a glance.
