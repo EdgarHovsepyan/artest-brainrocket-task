@@ -1008,9 +1008,9 @@
   // 16 source JPEGs. bg.jpg is a full painted scene used raw; every other file
   // ships its art on a solid-black field — loaded raw, then keyed out
   // (stripBlack) with a max-channel alpha ramp so glows feather, never clip.
-  const SH = 'assets/images/shining/';
+  const SH = 'assets/images/';
   const ASSETS = {
-    _bg:SH+'bg.jpg',     _logo:SH+'logo.jpg',     _button:SH+'button.jpg',
+    _bg:SH+'bg.jpg',     _logo:SH+'logo.jpg',
     // DROPPED 2026-05-30 (~8 MB off the bundle): balance.jpg / spin.jpg /
     // popup1.jpg / popup2.jpg were decoded but never rendered — the live spin
     // button + balance/bet/win plates are procedural, and the popup frames fed
@@ -1018,8 +1018,6 @@
     _s0:SH+'sym0-cherry.jpg', _s1:SH+'sym1-lemon.jpg',  _s2:SH+'sym2-plum.jpg',
     _s3:SH+'sym3-grapes.jpg', _s4:SH+'sym4-melon.jpg',  _s5:SH+'sym5-bell.jpg',
     _s6:SH+'sym6-seven.jpg',  _s7:SH+'sym7-crown.jpg',  _s8:SH+'sym8-star.jpg',
-    // EXTRA STUDIO boot splash — shown 1.5s before the game intro
-    _extraStudio: SH+'extra-studio.jpg',
     // Buy-Bonus tier emblems — crystal art (laurel / flame / burst), keyed on black
     _tierStd: SH+'tier-standard.jpg', _tierHot: SH+'tier-hot.jpg', _tierMega: SH+'tier-mega.jpg',
   };
@@ -1103,17 +1101,17 @@
 
   // Load raw source images for pixel processing (browser-cached from PIXI load).
   const _src = await Promise.all(['_s0','_s1','_s2','_s3','_s4','_s5','_s6','_s7','_s8',
-    '_logo','_button','_extraStudio','_tierStd','_tierHot','_tierMega'].map(imgLoad));
+    '_logo','_tierStd','_tierHot','_tierMega'].map(imgLoad));
   const symImg = _src.slice(0,9);
-  const [imLogo,imBtn,imExtraStudio,imTierStd,imTierHot,imTierMega] = _src.slice(9);
+  const [imLogo,imTierStd,imTierHot,imTierMega] = _src.slice(9);
 
   TEX.bg = PIXI.Assets.get('_bg');                    // full painted hall — raw
   for(let i=0;i<9;i++) TEX['s'+i] = proc(symImg[i], 540, false);   // 9 reel symbols
   TEX.logo         = proc(imLogo, 900, true);             // painted SHINING POP crest (image — cute crown)
-  TEX.extraStudio  = proc(imExtraStudio, 700, true);      // boot splash — EXTRA STUDIO
+  TEX.extraStudio  = proc(null, 700, true);              // boot splash retired (art removed); blank keeps tex() safe
   // Buy-Bonus tier emblems (keyed crystal art) — STANDARD=laurel · HOT=flame · MEGA=burst
   TEX.tierStd = proc(imTierStd, 480, true); TEX.tierHot = proc(imTierHot, 480, true); TEX.tierMega = proc(imTierMega, 480, true);
-  // ── BUY BONUS candy art (user-supplied: assets/images/shining/buy-bonus.png).
+  // ── BUY BONUS candy art (user-supplied: assets/images/buy-bonus.png).
   // Loaded SEPARATELY from the PIXI bundle so a MISSING file never breaks boot
   // (onerror -> null). Keyed (black -> alpha) + trimmed via proc, like the logo —
   // matches the delivered art that sits on a black background. Until the PNG is
@@ -1150,8 +1148,10 @@
     x.arcTo(X,Y+H,X,Y,r);     x.arcTo(X,Y,X+W,Y,r);
     x.closePath();
   }
-  // Ruby-crystal gem base (button.jpg) — shared backplate for icons + steppers.
-  const gemC = trimCanvas(stripCanvas(imBtn || _blankC, 264));
+  // Gem base backplate for icons + steppers. (button.jpg art retired — the
+  // icon redesign uses a transparent glyph-only texture, so the blank base is
+  // the intended path; drawBtnChip draws the chip frame underneath.)
+  const gemC = trimCanvas(stripCanvas(_blankC, 264));
   function gemTex(drawGlyph){
     // ── GLYPH-ONLY ICON TEXTURE — 2026 redesign
     // Old version baked a square gold border into every icon. That meant
@@ -1745,7 +1745,7 @@
   bg.filters = [gameBlurFilter];
   bg._blurT = 0;
 
-  // Logo wordmark — painted crystal-heart crest (assets/images/shining/logo.jpg)
+  // Logo wordmark — painted crystal-heart crest (assets/images/logo.jpg)
   // ── LOGO VFX system (2026-05-27 redesign per user "VFX effect work on
   // HIM like INSERT effect not outside offset effect") ─────────────────
   // The shine + halo now lives INSIDE the logo bounds via a sprite mask:
