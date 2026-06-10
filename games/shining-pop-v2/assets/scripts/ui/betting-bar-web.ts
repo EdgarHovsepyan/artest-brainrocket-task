@@ -34,6 +34,14 @@ const { ccclass } = _decorator;
 
 const W = 2400;
 const H = 300;
+/** Master type-scale (FS=1.1 in betting-bar-web.js): the design font sizes are
+ *  built for a 30%-viewport-tall bar; with our 42% cap the bar IS bigger but
+ *  the text was still reading thin at small presets. Bumping every lbl() by
+ *  this factor matches the flagship hierarchy. */
+const FS = 1.12;
+/** Banner panel + carousel + utility-circle inset Y (in design-down coords). */
+const ROW_Y = 148;
+const ROW_H = 76;
 
 const C = {
   stage: '#120b2e',
@@ -103,11 +111,27 @@ export class BettingBarWeb extends Component {
     ui.setAnchorPoint(0, 1);
 
     const bg = this.gfx('bg');
-    bg.fillColor = col(C.stage, 0.92);
+    // 3-stop vertical depth ramp (master uses FillGradient — Graphics has none,
+    // so a stack of softening alpha rects approximates the smooth wash).
+    bg.fillColor = col('#241652', 0.94); // upper warm violet
     bg.rect(0, -H, W, H);
     bg.fill();
-    bg.fillColor = col(C.stageDeep, 0.6);
-    bg.rect(0, -H, W, H - 118);
+    bg.fillColor = col(C.stage, 0.55); // mid stop
+    bg.rect(0, -H, W, H - 56);
+    bg.fill();
+    bg.fillColor = col(C.stageDeep, 0.7); // deepest band that grounds the controls
+    bg.rect(0, -H, W, H - 130);
+    bg.fill();
+    // Soft top contour — a 2px candy-pink hairline that lifts the bar off the
+    // reels above (master 2-color rim system).
+    bg.lineWidth = 2;
+    bg.strokeColor = col(C.edge, 0.55);
+    bg.moveTo(0, 0);
+    bg.lineTo(W, 0);
+    bg.stroke();
+    // Top inner glow — a faint additive band that sells the gloss.
+    bg.fillColor = col('#ffffff', 0.06);
+    bg.rect(0, -8, W, 8);
     bg.fill();
 
     this.buildAccount();
@@ -178,33 +202,54 @@ export class BettingBarWeb extends Component {
     n.setPosition(x, this.Y(y), 0);
     const l = n.addComponent(Label);
     l.string = text;
-    l.fontSize = size;
-    l.lineHeight = size + 4;
+    const fs = Math.round(size * FS);
+    l.fontSize = fs;
+    l.lineHeight = fs + 4;
     l.isBold = bold;
     l.color = col(color);
     applyFont(l, color === C.value ? 'display' : 'body');
     return l;
   }
 
-  /** Candy panel: dark fill + lighter top stop + gloss sheen + cyan glass inner + edge. */
+  /** Master-grade candy panel: 3-stop body ramp + glossy top sheen + bright
+   *  inner highlight band + cyan glass inner stroke + hot magenta outer rim. */
   private panel(g: Graphics, x: number, y: number, w: number, h: number, r: number): void {
-    g.fillColor = col(C.panel);
+    // Base dark fill.
+    g.fillColor = col('#19103e');
     g.roundRect(x, this.Y(y + h), w, h, r);
     g.fill();
-    g.fillColor = col(C.panelHi, 0.55);
-    g.roundRect(x + 2, this.Y(y + h * 0.46), w - 4, h * 0.44, Math.max(2, r - 4));
+    // Mid stop (warmer violet) covering the upper half — sells the gradient.
+    g.fillColor = col(C.panel, 0.92);
+    g.roundRect(x + 1, this.Y(y + h - 1), w - 2, h * 0.62, Math.max(2, r - 1));
     g.fill();
-    g.fillColor = col('#ffffff', 0.1);
-    g.roundRect(x + 2.5, this.Y(y + h * 0.42), w - 5, h * 0.4, Math.max(2, r - 2));
+    // Brighter top wash for the candy "lit-from-above" read.
+    g.fillColor = col(C.panelHi, 0.65);
+    g.roundRect(x + 2, this.Y(y + h * 0.48), w - 4, h * 0.46, Math.max(2, r - 4));
     g.fill();
-    g.lineWidth = 1.1;
-    g.strokeColor = col(C.cyan, 0.15);
+    // Master gloss sheen — a thin bright band along the top inner curve.
+    g.fillColor = col('#ffffff', 0.18);
+    g.roundRect(x + 3, this.Y(y + h * 0.32), w - 6, h * 0.16, Math.max(2, r - 4));
+    g.fill();
+    g.fillColor = col('#ffffff', 0.08);
+    g.roundRect(x + 3, this.Y(y + h * 0.48), w - 6, h * 0.18, Math.max(2, r - 4));
+    g.fill();
+    // Cyan glass inner stroke — the "dispersion rim" master signature.
+    g.lineWidth = 1.4;
+    g.strokeColor = col(C.cyan, 0.28);
     g.roundRect(x + 2, this.Y(y + h - 2), w - 4, h - 4, Math.max(2, r - 1));
     g.stroke();
-    g.lineWidth = 2;
+    // Hot magenta outer rim, slightly thicker for crisper edges at small scales.
+    g.lineWidth = 2.4;
     g.strokeColor = col(C.edge);
     g.roundRect(x + 1, this.Y(y + h - 1), w - 2, h - 2, Math.max(2, r - 1));
     g.stroke();
+    // Soft drop shadow under the panel — Graphics has no blur, so layered
+    // alpha rects approximate it: a 6px-tall fade beneath the panel.
+    for (let k = 1; k <= 3; k++) {
+      g.fillColor = col('#000000', 0.06 - k * 0.012);
+      g.roundRect(x + k, this.Y(y + h + k * 2), w - 2 * k, 2, r);
+      g.fill();
+    }
   }
 
   /** Invisible hit region. `visuals` get the master press feedback: scale-in
@@ -279,10 +324,17 @@ export class BettingBarWeb extends Component {
       this.volPanel.active = !this.volPanel.active;
     });
 
-    g.lineWidth = 1.6;
-    g.strokeColor = col(C.divider, 0.3);
-    g.moveTo(210, this.Y(162));
-    g.lineTo(210, this.Y(210));
+    // Stronger account divider — alpha 0.3 was washing out at scale 0.53.
+    g.lineWidth = 2;
+    g.strokeColor = col(C.divider, 0.6);
+    g.moveTo(210, this.Y(160));
+    g.lineTo(210, this.Y(212));
+    g.stroke();
+    // Hairline highlight on the right side of the divider for depth.
+    g.lineWidth = 1;
+    g.strokeColor = col('#ffffff', 0.15);
+    g.moveTo(211, this.Y(160));
+    g.lineTo(211, this.Y(212));
     g.stroke();
 
     this.lbl('BALANCE', 232, 167, 17, C.label);
@@ -404,11 +456,15 @@ export class BettingBarWeb extends Component {
   }
   private restyleCells(): void {
     this.cells.forEach((c, i) => {
-      const on = i === this.activeIdx;
+      const d = Math.abs(i - this.activeIdx);
+      const on = d === 0;
+      // Active = bold dark text on the candy pill; neighbours fade smoothly.
       c.color = col(on ? C.dark : C.value);
-      c.node.setScale(on ? 1 : 0.78, on ? 1 : 0.78, 1);
+      // Falloff: 1.0 active, 0.72 neighbours, 0.6 further (less clutter).
+      const s = on ? 1.0 : d === 1 ? 0.72 : 0.6;
+      c.node.setScale(s, s, 1);
       const op = c.node.getComponent(UIOpacity) ?? c.node.addComponent(UIOpacity);
-      op.opacity = on ? 255 : 150;
+      op.opacity = on ? 255 : d === 1 ? 175 : 110;
     });
   }
   private snapNearest(emit: boolean): void {
@@ -518,9 +574,28 @@ export class BettingBarWeb extends Component {
     this.hitNode(2170, 192, 60, 60, () => this.events.emit('autoplay'), [auto.node]);
 
     const R = 70;
-    const ring = this.localNode(this.node, 2330, this.Y(186), R * 2, R * 2);
+    // The spin ring lives in a wider container so its OUTER halo doesn't clip.
+    const ring = this.localNode(this.node, 2330, this.Y(186), R * 2.8, R * 2.8);
     this.spinRing = ring;
-    const rg = ring.addComponent(Graphics);
+
+    // ── Outer ambient halo: layered candy-pink fades that "breathe" behind the
+    //    ring (premium feel, master-equivalent of the FillGradient halo). The
+    //    Graphics has no blur so we stack low-alpha circles of decreasing
+    //    radius. Sells the spin ring as the most important control on the bar.
+    const haloG = ring.addComponent(Graphics);
+    for (let k = 6; k >= 1; k--) {
+      haloG.fillColor = col(C.active, 0.04 + (6 - k) * 0.014);
+      haloG.circle(0, 0, R + k * 6);
+      haloG.fill();
+    }
+    // Crisper inner halo close to the rim — catches the eye.
+    haloG.fillColor = col(C.active, 0.22);
+    haloG.circle(0, 0, R + 2);
+    haloG.fill();
+
+    // ── Ring body (gradient approximation via stacked offset circles).
+    const bodyN = this.localNode(ring, 0, 0, R * 2, R * 2);
+    const rg = bodyN.addComponent(Graphics);
     rg.fillColor = col(C.ringMid);
     rg.circle(0, 0, R);
     rg.fill();
@@ -530,15 +605,30 @@ export class BettingBarWeb extends Component {
     rg.fillColor = col(C.ringLo);
     rg.circle(R * 0.1, -R * 0.16, R * 0.9);
     rg.fill();
+    // Inner glass face — slightly larger inner radius for a thicker premium ring.
+    const INNER = R * 0.76;
     rg.fillColor = col(C.spinFace);
-    rg.circle(0, 0, R * 0.7857);
+    rg.circle(0, 0, INNER);
     rg.fill();
-    rg.lineWidth = R * 0.031;
-    rg.strokeColor = col(C.centerRim, 0.4);
-    rg.circle(0, 0, R * 0.7857);
+    // Subtle inner shadow ring (top-inner dark, bottom-inner light = lit from above).
+    rg.lineWidth = 3;
+    rg.strokeColor = col('#000000', 0.32);
+    rg.arc(0, 0, INNER - 1.5, -Math.PI, 0, false);
     rg.stroke();
-    rg.fillColor = col('#ffffff', 0.07);
-    rg.ellipse(-R * 0.23, R * 0.26, R * 0.245, R * 0.105);
+    rg.strokeColor = col('#ffffff', 0.18);
+    rg.arc(0, 0, INNER - 1.5, 0, Math.PI, false);
+    rg.stroke();
+    // Bright candy rim around the inner face.
+    rg.lineWidth = R * 0.04;
+    rg.strokeColor = col(C.centerRim, 0.65);
+    rg.circle(0, 0, INNER);
+    rg.stroke();
+    // Top gloss highlight on the ring.
+    rg.fillColor = col('#ffffff', 0.18);
+    rg.ellipse(-R * 0.18, R * 0.32, R * 0.42, R * 0.16);
+    rg.fill();
+    rg.fillColor = col('#ffffff', 0.1);
+    rg.ellipse(-R * 0.06, R * 0.5, R * 0.55, R * 0.12);
     rg.fill();
 
     const arrowNode = this.localNode(ring, 0, 0, R, R);
