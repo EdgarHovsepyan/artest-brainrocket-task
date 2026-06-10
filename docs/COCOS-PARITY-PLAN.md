@@ -55,7 +55,7 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 | MENU hub (Buy / Quick bet / Info / Settings / Autoplay) | ✅   | ✅    |                                                   |
 | Buy menu with mode costs                                | ✅   | ✅    |                                                   |
 | Scrollable panel bodies (long content)                  | ✅   | ⬜ M  | v2 content sized-to-fit; mask+drag scroll pending |
-| Reality Check (session timer popup)                     | ✅   | ⬜ M  | COMPLY table port                                 |
+| Reality Check (session timer popup)                     | ✅   | ✅    | compliance.ts (5 tests) + showRealityCheck modal  |
 | Error modal (dismissible, social-safe text)             | ✅   | ✅    | SlotView.showError + network modal (QA hardening) |
 | One-overlay-at-a-time discipline                        | ✅   | ✅    | `closeOverlays()`                                 |
 

@@ -336,6 +336,64 @@ export class SlotView extends Component {
     this.node.getChildByName('errorModal')?.destroy();
   }
 
+  /** Reality Check (responsible-gaming): blocking session-summary card with
+   *  Time / Spins / Bet / Net and CONTINUE (resets the timer) + STOP. */
+  showRealityCheck(
+    stats: { minutes: number; spins: number; betText: string; netText: string },
+    onContinue: () => void,
+    onStop: () => void,
+  ): void {
+    this.closeOverlays();
+    this.node.getChildByName('rcModal')?.destroy();
+    const w = 460;
+    const h = 300;
+    const layer = this.mkNode('rcModal', 2600, 2200, this.node);
+    const scrim = layer.addComponent(Graphics);
+    scrim.fillColor = new Color(10, 10, 14, 200);
+    scrim.rect(-1300, -1100, 2600, 2200);
+    scrim.fill();
+    layer.on(Node.EventType.TOUCH_END, () => undefined);
+    const card = this.mkNode('rcCard', w, h, layer);
+    this.surfChrome(card, w, h, 50);
+    this.mkLabel('REALITY CHECK', 0, h / 2 - 32, 22, ACID, card, true);
+    this.mkLabel('You have been playing for a while.', 0, h / 2 - 64, 13, MUTED, card);
+    const cells: [string, string][] = [
+      ['TIME', `${stats.minutes} min`],
+      ['SPINS', String(stats.spins)],
+      ['BET', stats.betText],
+      ['NET', stats.netText],
+    ];
+    cells.forEach(([lbl, val], i) => {
+      const x = -w / 2 + 58 + (i * (w - 116)) / 3;
+      this.mkLabel(lbl, x, 24, 11, MUTED, card);
+      this.mkLabel(val, x, 2, 16, new Color(245, 247, 250, 255), card, true);
+    });
+    this.mkTextButton(
+      'STOP',
+      -110,
+      -h / 2 + 40,
+      170,
+      46,
+      () => {
+        layer.destroy();
+        onStop();
+      },
+      card,
+    );
+    this.mkTextButton(
+      'CONTINUE',
+      110,
+      -h / 2 + 40,
+      170,
+      46,
+      () => {
+        layer.destroy();
+        onContinue();
+      },
+      card,
+    ).setActive(true);
+  }
+
   /** Master drawSurfChrome port — ONE premium panel language for every popup:
    *  violet glass gradient body, glossy top sheen, magenta bloom + hot border,
    *  cyan dispersion hairline, optional title divider. Gradients approximated

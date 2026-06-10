@@ -33,6 +33,17 @@ import {
   stopAutoplay,
 } from '../logic/autoplay';
 import { BET_LEVELS_CENTS, maxBet, minBet, snapBet, stepBet } from '../logic/bet-levels';
+import {
+  ackRealityCheck,
+  ComplyRules,
+  getComply,
+  newSession,
+  realityCheckDue,
+  recordSpin,
+  SessionStats,
+  sessionNetCents,
+} from '../logic/compliance';
+import { formatMoney } from '../logic/money';
 import { installLifecycle, LifecycleHandle } from './lifecycle';
 import { BONUS_MODES, BonusMode } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
@@ -56,6 +67,8 @@ export class SlotController extends Component {
   private barNode: Node | null = null;
   private barIsWeb: boolean | null = null;
   private lifecycle: LifecycleHandle | null = null;
+  private comply: ComplyRules = getComply();
+  private session: SessionStats = newSession(0);
 
   private state: FlowState = 'idle';
   private canStop = false;
@@ -69,6 +82,7 @@ export class SlotController extends Component {
     // display's native refresh (120/144Hz ProMotion) for buttery spins. Visual/perf only.
     game.frameRate = 120;
     this.model = new SlotModel({ balanceCents: this.startBalanceCents, betCents: this.betCents });
+    this.session = newSession(this.nowMs());
     const viewNode = new Node('SlotView');
     this.node.addChild(viewNode);
     this.view = viewNode.addComponent(SlotView);
@@ -260,6 +274,37 @@ export class SlotController extends Component {
     this.syncHud();
   }
 
+  /** Wall-clock for the session timer (Date.now is fine at game runtime). */
+  private nowMs(): number {
+    return typeof Date !== 'undefined' ? Date.now() : 0;
+  }
+
+  /** Show the Reality Check; CONTINUE resets the counters + resumes autoplay,
+   *  STOP ends any autoplay and leaves the player on an idle board. */
+  private presentRealityCheck(): void {
+    const wasAuto = this.autoplay.active;
+    if (wasAuto) this.stopAuto();
+    const minutes = Math.floor((this.nowMs() - this.session.startedAtMs) / 60000);
+    const net = sessionNetCents(this.session);
+    this.view.showRealityCheck(
+      {
+        minutes,
+        spins: this.session.spinsSinceCheck,
+        betText: formatMoney(this.session.totalBetCents / 100, 'USD'),
+        netText: (net >= 0 ? '+' : '') + formatMoney(net / 100, 'USD'),
+      },
+      () => {
+        this.session = ackRealityCheck(this.session, this.nowMs());
+        if (wasAuto && this.state === 'idle' && this.model.canSpin()) {
+          this.startAuto(this.autoplay.total || Infinity);
+        }
+      },
+      () => {
+        this.session = ackRealityCheck(this.session, this.nowMs());
+      },
+    );
+  }
+
   /** Bet stepper from the bar — walks the BET_LEVELS ladder (master parity).
    *  Locked during autoplay. */
   private changeBet(dir: number): void {
@@ -437,12 +482,19 @@ export class SlotController extends Component {
       }
     }
 
+    this.session = recordSpin(this.session, outcome.betCents, outcome.winCents);
+
     this.scheduleOnce(() => {
       this.state = 'idle';
       this.bar.setSpinning(false); // stop square → spin arrow
       this.bar.setAffordable(this.model.canSpin());
       this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
       this.view.setInteractable(true);
+      // Responsible-gaming Reality Check interrupts before the next spin/autoplay.
+      if (realityCheckDue(this.session, this.comply, this.nowMs())) {
+        this.presentRealityCheck();
+        return;
+      }
       if (this.autoplay.active) {
         // Master-parity continuation: feature -> bigWin -> exhausted -> balance.
         // Base game has no natural free-spin trigger (buy-only), so isFeature
