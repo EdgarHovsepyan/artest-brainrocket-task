@@ -3772,7 +3772,10 @@
       });
     } else {
       const tcW = (cardW * 0.88) / 3 - tierGap * 0.6;
-      const tcH = 200;
+      // 200 -> 176: the taller card pushed its bottom-edge "special" line (y≈+80)
+      // onto the inline BET label row (y≈+78). The shorter card lifts the whole
+      // tier (medallion + 4 text lines still fit) clear of the stepper.
+      const tcH = 176;
       const totalW = tcW*3 + tierGap*2;
       tierCards.forEach((tc, i) => {
         const cx = -totalW/2 + tcW*(i + 0.5) + tierGap*i;
