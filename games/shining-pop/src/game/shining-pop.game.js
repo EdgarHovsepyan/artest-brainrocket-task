@@ -2331,7 +2331,9 @@
       }
     });
     deliveredBarWeb.on2('menu', () => openDrawer('settings'));
-    deliveredBarWeb.on2('buy', () => { if(_buyAllowed()) showBuyBonusModal(); });
+    // Web-bar chip-stack icon → QUICK BETS (bet menu), NOT buy bonus. Buy bonus
+    // is the floating candy button (buyFab). (user: "this button → quick bets")
+    deliveredBarWeb.on2('betmenu', () => { if(typeof showBetMenu === 'function') showBetMenu(); });
     // bet:set passes an ABSOLUTE betLevels index — the swipe carousel snaps to a
     // centred level across the full list, so no sliding-window remap is needed.
     deliveredBarWeb.on2('bet:set', (idx) => {

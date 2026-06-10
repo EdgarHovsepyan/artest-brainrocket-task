@@ -200,7 +200,7 @@ export class BettingBarWeb extends PIXI.Container {
       mk(197, 0x9a4bd0); mk(189, 0xc06fda);
       c.addChild(new PIXI.Graphics().ellipse(0, 181 - 186, 19, 6.5).fill(0xe0a0ff));
     });
-    hit(coins, new PIXI.Circle(0, 0, 38), () => this._emit('buy')); this.addChild(coins); E.coins = coins;
+    hit(coins, new PIXI.Circle(0, 0, 38), () => this._emit('betmenu')); this.addChild(coins); E.coins = coins;   // chip-stack → QUICK BETS menu (buy-bonus is the floating candy button)
     const gamble = this._circleBtn(2090, 186, 38, null);
     const gx2 = T('×2', 25, COL.value, 700, 0.5, true); gx2.position.set(0, 0); gamble.addChild(gx2);
     hit(gamble, new PIXI.Circle(0, 0, 38), () => this._emit('bet:double'));
