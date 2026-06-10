@@ -53,7 +53,7 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 | GAME INFO: Rules / Paytable / Info tabs                 | ✅   | ✅    | paytable derives from PAYTABLE data               |
 | QUICK BET grid                                          | ✅   | ✅    |                                                   |
 | MENU hub (Buy / Quick bet / Info / Settings / Autoplay) | ✅   | ✅    |                                                   |
-| Buy menu with mode costs                                | ✅   | ✅    |                                                   |
+| Buy menu with mode costs                                | ✅   | ✅    | premium 3-tier modal + medallions + live costs    |
 | Scrollable panel bodies (long content)                  | ✅   | ⬜ M  | v2 content sized-to-fit; mask+drag scroll pending |
 | Reality Check (session timer popup)                     | ✅   | ✅    | compliance.ts (5 tests) + showRealityCheck modal  |
 | Error modal (dismissible, social-safe text)             | ✅   | ✅    | SlotView.showError + network modal (QA hardening) |
