@@ -17,6 +17,9 @@ its own outcome-book math, built end-to-end by a single developer.
 
 ## What is actually in these games
 
+<img width="1000" height="627" alt="logo" src="https://github.com/user-attachments/assets/47949898-14de-4156-a884-6025a6e9aa77" />
+<img width="720" height="720" alt="buy-bonus" src="https://github.com/user-attachments/assets/ea7a15c9-bc5e-4ae4-bf19-d9ed911e4832" />
+
 Far beyond a base-spin brief — every system below was designed, built and
 verified in-repo:
 
