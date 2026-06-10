@@ -6823,6 +6823,32 @@
     if (this._playSample('ui_bet', 'busSfx', 0.6)) return;
     this.tick();
   };
+  // ── EPIC SCATTER LAND — an escalating rising chime each time a STAR scatter
+  // lands. Sample-first (scatter_tick per land, scatter_trigger on the 3rd =
+  // bonus); procedural epic fallback = a bell stack + a fading-IN shimmer sweep
+  // with the pitch climbing per scatter. Ducks the music on the trigger.
+  Sound.scatterLand = function (n) {
+    this.ensure();
+    if (State.muted || !this.ctx) return;
+    n = Math.max(1, n | 0);
+    const id = n >= 3 ? 'scatter_trigger' : 'scatter_tick';
+    if (this._playSample(id, 'busWin', 0.95)) { if (n >= 3) this._duckMusic(4); return; }
+    const t0 = this.ctx.currentTime;
+    const base = 523 * Math.pow(2, (Math.min(n, 6) - 1) * 0.18);   // pitch climbs per scatter
+    [[base, 'triangle', 0.13], [base * 1.5, 'sine', 0.08], [base * 2, 'sine', 0.06]].forEach((v, i) => {
+      const o = this.ctx.createOscillator(); o.type = v[1]; o.frequency.value = v[0];
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(v[2], t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.85 + i * 0.1);
+      o.connect(g); g.connect(this.busWin); o.start(t0); o.stop(t0 + 1.1);
+    });
+    const sw = this.ctx.createOscillator(); sw.type = 'sine';
+    sw.frequency.setValueAtTime(base * 2, t0); sw.frequency.exponentialRampToValueAtTime(base * 4, t0 + 0.5);
+    const sg = this.ctx.createGain();
+    sg.gain.setValueAtTime(0.0001, t0); sg.gain.linearRampToValueAtTime(0.05, t0 + 0.28); sg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.7);
+    sw.connect(sg); sg.connect(this.busWin); sw.start(t0); sw.stop(t0 + 0.8);
+    if (n >= 3) this._duckMusic(4);   // bonus trigger — duck the music for impact
+  };
 
   // ── DEV: expose Sound for audio debugging (localhost / ?debug only) ──
   try {
@@ -8491,6 +8517,13 @@
         //   CROWN (sym 7) → brass swell, SEVEN (sym 6) → bell, else fruit thunk.
         Sound.reelStop(r, rl.symbols[1]);
         if(!isReduced()) Sound.tick();
+        // EPIC SCATTER LAND — if this reel landed a STAR scatter, ring an
+        // escalating epic chime (count climbs across reels, reels stop L→R).
+        if(r === 0) State._scatLandN = 0;
+        if(rl.symbols && (rl.symbols[0] === STAR || rl.symbols[1] === STAR || rl.symbols[2] === STAR)){
+          State._scatLandN = (State._scatLandN || 0) + 1;
+          try { Sound.scatterLand(State._scatLandN); } catch(e){}
+        }
       }
     }
     if(!anySpinning && allReelsSpinning){
@@ -9411,7 +9444,13 @@
     const crownFxG  = _crownSurf ? new PIXI.Graphics() : null;
     const crownMask = _crownSurf ? new PIXI.Sprite(SYM_TEX[7]) : null;
     if(_crownSurf){ crownFxG.blendMode = 'add'; crownMask.anchor.set(0.5); crownFxG.mask = crownMask; }
-    stage.addChild(backdropG, bloomG, crownRimBack, arcG, crownRimC, crownRimM, crownS);   // back-rim < light < bolts < rims < crown
+    // CANDY LIGHT-POOL behind the crown — soft additive pink→light-pink glow so the
+    // hero crown sits in candy light and never reads as a flat "crown on black box"
+    // (the JPG crown keeps a faint dark halo at ceremony scale). 2026-06-10 fix.
+    const crownGlow = new PIXI.Graphics();
+    for(let _i = 6; _i >= 1; _i--) crownGlow.circle(0, 0, crownMax * 0.5 * (0.45 + _i * 0.17)).fill({ color: _i > 3 ? 0xff5ab0 : 0xffa6e0, alpha: 0.055 });
+    crownGlow.blendMode = 'add'; crownGlow.position.set(cx, cy);
+    stage.addChild(backdropG, bloomG, crownGlow, crownRimBack, arcG, crownRimC, crownRimM, crownS);   // back-rim < pool < light < bolts < rims < crown
     if(_crownSurf) stage.addChild(crownMask, crownFxG);                      // masked surface FX on top (strong GPU only)
     crownS.position.set(cx, cy);
     // ── SPINE-05 — swap the flat crown SPRITE for the live Crown-Wild RIG when ready.
@@ -9458,7 +9497,7 @@
     await new Promise(res => {
       function step(){
         const now = performance.now(), t = (now - t0) / DUR;
-        if(t >= 1){ backdropG.destroy(); bloomG.destroy(); arcG.destroy(); if(crownFxG){ crownFxG.mask = null; crownFxG.destroy(); } if(crownMask) crownMask.destroy(); crownRimBack.destroy(); crownRimC.destroy(); crownRimM.destroy(); crownS.destroy(); if (_crownRig && _spinePool) { try { _spinePool.release(_crownRig); } catch(e) {} _crownRig = null; } res(); return; }
+        if(t >= 1){ backdropG.destroy(); bloomG.destroy(); crownGlow.destroy(); arcG.destroy(); if(crownFxG){ crownFxG.mask = null; crownFxG.destroy(); } if(crownMask) crownMask.destroy(); crownRimBack.destroy(); crownRimC.destroy(); crownRimM.destroy(); crownS.destroy(); if (_crownRig && _spinePool) { try { _spinePool.release(_crownRig); } catch(e) {} _crownRig = null; } res(); return; }
         // VIGNETTE backdrop (NOT a flat black box): a lit, transparent centre so the
         // painted hall reads behind the crown → soft dark edges that FRAME the hero.
         // Capped at 0.40 (was flat 0.62) — the "crown floating on a black box" fix.
