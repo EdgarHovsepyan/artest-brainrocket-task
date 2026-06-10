@@ -179,6 +179,7 @@ export class SlotController extends Component {
     this.bar.on('sound', () => this.toggleSound());
     this.bar.on('volume', (v: number) => this.view.setVolume(v));
     this.bar.on('menu', () => this.view.openMenuHub());
+    this.bar.on('ui:click', () => this.view.audio.click());
     // Defer state writes one frame so the bar's onLoad has built its labels.
     this.scheduleOnce(() => {
       // Code-created nodes default to the DEFAULT layer, which the 2D UI renderer

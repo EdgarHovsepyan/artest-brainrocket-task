@@ -112,6 +112,7 @@ export class BettingBarWeb extends Component {
     this.buildAccount();
     this.buildBanner(500, 320, 'LAST WIN', (l) => (this.lastWinValue = l));
     this.buildBanner(840, 240, 'TOTAL BET', (l) => (this.totalBetValue = l));
+    this.relayoutBanners();
     this.buildCarousel();
     this.buildRightCluster();
     this.buildVolumePanel();
@@ -182,7 +183,9 @@ export class BettingBarWeb extends Component {
   }
 
   /** Invisible hit region. `visuals` get the master press feedback: scale-in
-   *  0.94 on touch, spring back on release (Emil's highest-ROI micro-interaction). */
+   *  0.94 on touch, spring back on release (Emil's highest-ROI micro-interaction).
+   *  Every tap also emits ui:click for the controller's click sample — except
+   *  `silent` surfaces (the carousel: drag-end already feeds audio via bet:set). */
   private hitNode(
     x: number,
     y: number,
@@ -190,6 +193,7 @@ export class BettingBarWeb extends Component {
     h: number,
     cb: () => void,
     visuals: Node[] = [],
+    silent = false,
   ): Node {
     const n = new Node('hit');
     n.layer = this.node.layer;
@@ -203,6 +207,7 @@ export class BettingBarWeb extends Component {
     n.on(Node.EventType.TOUCH_CANCEL, restore);
     n.on(Node.EventType.TOUCH_END, () => {
       restore();
+      if (!silent) this.events.emit('ui:click');
       cb();
     });
     return n;
@@ -260,6 +265,8 @@ export class BettingBarWeb extends Component {
     this.balCur = this.lbl('USD', 330, 200, 16, C.cur, false);
   }
 
+  private banners: { x: number; w: number; cap: Label; val: Label }[] = [];
+
   private buildBanner(x: number, w: number, label: string, sink: (l: Label) => void): void {
     const g = this.gfx('banner_' + label);
     g.fillColor = col(C.banner);
@@ -272,11 +279,31 @@ export class BettingBarWeb extends Component {
     g.strokeColor = col(C.edge);
     g.roundRect(x + 1, this.Y(223), w - 2, 74, 37);
     g.stroke();
-    // Pair layout (master relayout): caption right-anchored, value left-anchored,
-    // meeting at the panel centre with a fixed gutter.
-    this.lbl(label, x + w / 2 - 7, 186, 18, C.label, true, this.node, 1);
+    const cap = this.lbl(label, x + w / 2 - 7, 186, 18, C.label);
     const val = this.lbl('0.00', x + w / 2 + 7, 186, 27, C.value);
+    this.banners.push({ x, w, cap, val });
     sink(val);
+  }
+
+  /** Master relayout(): measure caption+value, centre them as a PAIR on the
+   *  panel, shrink the value to fit — long amounts never escape the banner. */
+  private relayoutBanners(): void {
+    for (const b of this.banners) {
+      b.val.node.setScale(1, 1, 1);
+      b.cap.updateRenderData(true);
+      b.val.updateRenderData(true);
+      const capW = b.cap.node.getComponent(UITransform)!.width;
+      let valW = b.val.node.getComponent(UITransform)!.width;
+      const maxV = b.w - 24 - capW - 14;
+      if (valW > maxV && maxV > 12) {
+        const k = maxV / valW;
+        b.val.node.setScale(k, k, 1);
+        valW = maxV;
+      }
+      const left = b.x + b.w / 2 - (capW + 14 + valW) / 2;
+      b.cap.node.setPosition(left, this.Y(186), 0);
+      b.val.node.setPosition(left + capW + 14, this.Y(186), 0);
+    }
   }
 
   private buildCarousel(): void {
@@ -314,7 +341,7 @@ export class BettingBarWeb extends Component {
     track.addComponent(UITransform).setContentSize(10, 10);
     this.track = track;
 
-    const sel = this.hitNode(SX, 148, SW, 76, () => undefined);
+    const sel = this.hitNode(SX, 148, SW, 76, () => undefined, [], true);
     sel.on(Node.EventType.TOUCH_START, (e: EventTouch) => {
       this.dragging = true;
       this.moved = 0;
@@ -339,11 +366,15 @@ export class BettingBarWeb extends Component {
   }
 
   private CELLW = 132;
+  /** Pill centre in TRACK space: selector centre (SW/2=400) minus the 12px mask
+   *  inset the track lives under — using 400 raw left every cell 12px right of
+   *  the active pill. */
+  private PCX = 388;
   private trackXFor(i: number): number {
-    return 400 - (i * this.CELLW + this.CELLW / 2);
+    return this.PCX - (i * this.CELLW + this.CELLW / 2);
   }
   private nearestIdx(): number {
-    const i = Math.round((400 - this.track.position.x - this.CELLW / 2) / this.CELLW);
+    const i = Math.round((this.PCX - this.track.position.x - this.CELLW / 2) / this.CELLW);
     return Math.max(0, Math.min(this.levels.length - 1, i));
   }
   private restyleCells(): void {
@@ -643,17 +674,21 @@ export class BettingBarWeb extends Component {
   setBalance(n: number): void {
     this.balValue.string = this.fmt(n);
     this.balValue.updateRenderData(true);
-    const w = this.balValue.node.getComponent(UITransform)!.width;
-    this.balCur.node.setPosition(232 + w + 10, this.Y(200), 0);
+    const ut = this.balValue.node.getComponent(UITransform)!;
+    const k = ut.width > 180 ? 180 / ut.width : 1;
+    this.balValue.node.setScale(k, k, 1);
+    this.balCur.node.setPosition(232 + ut.width * k + 10, this.Y(200), 0);
   }
   setCurrency(c: string): void {
     this.balCur.string = c;
   }
   setLastWin(n: number): void {
     this.lastWinValue.string = this.fmt(n);
+    this.relayoutBanners();
   }
   setBet(n: number): void {
     this.totalBetValue.string = this.fmt(n);
+    this.relayoutBanners();
   }
   setBetLevels(valuesCents: number[], activeIdx: number, fmt?: (v: number) => string): void {
     if (fmt) this.carFmt = fmt;

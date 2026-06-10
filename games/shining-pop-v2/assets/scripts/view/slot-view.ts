@@ -221,6 +221,43 @@ export class SlotView extends Component {
     return this.brandFrames[key] ?? null;
   }
 
+  /** Master drawSurfChrome port — ONE premium panel language for every popup:
+   *  violet glass gradient body, glossy top sheen, magenta bloom + hot border,
+   *  cyan dispersion hairline, optional title divider. Gradients approximated
+   *  with stacked stops (cc.Graphics has none). */
+  private surfChrome(parent: Node, w: number, h: number, titleDivAt = 0): Graphics {
+    const g = parent.addComponent(Graphics);
+    g.fillColor = new Color(25, 16, 52, 248);
+    g.roundRect(-w / 2, -h / 2, w, h, 16);
+    g.fill();
+    g.fillColor = new Color(13, 8, 30, 240);
+    g.roundRect(-w / 2, -h / 2, w, h * 0.55, 14);
+    g.fill();
+    g.fillColor = new Color(255, 255, 255, 13);
+    g.roundRect(-w / 2 + 3, h / 2 - h * 0.24, w - 6, h * 0.21, 12);
+    g.fill();
+    g.lineWidth = 7;
+    g.strokeColor = new Color(255, 0, 127, 55);
+    g.roundRect(-w / 2 - 1, -h / 2 - 1, w + 2, h + 2, 17);
+    g.stroke();
+    g.lineWidth = 2.5;
+    g.strokeColor = new Color(255, 90, 156, 255);
+    g.roundRect(-w / 2, -h / 2, w, h, 16);
+    g.stroke();
+    g.lineWidth = 1;
+    g.strokeColor = new Color(191, 232, 255, 45);
+    g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 13);
+    g.stroke();
+    if (titleDivAt > 0) {
+      g.lineWidth = 1.5;
+      g.strokeColor = new Color(207, 120, 224, 90);
+      g.moveTo(-w / 2 + 18, h / 2 - titleDivAt);
+      g.lineTo(w / 2 - 18, h / 2 - titleDivAt);
+      g.stroke();
+    }
+    return g;
+  }
+
   /** Screen px reserved at the bottom for the web bar's solid band — the board
    *  contain-fits into the remaining area and centres above it. */
   setBottomInset(px: number): void {
@@ -522,27 +559,40 @@ export class SlotView extends Component {
     g.fillColor = new Color(0, 0, 0, 150);
     g.roundRect(-w / 2 - 6, -h / 2 - 12, w + 12, h + 8, 16);
     g.fill();
-    // Chrome bezel — violet plate around the glass window.
-    g.fillColor = new Color(25, 17, 64, 255);
-    g.roundRect(-w / 2 - 8, -h / 2 - 8, w + 16, h + 16, 16);
+    // Master frame proportions (flagship drawReelFrame): no hard bezel box — a
+    // layered soft pink halo lifts the window off the bg instead of a 4px border.
+    g.lineWidth = 2.5;
+    g.strokeColor = new Color(255, 138, 184, 13);
+    for (let k = 3; k >= 1; k--) {
+      g.roundRect(-w / 2 - k * 2.5, -h / 2 - k * 2.5, w + k * 5, h + k * 5, 12 + k * 2.5);
+      g.stroke();
+    }
+    // Dark glass window — translucent (master 0.72) so the painted bg reads through.
+    g.fillColor = new Color(20, 10, 32, 184);
+    g.roundRect(-w / 2, -h / 2, w, h, 12);
     g.fill();
-    // Inner glass window.
-    g.fillColor = INK;
-    g.roundRect(-w / 2, -h / 2, w, h, 10);
-    g.fill();
-    // Dual border: hot magenta outside, crystal highlight inside (dispersion rim).
-    g.lineWidth = 4;
-    g.strokeColor = ACID;
-    g.roundRect(-w / 2 - 8, -h / 2 - 8, w + 16, h + 16, 16);
+    // Flagship 2-color rim system: smoke-white outer + soft pink inner edge.
+    g.lineWidth = 2.5;
+    g.strokeColor = new Color(245, 247, 250, 140);
+    g.roundRect(-w / 2, -h / 2, w, h, 12);
     g.stroke();
-    g.lineWidth = 1.5;
-    g.strokeColor = new Color(240, 224, 255, 90);
-    g.roundRect(-w / 2 + 2, -h / 2 + 2, w - 4, h - 4, 8);
+    g.lineWidth = 1.6;
+    g.strokeColor = new Color(255, 90, 156, 89);
+    g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 9);
     g.stroke();
-    // Glossy top sheen inside the window.
-    g.fillColor = new Color(255, 255, 255, 12);
-    g.roundRect(-w / 2 + 4, h / 2 - 26, w - 8, 22, 8);
-    g.fill();
+    // Beveled crystal read (master ART-02): bright top-inner band, deep bottom shadow.
+    const bevH = h * 0.12;
+    for (let i = 1; i <= 4; i++) {
+      const bh = bevH * (1.05 - i * 0.18);
+      g.fillColor = new Color(245, 247, 250, Math.round((0.06 - i * 0.012) * 255));
+      g.roundRect(-w / 2 + 4, h / 2 - 4 - bh, w - 8, bh, 8);
+      g.fill();
+    }
+    for (let i = 1; i <= 3; i++) {
+      g.fillColor = new Color(5, 2, 10, Math.round((0.08 - i * 0.015) * 255));
+      g.rect(-w / 2 + 4, -h / 2 + 4 + (i - 1) * 2, w - 8, bevH * 0.65);
+      g.fill();
+    }
     // Corner gems (faceted diamonds — the brand accent, no circles).
     const gem = (cx: number, cy: number) => {
       g.fillColor = new Color(255, 90, 156, 235);
@@ -680,15 +730,8 @@ export class SlotView extends Component {
     const menu = this.mkNode('buyMenu', 360, 60 + options.length * 64, this.node);
     menu.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     menu.active = false;
-    const bg = menu.addComponent(Graphics);
     const h = 60 + options.length * 64;
-    bg.fillColor = new Color(8, 8, 10, 245);
-    bg.roundRect(-180, -h / 2, 360, h, 14);
-    bg.fill();
-    bg.lineWidth = 4;
-    bg.strokeColor = ACID;
-    bg.roundRect(-180, -h / 2, 360, h, 14);
-    bg.stroke();
+    this.surfChrome(menu, 360, h, 46);
     this.mkLabel('BUY FEATURE', 0, h / 2 - 28, 22, ACID, menu);
     options.forEach((o, i) => {
       const y = h / 2 - 72 - i * 64;
@@ -746,14 +789,7 @@ export class SlotView extends Component {
     const panel = this.mkNode('autoplayPanel', w, h, this.node);
     panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     panel.active = wasOpen;
-    const bg = panel.addComponent(Graphics);
-    bg.fillColor = new Color(8, 8, 10, 245);
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.fill();
-    bg.lineWidth = 4;
-    bg.strokeColor = ACID;
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.stroke();
+    this.surfChrome(panel, w, h, 44);
     this.mkLabel('AUTOPLAY', 0, h / 2 - 28, 22, ACID, panel);
     this.mkLabel('Number of spins:', 0, h / 2 - 58, 13, MUTED, panel);
     counts.forEach((n, i) => {
@@ -829,14 +865,7 @@ export class SlotView extends Component {
     const panel = this.mkNode('settingsPanel', w, h, this.node);
     panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     panel.active = wasOpen;
-    const bg = panel.addComponent(Graphics);
-    bg.fillColor = new Color(8, 8, 10, 245);
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.fill();
-    bg.lineWidth = 4;
-    bg.strokeColor = ACID;
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.stroke();
+    this.surfChrome(panel, w, h, 44);
     this.mkLabel('SETTINGS', 0, h / 2 - 28, 22, ACID, panel);
     const row = (label: string, desc: string, y: number) => {
       const l = this.mkLabel(label, -64, y + 8, 14, MUTED, panel);
@@ -904,14 +933,7 @@ export class SlotView extends Component {
     const panel = this.mkNode('infoPanel', w, h, this.node);
     panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY - 40, 0);
     panel.active = wasOpen;
-    const bg = panel.addComponent(Graphics);
-    bg.fillColor = new Color(8, 8, 10, 248);
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.fill();
-    bg.lineWidth = 4;
-    bg.strokeColor = ACID;
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.stroke();
+    this.surfChrome(panel, w, h, 46);
     this.mkLabel('GAME INFORMATION', 0, h / 2 - 26, 20, ACID, panel);
     (['rules', 'paytable', 'info'] as const).forEach((name, i) => {
       this.mkTextButton(
@@ -1022,14 +1044,7 @@ export class SlotView extends Component {
     const hub = this.mkNode('menuHub', w, h, this.node);
     hub.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     hub.active = false;
-    const bg = hub.addComponent(Graphics);
-    bg.fillColor = new Color(8, 8, 10, 245);
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.fill();
-    bg.lineWidth = 4;
-    bg.strokeColor = ACID;
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.stroke();
+    this.surfChrome(hub, w, h, 44);
     this.mkLabel('MENU', 0, h / 2 - 26, 20, ACID, hub);
     entries.forEach(([label, open], i) => {
       this.mkTextButton(
@@ -1069,14 +1084,7 @@ export class SlotView extends Component {
     const panel = this.mkNode('quickBetPanel', w, h, this.node);
     panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     panel.active = wasOpen;
-    const bg = panel.addComponent(Graphics);
-    bg.fillColor = new Color(8, 8, 10, 245);
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.fill();
-    bg.lineWidth = 4;
-    bg.strokeColor = ACID;
-    bg.roundRect(-w / 2, -h / 2, w, h, 14);
-    bg.stroke();
+    this.surfChrome(panel, w, h, 44);
     this.mkLabel('QUICK BET', 0, h / 2 - 28, 22, ACID, panel);
     this.mkLabel('Total bet (10 lines):', 0, h / 2 - 58, 13, MUTED, panel);
     levelsCents.forEach((cents, i) => {
