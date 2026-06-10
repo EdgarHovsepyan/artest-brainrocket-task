@@ -75,11 +75,13 @@ export class ReelView extends Component {
     if (this.blurActive) {
       const { triggerSpd, span, strengthYFrac, rampInDecay, rampOutDecay } = VIEW_CONFIG.spin.blur;
       const cellsPerFrame = Math.abs(y - this.lastStripY) / (this.pitch || 1) / (dt * 60);
+      // Subtle smear only — capped at ~1.18x so the reel reads as fast, never as
+      // a distorted/rescaled container (owner note: don't change reel scaling).
       const target =
-        1 + Math.max(0, Math.min(1, (cellsPerFrame - triggerSpd) / span)) * (strengthYFrac * 8);
+        1 + Math.max(0, Math.min(1, (cellsPerFrame - triggerSpd) / span)) * (strengthYFrac * 2.2);
       const decay = target > this.blurStretch ? rampInDecay : rampOutDecay;
       this.blurStretch += (target - this.blurStretch) * decay;
-      this.strip.setScale(1 - (this.blurStretch - 1) * 0.5, this.blurStretch, 1);
+      this.strip.setScale(1 - (this.blurStretch - 1) * 0.4, this.blurStretch, 1);
     }
     this.lastStripY = y;
   }
@@ -180,9 +182,10 @@ export class ReelView extends Component {
     return this.settle !== null;
   }
 
-  /** Pulse the given window rows (cells in a winning line). */
-  highlight(rows: number[]): void {
-    rows.forEach((row) => this.cells[row]?.playWin());
+  /** Pulse the given window rows (cells in a winning line), offset by `delay`
+   *  seconds so the controller can stagger reels into an L->R wave blink. */
+  highlight(rows: number[], delay = 0): void {
+    rows.forEach((row, i) => this.cells[row]?.playWin(delay + i * 0.04));
   }
 
   /** Bounce the given window rows — sticky wilds/crowns celebrating each free

@@ -30,10 +30,15 @@ export class SymbolView extends Component {
   private frames: SpriteFrame[] = [];
   private glow: Node | null = null;
   private glowOp: UIOpacity | null = null;
+  private size = 90;
+  // Win-VFX layers (slot-vfx artist): built lazily on first win, killed in clear.
+  private sheen: Node | null = null;
+  private sparkles: Node[] = [];
 
   /** Build the cell's sprite + text fallback at `size` px square. */
   build(size: number, frames: SpriteFrame[]): void {
     this.frames = frames;
+    this.size = size;
 
     const art = size * VIEW_CONFIG.layout.symbolFill;
     (this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform)).setContentSize(
@@ -127,6 +132,127 @@ export class SymbolView extends Component {
         .repeat(3)
         .start();
     }
+    this.playSheen(delay);
+    this.playSparkles(delay);
+  }
+
+  /** SHEEN SWEEP (slot-vfx Layer 7): a bright diagonal specular streak rakes
+   *  top->bottom across the symbol face, looping — reads as light catching a
+   *  glossy candy surface. Built lazily on first win. */
+  private playSheen(delay: number): void {
+    if (!this.sheen) {
+      const s = this.size;
+      const n = new Node('sheen');
+      n.addComponent(UITransform).setContentSize(s, s);
+      this.node.addChild(n);
+      const g = n.addComponent(Graphics);
+      // thin bright parallelogram (diagonal streak), no circles
+      g.fillColor = new Color(255, 255, 255, 70);
+      g.moveTo(-s * 0.12, s * 0.6);
+      g.lineTo(s * 0.06, s * 0.6);
+      g.lineTo(-s * 0.06, -s * 0.6);
+      g.lineTo(-s * 0.24, -s * 0.6);
+      g.close();
+      g.fill();
+      n.addComponent(UIOpacity).opacity = 0;
+      this.sheen = n;
+    }
+    const sheen = this.sheen;
+    const s = this.size;
+    const op = sheen.getComponent(UIOpacity)!;
+    Tween.stopAllByTarget(sheen);
+    Tween.stopAllByTarget(op);
+    sheen.setPosition(-s * 0.55, s * 0.5, 0);
+    op.opacity = 0;
+    // sweep position L->R, fade in/out at the ends; loop until cleared.
+    tween(sheen)
+      .delay(delay)
+      .to(0.55, { position: new Vec3(s * 0.55, -s * 0.5, 0) }, { easing: 'sineInOut' })
+      .delay(0.7)
+      .union()
+      .repeatForever()
+      .start();
+    tween(op)
+      .delay(delay)
+      .to(0.18, { opacity: 150 })
+      .to(0.37, { opacity: 0 })
+      .delay(0.7)
+      .union()
+      .repeatForever()
+      .start();
+  }
+
+  /** EDGE SPARKLE (slot-vfx Layer 8): four tiny diamonds twinkle at the cell
+   *  corners on a staggered loop. Pure opacity + scale, no circles. */
+  private playSparkles(delay: number): void {
+    if (this.sparkles.length === 0) {
+      const s = this.size;
+      const corners = [
+        [-s * 0.4, s * 0.4],
+        [s * 0.4, s * 0.4],
+        [s * 0.4, -s * 0.4],
+        [-s * 0.4, -s * 0.4],
+      ];
+      for (const [x, y] of corners) {
+        const n = new Node('spark');
+        n.addComponent(UITransform).setContentSize(12, 12);
+        n.setPosition(x, y, 0);
+        const g = n.addComponent(Graphics);
+        g.fillColor = new Color(255, 224, 255, 255);
+        g.moveTo(0, 6);
+        g.lineTo(5, 0);
+        g.lineTo(0, -6);
+        g.lineTo(-5, 0);
+        g.close();
+        g.fill();
+        n.addComponent(UIOpacity).opacity = 0;
+        this.node.addChild(n);
+        this.sparkles.push(n);
+      }
+    }
+    this.sparkles.forEach((n, i) => {
+      const op = n.getComponent(UIOpacity)!;
+      Tween.stopAllByTarget(op);
+      Tween.stopAllByTarget(n);
+      op.opacity = 0;
+      n.setScale(0.4, 0.4, 1);
+      tween(op)
+        .delay(delay + i * 0.18)
+        .to(0.16, { opacity: 230 })
+        .to(0.3, { opacity: 0 })
+        .delay(0.7)
+        .union()
+        .repeatForever()
+        .start();
+      tween(n)
+        .delay(delay + i * 0.18)
+        .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .to(0.3, { scale: new Vec3(0.4, 0.4, 1) })
+        .delay(0.7)
+        .union()
+        .repeatForever()
+        .start();
+    });
+  }
+
+  /** Kill the looping win layers (called from clear on the next spin). */
+  private stopWinFx(): void {
+    if (this.sheen) {
+      Tween.stopAllByTarget(this.sheen);
+      const op = this.sheen.getComponent(UIOpacity);
+      if (op) {
+        Tween.stopAllByTarget(op);
+        op.opacity = 0;
+      }
+    }
+    this.sparkles.forEach((n) => {
+      Tween.stopAllByTarget(n);
+      const op = n.getComponent(UIOpacity);
+      if (op) {
+        Tween.stopAllByTarget(op);
+        op.opacity = 0;
+      }
+    });
   }
 
   /** Sharp one-shot WILD-landing flash: scale punch + single hot glow strike.
@@ -196,5 +322,6 @@ export class SymbolView extends Component {
       Tween.stopAllByTarget(this.glowOp);
       this.glowOp.opacity = 0;
     }
+    this.stopWinFx();
   }
 }
