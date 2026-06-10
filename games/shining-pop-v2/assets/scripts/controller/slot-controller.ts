@@ -171,6 +171,9 @@ export class SlotController extends Component {
     this.bar.on('spin', () => this.onSpinPressed());
     this.bar.on('bet:inc', () => this.changeBet(1));
     this.bar.on('bet:dec', () => this.changeBet(-1));
+    this.bar.on('bet:set', (idx: number) => this.setBetTo(BET_LEVELS_CENTS[idx] ?? minBet()));
+    this.bar.on('bet:double', () => this.setBetTo(snapBet(this.model.bet * 2)));
+    this.bar.on('betmenu', () => this.view.openQuickBetPanel());
     this.bar.on('turbo', () => this.toggleTurbo());
     this.bar.on('autoplay', () => this.toggleAuto());
     this.bar.on('sound', () => this.toggleSound());
@@ -215,6 +218,22 @@ export class SlotController extends Component {
     // live bar state: dim the stepper at the ladder ends, dim spin if unaffordable.
     this.bar.setSteppers(this.model.bet > minBet(), this.model.bet < maxBet());
     this.bar.setAffordable(this.model.canSpin());
+    if (this.barIsWeb) {
+      (this.bar as BettingBarWeb).setBetLevels(
+        BET_LEVELS_CENTS.slice(),
+        BET_LEVELS_CENTS.indexOf(snapBet(this.model.bet)),
+        (cents) => (cents / 100).toFixed(2),
+      );
+    }
+  }
+
+  /** Absolute bet set (carousel / x2 / quick-bet panel) — same guards as stepping. */
+  private setBetTo(cents: number): void {
+    if (this.state !== 'idle' || this.autoplay.active) return;
+    this.model.setBet(snapBet(cents));
+    this.view.audio.bet();
+    this.view.configureQuickBetPanel(BET_LEVELS_CENTS, this.model.bet);
+    this.syncHud();
   }
 
   /** Bet stepper from the bar — walks the BET_LEVELS ladder (master parity).

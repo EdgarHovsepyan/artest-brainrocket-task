@@ -1,37 +1,60 @@
-/* BettingBarWeb — Cocos Creator 3.8 component. The DESKTOP/LANDSCAPE control
-   strip, master parity with the Pixi web bar: one bottom band with labeled
-   money readouts on the left (BALANCE · LAST WIN · TOTAL BET), the bet stepper
-   centre, the SPIN control right-of-centre and the icon cluster (turbo ·
-   autoplay · sound · menu) on the right. Same event names + live-state API as
-   BettingBarMobile so the controller drives either bar through one surface.
+/* BettingBarWeb — Cocos Creator 3.8 port of the owner's delivered web bar
+   (betting-bar-web.js, design 2400x300, candy/cotton-candy master pass).
+   Layout: ACCOUNT(menu+sound+BALANCE) | LAST WIN | TOTAL BET | swipe bet
+   carousel (center = active pill) | coins(quick bets) | x2 | turbo/autoplay |
+   SPIN ring. cc.Graphics has no gradients, so each gradient is approximated by
+   a representative stop + glossy top sheen + cyan glass inner stroke — the
+   same technique the delivered mobile bar uses.
 
-   Events: spin · bet:inc · bet:dec · autoplay · turbo · sound · menu */
+   Events: spin · bet:set(idx) · bet:double · betmenu · autoplay · turbo ·
+           volume(0..1) · menu
+   API: on · fit · setBalance · setCurrency · setLastWin · setBet ·
+        setBetLevels · setDemo · setSoundOn · setVolume · setSpinning ·
+        setAutoplay · setTurbo · setAffordable · setSteppers */
 import {
   _decorator,
   Color,
   Component,
   EventTarget,
+  EventTouch,
   Graphics,
   Label,
+  Mask,
   Node,
   tween,
+  Tween,
   UIOpacity,
   UITransform,
   Vec3,
 } from 'cc';
 const { ccclass } = _decorator;
 
-const W = 1240;
-const H = 110;
+const W = 2400;
+const H = 300;
 
 const C = {
-  panel: '#191140',
-  edge: '#b86fda',
-  active: '#db5fd8',
-  accent: '#ff007f',
-  value: '#f5f7fa',
-  label: '#c9ced8',
-  shadow: '#05020c',
+  stage: '#120b2e',
+  stageDeep: '#08051c',
+  panel: '#2e1c58',
+  panelHi: '#46297a',
+  banner: '#251853',
+  active: '#ff5ab0',
+  activeHi: '#ffd9f4',
+  activeLo: '#bf2496',
+  ringHi: '#ffe8fb',
+  ringMid: '#ff7ad0',
+  ringLo: '#3e2076',
+  spinFace: '#1a1138',
+  label: '#e9d6f5',
+  value: '#fdf2ff',
+  cur: '#eaddf8',
+  icon: '#fdf2ff',
+  edge: '#ff7ad0',
+  divider: '#cf78e0',
+  pillStroke: '#ffc8ef',
+  dark: '#24082c',
+  cyan: '#bfe8ff',
+  centerRim: '#ffd6f4',
 };
 function col(hex: string, a?: number): Color {
   const c = new Color();
@@ -40,301 +63,609 @@ function col(hex: string, a?: number): Color {
   return c;
 }
 
-interface Plate {
-  value: Label;
-}
-
 @ccclass('BettingBarWeb')
 export class BettingBarWeb extends Component {
   private events = new EventTarget();
-  private balance!: Plate;
-  private lastWin!: Plate;
-  private totalBet!: Plate;
-  private betValue!: Label;
-  private currencyLabel!: Label;
-  private spinNode!: Node;
-  private spinGlyph!: Graphics;
-  private spinning = false;
-  private autoCount!: Label;
-  private autoGlyphOp!: UIOpacity;
-  private turboOp!: UIOpacity;
-  private turboPip!: Node;
-  private soundOp!: UIOpacity;
-  private minusOp!: UIOpacity;
-  private plusOp!: UIOpacity;
+  private balValue!: Label;
+  private balCur!: Label;
+  private lastWinValue!: Label;
+  private totalBetValue!: Label;
+  private sndGlyphOp!: UIOpacity;
+  private sndSlash!: Node;
+  private volPanel!: Node;
+  private volFill!: Graphics;
+  private volKnob!: Node;
+  private volume = 0.5;
+  private lastNonZero = 0.5;
+  private spinArrow!: Node;
+  private spinStop!: Node;
   private spinOp!: UIOpacity;
+  private autoGlyph!: Node;
+  private autoCount!: Label;
+  private turboGlyphOp!: UIOpacity;
+  private turboPip!: Node;
+  private track!: Node;
+  private cells: Label[] = [];
+  private levels: number[] = [];
+  private activeIdx = 0;
+  private carFmt: (v: number) => string = (v) => String(v);
+  private dragX = 0;
+  private dragging = false;
+  private moved = 0;
 
   onLoad(): void {
     const ui = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
     ui.setContentSize(W, H);
-    ui.setAnchorPoint(0.5, 0.5);
+    ui.setAnchorPoint(0, 1);
 
-    const g = new Node('decor');
-    this.node.addChild(g);
-    g.addComponent(UITransform).setContentSize(W, H);
-    const dg = g.addComponent(Graphics);
-    dg.fillColor = col(C.shadow, 0.65);
-    dg.roundRect(-W / 2, -H / 2 - 5, W, H, 18);
-    dg.fill();
-    dg.fillColor = col(C.panel, 0.96);
-    dg.roundRect(-W / 2, -H / 2, W, H, 18);
-    dg.fill();
-    dg.lineWidth = 2;
-    dg.strokeColor = col(C.edge, 0.8);
-    dg.roundRect(-W / 2, -H / 2, W, H, 18);
-    dg.stroke();
-    dg.lineWidth = 3;
-    dg.strokeColor = col(C.accent);
-    dg.moveTo(-W / 2 + 18, H / 2 - 1);
-    dg.lineTo(W / 2 - 18, H / 2 - 1);
-    dg.stroke();
+    const bg = this.gfx('bg');
+    bg.fillColor = col(C.stage, 0.92);
+    bg.rect(0, -H, W, H);
+    bg.fill();
+    bg.fillColor = col(C.stageDeep, 0.6);
+    bg.rect(0, -H, W, H - 118);
+    bg.fill();
 
-    this.balance = this.plate(-470, 'BALANCE');
-    this.lastWin = this.plate(-285, 'LAST WIN');
-    this.totalBet = this.plate(-100, 'TOTAL BET');
-    this.currencyLabel = this.caption(-470, -34, 'USD');
-
-    this.minusOp = this.glyphButton(60, '−', () => this.events.emit('bet:dec'));
-    this.betValue = this.money(130, 0, 22);
-    this.caption(130, -34, 'BET');
-    this.plusOp = this.glyphButton(200, '+', () => this.events.emit('bet:inc'));
-
-    this.buildSpin(330);
-    this.turboOp = this.iconButton(430, 'T', () => this.events.emit('turbo'));
-    const pip = new Node('turboPip');
-    this.node.addChild(pip);
-    pip.addComponent(UITransform).setContentSize(10, 10);
-    pip.setPosition(446, 18, 0);
-    const pg = pip.addComponent(Graphics);
-    pg.fillColor = col(C.accent);
-    pg.moveTo(0, 5);
-    pg.lineTo(5, 0);
-    pg.lineTo(0, -5);
-    pg.lineTo(-5, 0);
-    pg.close();
-    pg.fill();
-    pip.active = false;
-    this.turboPip = pip;
-
-    const autoOp = this.iconButton(495, 'A', () => this.events.emit('autoplay'));
-    this.autoGlyphOp = autoOp;
-    const cnt = new Node('autoCount');
-    this.node.addChild(cnt);
-    cnt.addComponent(UITransform).setContentSize(60, 24);
-    cnt.setPosition(495, 26, 0);
-    const cl = cnt.addComponent(Label);
-    cl.fontSize = 13;
-    cl.lineHeight = 15;
-    cl.isBold = true;
-    cl.color = col(C.accent);
-    cl.string = '';
-    this.autoCount = cl;
-    this.autoCount.node.active = false;
-
-    this.soundOp = this.iconButton(560, '♪', () => this.events.emit('sound'));
-    this.iconButton(615, '≡', () => this.events.emit('menu'));
+    this.buildAccount();
+    this.buildBanner(500, 320, 'LAST WIN', (l) => (this.lastWinValue = l));
+    this.buildBanner(840, 240, 'TOTAL BET', (l) => (this.totalBetValue = l));
+    this.buildCarousel();
+    this.buildRightCluster();
+    this.buildVolumePanel();
   }
 
-  private plate(x: number, label: string): Plate {
-    const n = new Node('plate_' + label);
-    this.node.addChild(n);
-    n.addComponent(UITransform).setContentSize(170, 64);
-    n.setPosition(x, 0, 0);
-    const g = n.addComponent(Graphics);
-    g.fillColor = col(C.shadow, 0.55);
-    g.roundRect(-85, -32, 170, 64, 12);
-    g.fill();
-    g.lineWidth = 1.5;
-    g.strokeColor = col(C.edge, 0.45);
-    g.roundRect(-85, -32, 170, 64, 12);
-    g.stroke();
-    this.caption(x, 16, label);
-    return { value: this.money(x, -8, 20) };
+  private Y(y: number): number {
+    return -y;
   }
 
-  private caption(x: number, y: number, text: string): Label {
-    const n = new Node('cap');
-    this.node.addChild(n);
-    n.addComponent(UITransform).setContentSize(170, 18);
-    n.setPosition(x, y, 0);
+  private gfx(name: string, parent: Node = this.node): Graphics {
+    const n = new Node(name);
+    n.layer = this.node.layer;
+    parent.addChild(n);
+    const ui = n.addComponent(UITransform);
+    ui.setAnchorPoint(0, 1);
+    ui.setContentSize(W, H);
+    return n.addComponent(Graphics);
+  }
+
+  private lbl(
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    color: string,
+    bold = true,
+    parent: Node = this.node,
+  ): Label {
+    const n = new Node('t');
+    n.layer = this.node.layer;
+    parent.addChild(n);
+    n.addComponent(UITransform).setContentSize(10, 10);
+    n.setPosition(x, this.Y(y), 0);
     const l = n.addComponent(Label);
-    l.fontSize = 11;
-    l.lineHeight = 13;
-    l.isBold = true;
-    l.color = col(C.label, 0.8);
     l.string = text;
-    return l;
-  }
-
-  private money(x: number, y: number, size: number): Label {
-    const n = new Node('money');
-    this.node.addChild(n);
-    n.addComponent(UITransform).setContentSize(180, size + 6);
-    n.setPosition(x, y, 0);
-    const l = n.addComponent(Label);
     l.fontSize = size;
     l.lineHeight = size + 4;
-    l.isBold = true;
-    l.color = col(C.value);
-    l.string = '0.00';
+    l.isBold = bold;
+    l.color = col(color);
     return l;
   }
 
-  private glyphButton(x: number, glyph: string, cb: () => void): UIOpacity {
-    const n = new Node('btn_' + glyph);
-    this.node.addChild(n);
-    n.addComponent(UITransform).setContentSize(54, 54);
-    n.setPosition(x, 0, 0);
-    const g = n.addComponent(Graphics);
+  /** Candy panel: dark fill + lighter top stop + gloss sheen + cyan glass inner + edge. */
+  private panel(g: Graphics, x: number, y: number, w: number, h: number, r: number): void {
     g.fillColor = col(C.panel);
-    g.roundRect(-25, -25, 50, 50, 12);
+    g.roundRect(x, this.Y(y + h), w, h, r);
+    g.fill();
+    g.fillColor = col(C.panelHi, 0.55);
+    g.roundRect(x + 2, this.Y(y + h * 0.46), w - 4, h * 0.44, Math.max(2, r - 4));
+    g.fill();
+    g.fillColor = col('#ffffff', 0.1);
+    g.roundRect(x + 2.5, this.Y(y + h * 0.42), w - 5, h * 0.4, Math.max(2, r - 2));
+    g.fill();
+    g.lineWidth = 1.1;
+    g.strokeColor = col(C.cyan, 0.15);
+    g.roundRect(x + 2, this.Y(y + h - 2), w - 4, h - 4, Math.max(2, r - 1));
+    g.stroke();
+    g.lineWidth = 2;
+    g.strokeColor = col(C.edge);
+    g.roundRect(x + 1, this.Y(y + h - 1), w - 2, h - 2, Math.max(2, r - 1));
+    g.stroke();
+  }
+
+  private hitNode(x: number, y: number, w: number, h: number, cb: () => void): Node {
+    const n = new Node('hit');
+    n.layer = this.node.layer;
+    this.node.addChild(n);
+    const ui = n.addComponent(UITransform);
+    ui.setAnchorPoint(0, 1);
+    ui.setContentSize(w, h);
+    n.setPosition(x, this.Y(y), 0);
+    n.on(Node.EventType.TOUCH_END, cb);
+    return n;
+  }
+
+  private buildAccount(): void {
+    const g = this.gfx('account');
+    this.panel(g, 40, 148, 440, 76, 38);
+    [27, 38, 49].forEach((dy) => {
+      g.moveTo(80, this.Y(148 + dy));
+      g.lineTo(110, this.Y(148 + dy));
+    });
+    g.lineWidth = 3.2;
+    g.strokeColor = col(C.icon);
+    g.stroke();
+    this.hitNode(60, 148, 70, 76, () => this.events.emit('menu'));
+
+    const snd = this.gfx('snd');
+    snd.fillColor = col(C.icon);
+    snd.moveTo(152, this.Y(180));
+    snd.lineTo(158, this.Y(180));
+    snd.lineTo(166, this.Y(173));
+    snd.lineTo(166, this.Y(199));
+    snd.lineTo(158, this.Y(192));
+    snd.lineTo(152, this.Y(192));
+    snd.close();
+    snd.fill();
+    snd.lineWidth = 2.6;
+    snd.strokeColor = col(C.icon);
+    snd.moveTo(173, this.Y(180));
+    snd.lineTo(176, this.Y(186));
+    snd.lineTo(173, this.Y(192));
+    snd.stroke();
+    this.sndGlyphOp = snd.node.addComponent(UIOpacity);
+    const slash = this.gfx('sndSlash');
+    slash.lineWidth = 3;
+    slash.strokeColor = col(C.icon);
+    slash.moveTo(146, this.Y(172));
+    slash.lineTo(174, this.Y(200));
+    slash.stroke();
+    this.sndSlash = slash.node;
+    this.sndSlash.active = false;
+    this.hitNode(140, 160, 44, 52, () => {
+      this.volPanel.active = !this.volPanel.active;
+    });
+
+    g.lineWidth = 1.6;
+    g.strokeColor = col(C.divider, 0.3);
+    g.moveTo(210, this.Y(162));
+    g.lineTo(210, this.Y(210));
+    g.stroke();
+
+    this.lbl('BALANCE', 232, 168, 17, C.label);
+    this.balValue = this.lbl('0.00', 232, 192, 28, C.value);
+    this.balCur = this.lbl('USD', 320, 198, 16, C.cur, false);
+    [this.lbl('', 0, 0, 1, C.label)].forEach((l) => l.node.destroy());
+    [this.balValue, this.balCur, this.lastWinValue].forEach(() => undefined);
+    this.balValue.node.getComponent(UITransform)!.setAnchorPoint(0, 0.5);
+    this.balValue.horizontalAlign = Label.HorizontalAlign.LEFT;
+  }
+
+  private buildBanner(x: number, w: number, label: string, sink: (l: Label) => void): void {
+    const g = this.gfx('banner_' + label);
+    g.fillColor = col(C.banner);
+    g.roundRect(x, this.Y(224), w, 76, 38);
+    g.fill();
+    g.fillColor = col('#ffffff', 0.08);
+    g.roundRect(x + 2.5, this.Y(180), w - 5, 30, 34);
     g.fill();
     g.lineWidth = 2;
     g.strokeColor = col(C.edge);
-    g.roundRect(-25, -25, 50, 50, 12);
+    g.roundRect(x + 1, this.Y(223), w - 2, 74, 37);
     g.stroke();
-    const lblNode = new Node('g');
-    n.addChild(lblNode);
-    lblNode.addComponent(UITransform).setContentSize(50, 30);
-    const l = lblNode.addComponent(Label);
-    l.fontSize = 26;
-    l.lineHeight = 28;
-    l.isBold = true;
-    l.color = col(C.value);
-    l.string = glyph;
-    n.on(Node.EventType.TOUCH_END, () => {
-      tween(n)
-        .to(0.05, { scale: new Vec3(0.92, 0.92, 1) })
-        .to(0.1, { scale: new Vec3(1, 1, 1) })
-        .start();
-      cb();
-    });
-    return n.addComponent(UIOpacity);
+    const cap = this.lbl(label, x + w / 2 - 70, 178, 18, C.label);
+    cap.horizontalAlign = Label.HorizontalAlign.RIGHT;
+    const val = this.lbl('0.00', x + w / 2 + 14, 178, 27, C.value);
+    val.horizontalAlign = Label.HorizontalAlign.LEFT;
+    sink(val);
   }
 
-  private iconButton(x: number, glyph: string, cb: () => void): UIOpacity {
-    const op = this.glyphButton(x, glyph, cb);
-    op.node.setScale(0.85, 0.85, 1);
-    return op;
-  }
-
-  private buildSpin(x: number): void {
-    const n = new Node('spin');
-    this.node.addChild(n);
-    n.addComponent(UITransform).setContentSize(92, 92);
-    n.setPosition(x, 0, 0);
-    const g = n.addComponent(Graphics);
-    const rad = 44;
-    g.fillColor = col(C.panel);
-    for (let k = 0; k < 8; k++) {
-      const a = (Math.PI / 4) * k - Math.PI / 8;
-      const px = Math.cos(a) * rad;
-      const py = Math.sin(a) * rad;
-      if (k === 0) g.moveTo(px, py);
-      else g.lineTo(px, py);
-    }
-    g.close();
+  private buildCarousel(): void {
+    const SX = 1100;
+    const SW = 800;
+    const g = this.gfx('selector');
+    this.panel(g, SX, 148, SW, 76, 38);
+    g.fillColor = col(C.activeLo);
+    g.roundRect(SX + SW / 2 - 62, this.Y(216), 124, 60, 30);
     g.fill();
-    g.lineWidth = 4;
-    g.strokeColor = col(C.accent);
-    for (let k = 0; k < 8; k++) {
-      const a = (Math.PI / 4) * k - Math.PI / 8;
-      const px = Math.cos(a) * rad;
-      const py = Math.sin(a) * rad;
-      if (k === 0) g.moveTo(px, py);
-      else g.lineTo(px, py);
-    }
-    g.close();
+    g.fillColor = col(C.active);
+    g.roundRect(SX + SW / 2 - 62, this.Y(190), 124, 32, 26);
+    g.fill();
+    g.fillColor = col(C.activeHi, 0.5);
+    g.roundRect(SX + SW / 2 - 58, this.Y(176), 116, 14, 10);
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeColor = col(C.pillStroke);
+    g.roundRect(SX + SW / 2 - 62, this.Y(216), 124, 60, 30);
     g.stroke();
-    const glyphNode = new Node('spinGlyph');
-    n.addChild(glyphNode);
-    glyphNode.addComponent(UITransform).setContentSize(40, 40);
-    this.spinGlyph = glyphNode.addComponent(Graphics);
-    this.drawSpinGlyph(false);
-    n.on(Node.EventType.TOUCH_START, () => n.setScale(0.94, 0.94, 1));
-    const release = () => n.setScale(1, 1, 1);
-    n.on(Node.EventType.TOUCH_CANCEL, release);
-    n.on(Node.EventType.TOUCH_END, () => {
-      release();
+
+    const maskNode = new Node('carMask');
+    maskNode.layer = this.node.layer;
+    this.node.addChild(maskNode);
+    const mui = maskNode.addComponent(UITransform);
+    mui.setAnchorPoint(0, 1);
+    mui.setContentSize(SW - 24, 60);
+    maskNode.setPosition(SX + 12, this.Y(156), 0);
+    const mask = maskNode.addComponent(Mask);
+    mask.type = Mask.Type.GRAPHICS_RECT;
+
+    const track = new Node('carTrack');
+    track.layer = this.node.layer;
+    maskNode.addChild(track);
+    track.addComponent(UITransform).setContentSize(10, 10);
+    this.track = track;
+
+    const sel = this.hitNode(SX, 148, SW, 76, () => undefined);
+    sel.on(Node.EventType.TOUCH_START, (e: EventTouch) => {
+      this.dragging = true;
+      this.moved = 0;
+      this.dragX = e.getUILocation().x;
+      Tween.stopAllByTarget(this.track);
+    });
+    sel.on(Node.EventType.TOUCH_MOVE, (e: EventTouch) => {
+      if (!this.dragging) return;
+      const x = e.getUILocation().x;
+      const dx = (x - this.dragX) / (this.node.scale.x || 1);
+      this.dragX = x;
+      this.moved += Math.abs(dx);
+      this.track.setPosition(this.track.position.x + dx, this.track.position.y, 0);
+    });
+    const end = () => {
+      if (!this.dragging) return;
+      this.dragging = false;
+      this.snapNearest(true);
+    };
+    sel.on(Node.EventType.TOUCH_END, end);
+    sel.on(Node.EventType.TOUCH_CANCEL, end);
+  }
+
+  private CELLW = 132;
+  private trackXFor(i: number): number {
+    return 400 - (i * this.CELLW + this.CELLW / 2);
+  }
+  private nearestIdx(): number {
+    const i = Math.round((400 - this.track.position.x - this.CELLW / 2) / this.CELLW);
+    return Math.max(0, Math.min(this.levels.length - 1, i));
+  }
+  private restyleCells(): void {
+    this.cells.forEach((c, i) => {
+      const on = i === this.activeIdx;
+      c.color = col(on ? C.dark : C.value);
+      c.node.setScale(on ? 1 : 0.78, on ? 1 : 0.78, 1);
+      const op = c.node.getComponent(UIOpacity) ?? c.node.addComponent(UIOpacity);
+      op.opacity = on ? 255 : 150;
+    });
+  }
+  private snapNearest(emit: boolean): void {
+    const i = this.nearestIdx();
+    const changed = i !== this.activeIdx;
+    this.activeIdx = i;
+    tween(this.track)
+      .to(
+        0.32,
+        { position: new Vec3(this.trackXFor(i), this.track.position.y, 0) },
+        { easing: 'backOut' },
+      )
+      .call(() => this.restyleCells())
+      .start();
+    this.restyleCells();
+    if (emit && changed) this.events.emit('bet:set', i);
+  }
+
+  private buildRightCluster(): void {
+    const circle = (cx: number, cy: number, r: number): Graphics => {
+      const g = this.gfx('c' + cx);
+      g.fillColor = col(C.panel);
+      g.circle(cx, this.Y(cy), r);
+      g.fill();
+      g.fillColor = col(C.panelHi, 0.5);
+      g.circle(cx - r * 0.18, this.Y(cy - r * 0.3), r * 0.62);
+      g.fill();
+      g.lineWidth = 1.8;
+      g.strokeColor = col(C.edge, 0.92);
+      g.circle(cx, this.Y(cy), r - 1);
+      g.stroke();
+      return g;
+    };
+
+    const coins = circle(1980, 186, 38);
+    coins.fillColor = col('#9a4bd0');
+    coins.ellipse(1980, this.Y(197), 19, 6.5);
+    coins.fill();
+    coins.fillColor = col('#c06fda');
+    coins.ellipse(1980, this.Y(189), 19, 6.5);
+    coins.fill();
+    coins.fillColor = col('#e0a0ff');
+    coins.ellipse(1980, this.Y(181), 19, 6.5);
+    coins.fill();
+    this.hitNode(1942, 148, 76, 76, () => this.events.emit('betmenu'));
+
+    circle(2090, 186, 38);
+    const x2 = this.lbl('×2', 2090, 174, 25, C.value);
+    x2.horizontalAlign = Label.HorizontalAlign.CENTER;
+    x2.node.getComponent(UITransform)!.setAnchorPoint(0.5, 0.5);
+    this.hitNode(2052, 148, 76, 76, () => this.events.emit('bet:double'));
+
+    const turbo = circle(2200, 150, 30);
+    turbo.fillColor = col(C.active);
+    turbo.moveTo(2204, this.Y(138));
+    turbo.lineTo(2191, this.Y(153));
+    turbo.lineTo(2199, this.Y(153));
+    turbo.lineTo(2195, this.Y(164));
+    turbo.lineTo(2208, this.Y(148));
+    turbo.lineTo(2200, this.Y(148));
+    turbo.close();
+    turbo.fill();
+    this.turboGlyphOp = turbo.node.addComponent(UIOpacity);
+    const pipG = this.gfx('turboPip');
+    pipG.fillColor = col('#e9bf5a');
+    pipG.circle(2213, this.Y(137), 5);
+    pipG.fill();
+    this.turboPip = pipG.node;
+    this.turboPip.active = false;
+    this.hitNode(2170, 120, 60, 60, () => this.events.emit('turbo'));
+
+    const auto = circle(2200, 222, 30);
+    auto.lineWidth = 3;
+    auto.strokeColor = col('#e0a0ff');
+    auto.arc(2200, this.Y(222), 12, -1.23, -1.91 + Math.PI * 2, true);
+    auto.stroke();
+    auto.fillColor = col('#e0a0ff');
+    auto.moveTo(2202, this.Y(209));
+    auto.lineTo(2197, this.Y(215));
+    auto.lineTo(2195, this.Y(207));
+    auto.close();
+    auto.fill();
+    this.autoGlyph = auto.node;
+    const cnt = this.lbl('', 2200, 210, 22, C.value);
+    cnt.horizontalAlign = Label.HorizontalAlign.CENTER;
+    cnt.node.getComponent(UITransform)!.setAnchorPoint(0.5, 0.5);
+    this.autoCount = cnt;
+    this.autoCount.node.active = false;
+    this.hitNode(2170, 192, 60, 60, () => this.events.emit('autoplay'));
+
+    const R = 70;
+    const spin = this.gfx('spinRing');
+    spin.fillColor = col(C.ringMid);
+    spin.circle(2330, this.Y(186), R);
+    spin.fill();
+    spin.fillColor = col(C.ringHi, 0.85);
+    spin.circle(2330 - R * 0.16, this.Y(186 - R * 0.2), R * 0.92);
+    spin.fill();
+    spin.fillColor = col(C.ringLo);
+    spin.circle(2330 + R * 0.1, this.Y(186 + R * 0.16), R * 0.9);
+    spin.fill();
+    spin.fillColor = col(C.spinFace);
+    spin.circle(2330, this.Y(186), R * 0.7857);
+    spin.fill();
+    spin.lineWidth = R * 0.031;
+    spin.strokeColor = col(C.centerRim, 0.4);
+    spin.circle(2330, this.Y(186), R * 0.7857);
+    spin.stroke();
+    spin.fillColor = col('#ffffff', 0.07);
+    spin.ellipse(2330 - R * 0.23, this.Y(186 - R * 0.26), R * 0.245, R * 0.105);
+    spin.fill();
+
+    const arrowNode = new Node('spinArrow');
+    arrowNode.layer = this.node.layer;
+    this.node.addChild(arrowNode);
+    arrowNode.addComponent(UITransform).setContentSize(10, 10);
+    arrowNode.setPosition(2330, this.Y(186), 0);
+    const ag = arrowNode.addComponent(Graphics);
+    const ar = R * 0.4;
+    ag.lineWidth = R * 0.107;
+    ag.strokeColor = col(C.value);
+    ag.arc(0, 0, ar, -1.206, -1.936 + Math.PI * 2, true);
+    ag.stroke();
+    ag.fillColor = col(C.value);
+    ag.moveTo(0, ar + R * 0.05);
+    ag.lineTo(-R * 0.114, ar - R * 0.06);
+    ag.lineTo(-R * 0.171, ar + R * 0.09);
+    ag.close();
+    ag.fill();
+    this.spinArrow = arrowNode;
+
+    const stopNode = new Node('spinStop');
+    stopNode.layer = this.node.layer;
+    this.node.addChild(stopNode);
+    stopNode.addComponent(UITransform).setContentSize(10, 10);
+    stopNode.setPosition(2330, this.Y(186), 0);
+    const sg = stopNode.addComponent(Graphics);
+    sg.fillColor = col(C.value, 0.98);
+    sg.roundRect(-R * 0.26, -R * 0.26, R * 0.52, R * 0.52, R * 0.12);
+    sg.fill();
+    stopNode.active = false;
+    this.spinStop = stopNode;
+
+    this.spinOp = spin.node.addComponent(UIOpacity);
+    const spinHit = this.hitNode(2330 - R, 186 - R, R * 2, R * 2, () => {
+      if (!this.spinStop.active) {
+        Tween.stopAllByTarget(this.spinArrow);
+        this.spinArrow.angle = 0;
+        tween(this.spinArrow)
+          .to(0.7, { angle: -360 }, { easing: 'quadOut' })
+          .call(() => (this.spinArrow.angle = 0))
+          .start();
+      }
       this.events.emit('spin');
     });
-    this.spinNode = n;
-    this.spinOp = n.addComponent(UIOpacity);
+    spinHit.on(Node.EventType.TOUCH_START, () => this.spinArrow.setScale(0.94, 0.94, 1));
+    spinHit.on(Node.EventType.TOUCH_END, () => this.spinArrow.setScale(1, 1, 1));
   }
 
-  /** Play triangle when idle, stop square while spinning. */
-  private drawSpinGlyph(spinning: boolean): void {
-    const g = this.spinGlyph;
-    g.clear();
-    g.fillColor = col(C.value);
-    if (spinning) {
-      g.roundRect(-12, -12, 24, 24, 4);
-      g.fill();
-    } else {
-      g.moveTo(-9, 15);
-      g.lineTo(15, 0);
-      g.lineTo(-9, -15);
-      g.close();
-      g.fill();
-    }
+  private buildVolumePanel(): void {
+    const vp = new Node('volPanel');
+    vp.layer = this.node.layer;
+    this.node.addChild(vp);
+    const ui = vp.addComponent(UITransform);
+    ui.setAnchorPoint(0, 1);
+    ui.setContentSize(240, 98);
+    vp.setPosition(70, this.Y(10), 0);
+    vp.active = false;
+    this.volPanel = vp;
+    const g = vp.addComponent(Graphics);
+    g.fillColor = col(C.panel, 0.97);
+    g.roundRect(0, -98, 240, 98, 20);
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeColor = col(C.edge);
+    g.roundRect(1, -97, 238, 96, 19);
+    g.stroke();
+    g.fillColor = col(C.dark, 0.85);
+    g.roundRect(60, -71, 154, 10, 5);
+    g.fill();
+    const cap = this.lbl('VOLUME', 20, 14, 16, C.label, true, vp);
+    cap.node.setPosition(20, -14, 0);
+    const close = this.lbl('✕', 218, 24, 18, C.icon, true, vp);
+    close.node.setPosition(214, -22, 0);
+    const closeHit = new Node('vx');
+    closeHit.layer = this.node.layer;
+    vp.addChild(closeHit);
+    closeHit.addComponent(UITransform).setContentSize(36, 36);
+    closeHit.setPosition(216, -22, 0);
+    closeHit.on(Node.EventType.TOUCH_END, () => (vp.active = false));
+
+    const fillNode = new Node('vfill');
+    fillNode.layer = this.node.layer;
+    vp.addChild(fillNode);
+    fillNode.addComponent(UITransform).setContentSize(10, 10);
+    this.volFill = fillNode.addComponent(Graphics);
+
+    const knob = new Node('vknob');
+    knob.layer = this.node.layer;
+    vp.addChild(knob);
+    knob.addComponent(UITransform).setContentSize(28, 28);
+    const kg = knob.addComponent(Graphics);
+    kg.fillColor = col(C.active);
+    kg.circle(0, 0, 12);
+    kg.fill();
+    kg.lineWidth = 2;
+    kg.strokeColor = col(C.pillStroke);
+    kg.circle(0, 0, 12);
+    kg.stroke();
+    this.volKnob = knob;
+    knob.on(Node.EventType.TOUCH_MOVE, (e: EventTouch) => {
+      const s = this.node.scale.x || 1;
+      this.applyVolume(this.volume + e.getDeltaX() / s / 154, true);
+    });
+    const mute = new Node('vmute');
+    mute.layer = this.node.layer;
+    vp.addChild(mute);
+    mute.addComponent(UITransform).setContentSize(36, 36);
+    mute.setPosition(34, -66, 0);
+    const mg = mute.addComponent(Graphics);
+    mg.fillColor = col(C.icon);
+    mg.moveTo(-10, 5);
+    mg.lineTo(-5, 5);
+    mg.lineTo(1, 11);
+    mg.lineTo(1, -11);
+    mg.lineTo(-5, -5);
+    mg.lineTo(-10, -5);
+    mg.close();
+    mg.fill();
+    mute.on(Node.EventType.TOUCH_END, () =>
+      this.applyVolume(this.volume > 0.001 ? 0 : this.lastNonZero, true),
+    );
+    this.redrawVolume();
   }
 
-  // ---- shared bar API (mirror of BettingBarMobile) ---------------------------
+  private redrawVolume(): void {
+    this.volKnob.setPosition(60 + 154 * this.volume, -66, 0);
+    this.volFill.clear();
+    this.volFill.fillColor = col(C.active);
+    this.volFill.roundRect(60, -71, Math.max(0.001, 154 * this.volume), 10, 5);
+    this.volFill.fill();
+  }
+
+  private applyVolume(v: number, emit: boolean): void {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.volume > 0) this.lastNonZero = this.volume;
+    this.redrawVolume();
+    this.setSoundOn(this.volume > 0.001);
+    if (emit) this.events.emit('volume', this.volume);
+  }
+
+  // ---- shared bar API ---------------------------------------------------------
   on(ev: string, cb: (...args: unknown[]) => void): this {
     this.events.on(ev, cb);
     return this;
   }
 
   fit(viewW: number, viewH: number): void {
-    const s = Math.min(1, (viewW - 24) / W, (viewH * 0.2) / H);
+    const s = Math.min(viewW / W, (viewH * 0.3) / H);
     this.node.setScale(s, s, 1);
-    this.node.setPosition(new Vec3(0, -viewH / 2 + (H / 2 + 10) * s, 0));
+    this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + H * s, 0));
   }
 
   private fmt(n: number): string {
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   setBalance(n: number): void {
-    this.balance.value.string = this.fmt(n);
+    this.balValue.string = this.fmt(n);
+    this.balCur.node.setPosition(244 + this.balValue.string.length * 15, this.Y(198), 0);
   }
   setCurrency(c: string): void {
-    this.currencyLabel.string = c;
+    this.balCur.string = c;
   }
   setLastWin(n: number): void {
-    this.lastWin.value.string = this.fmt(n);
+    this.lastWinValue.string = this.fmt(n);
   }
   setBet(n: number): void {
-    this.betValue.string = this.fmt(n);
-    this.totalBet.value.string = this.fmt(n);
+    this.totalBetValue.string = this.fmt(n);
   }
-  setDemo(): void {
-    /* web bar shows no demo ribbon */
+  setBetLevels(valuesCents: number[], activeIdx: number, fmt?: (v: number) => string): void {
+    if (fmt) this.carFmt = fmt;
+    const same =
+      this.levels.length === valuesCents.length &&
+      this.levels[0] === valuesCents[0] &&
+      this.levels[this.levels.length - 1] === valuesCents[valuesCents.length - 1];
+    if (!same) {
+      this.levels = valuesCents.slice();
+      this.track.removeAllChildren();
+      this.cells = [];
+      valuesCents.forEach((v, i) => {
+        const t = this.lbl(this.carFmt(v), 0, 0, 27, C.value, true, this.track);
+        t.horizontalAlign = Label.HorizontalAlign.CENTER;
+        t.node.getComponent(UITransform)!.setAnchorPoint(0.5, 0.5);
+        t.node.setPosition(i * this.CELLW + this.CELLW / 2, -30, 0);
+        this.cells.push(t);
+      });
+      this.activeIdx = Math.max(0, Math.min(valuesCents.length - 1, activeIdx));
+      this.track.setPosition(this.trackXFor(this.activeIdx), 0, 0);
+      this.restyleCells();
+    } else if (!this.dragging && activeIdx !== this.activeIdx) {
+      this.activeIdx = activeIdx;
+      tween(this.track)
+        .to(0.3, { position: new Vec3(this.trackXFor(activeIdx), 0, 0) }, { easing: 'quadOut' })
+        .call(() => this.restyleCells())
+        .start();
+      this.restyleCells();
+    }
   }
+  setDemo(): void {}
   setSoundOn(on: boolean): void {
-    this.soundOp.opacity = on ? 255 : 120;
+    this.sndGlyphOp.opacity = on ? 255 : 128;
+    this.sndSlash.active = !on;
   }
-  setVolume(): void {
-    /* volume slider lives in Settings on the web layout */
+  setVolume(v: number): void {
+    this.applyVolume(v, false);
   }
   setSpinning(on: boolean): void {
-    this.spinning = on;
-    this.drawSpinGlyph(on);
+    if (on) this.volPanel.active = false;
+    this.spinArrow.active = !on;
+    this.spinStop.active = on;
   }
   setAutoplay(count: number | null): void {
     const active = count != null && count !== 0;
     this.autoCount.string = count === Infinity ? '∞' : String(count ?? '');
     this.autoCount.node.active = active;
-    this.autoGlyphOp.opacity = active ? 255 : 200;
+    this.autoGlyph.active = !active;
   }
   setTurbo(mode: number): void {
-    this.turboOp.opacity = mode > 0 ? 255 : 130;
+    this.turboGlyphOp.opacity = mode > 0 ? 255 : 115;
     this.turboPip.active = mode === 2;
   }
   setAffordable(on: boolean): void {
     this.spinOp.opacity = on ? 255 : 128;
   }
-  setSteppers(minusOn: boolean, plusOn: boolean): void {
-    this.minusOp.opacity = minusOn ? 255 : 102;
-    this.plusOp.opacity = plusOn ? 255 : 102;
-  }
+  setSteppers(): void {}
 }
