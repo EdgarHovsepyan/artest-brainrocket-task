@@ -22,33 +22,97 @@
 
   <link rel="stylesheet" type="text/css" href="<%= cssUrl %>"/>
   <style>
-    /* Branded boot loader (master parity: logo + gliding bar + shine). Sits above
-       the engine canvas and fades once the first scene is live. */
-    #brandLoader{position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;
-      align-items:center;justify-content:center;gap:26px;background:#0a0610;
-      transition:opacity .45s cubic-bezier(.16,1,.3,1)}
+    /* CINEMATIC boot loader — Pixi popLoader port: real bg.jpg darkened + blurred,
+       magenta radial vignette, animated rays, halo behind the real logo, 3-stop
+       gradient bar with shine sweep, animated dots. Same anatomy + same beats as
+       the flagship; fades when assets settle. */
+    @font-face{font-family:'Fredoka';font-style:normal;font-display:swap;
+      src:url('loader/Fredoka.ttf') format('truetype')}
+    #brandLoader{position:fixed;inset:0;z-index:999;background:#0a0610;
+      transition:opacity .45s cubic-bezier(.16,1,.3,1);overflow:hidden;
+      display:flex;flex-direction:column;align-items:center;justify-content:center}
     #brandLoader.gone{opacity:0;pointer-events:none}
-    #brandLoader .blogo{font:italic 800 34px/1.15 system-ui,sans-serif;color:#f5f7fa;
-      text-align:center;letter-spacing:2px;
-      animation:bl-breathe 2.4s ease-in-out infinite}
-    #brandLoader .blogo b{display:block;color:#ff007f;font-size:40px}
-    #brandLoader .bbar{position:relative;width:min(60vw,300px);height:5px;border-radius:3px;
-      background:rgba(255,255,255,.10);overflow:hidden;
-      box-shadow:inset 0 0 0 1px rgba(255,0,127,.25)}
-    #brandLoader .bfill{height:100%;width:4%;border-radius:3px;
-      background:linear-gradient(90deg,#ff007f,#ff5a9c,#b86fda);
-      box-shadow:0 0 10px rgba(255,0,127,.55);
+    /* bg backdrop: real candy world, dark wash + blur for context-aware boot */
+    #brandLoader .bg{position:absolute;inset:-8%;
+      background:url('loader/bg.jpg') center/cover no-repeat;
+      filter:blur(14px) brightness(.45) saturate(1.1);
+      transform:scale(1.05)}
+    /* magenta radial vignette + soft accent */
+    #brandLoader .vign{position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse at center,rgba(255,0,127,.10) 0%,transparent 40%),
+        radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.75) 100%)}
+    /* cinema corner darkening (4-corner cone) */
+    #brandLoader .corners{position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 60% 50% at 0% 0%,rgba(0,0,0,.55),transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 0%,rgba(0,0,0,.55),transparent 60%),
+        radial-gradient(ellipse 60% 50% at 0% 100%,rgba(0,0,0,.55),transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 100%,rgba(0,0,0,.55),transparent 60%)}
+    /* additive light rays rotating slowly */
+    #brandLoader .rays{position:absolute;top:50%;left:50%;width:140vmin;height:140vmin;
+      transform:translate(-50%,-55%);pointer-events:none;mix-blend-mode:screen;
+      background:conic-gradient(from 0deg,
+        transparent 0deg, rgba(255,0,127,.05) 10deg, transparent 20deg,
+        transparent 60deg, rgba(255,90,156,.06) 70deg, transparent 80deg,
+        transparent 120deg, rgba(184,111,218,.05) 130deg, transparent 140deg,
+        transparent 180deg, rgba(255,0,127,.05) 190deg, transparent 200deg,
+        transparent 240deg, rgba(255,90,156,.06) 250deg, transparent 260deg,
+        transparent 300deg, rgba(184,111,218,.05) 310deg, transparent 320deg);
+      animation:bl-rays 24s linear infinite}
+    /* pink halo behind the logo (additive glow) */
+    #brandLoader .halo{position:absolute;top:43%;left:50%;width:min(560px,72vw);
+      height:min(420px,54vw);transform:translate(-50%,-50%);pointer-events:none;
+      background:radial-gradient(ellipse,rgba(255,0,127,.32) 0%,
+        rgba(255,90,156,.18) 30%,transparent 65%);
+      mix-blend-mode:screen;
+      animation:bl-halo 3.2s ease-in-out infinite}
+    /* the REAL logo art */
+    #brandLoader .logo{position:relative;width:min(380px,58vw);height:auto;
+      filter:drop-shadow(0 6px 22px rgba(0,0,0,.5));
+      animation:bl-breathe 2.6s ease-in-out infinite}
+    /* bar stack */
+    #brandLoader .barwrap{position:relative;margin-top:34px;display:flex;
+      flex-direction:column;align-items:center;gap:14px;z-index:2}
+    #brandLoader .bbar{position:relative;width:min(62vw,300px);height:5px;
+      border-radius:3px;background:rgba(255,255,255,.10);overflow:hidden;
+      box-shadow:inset 0 0 0 1px rgba(255,0,127,.25),
+        0 0 0 1px rgba(255,255,255,.04),
+        0 0 22px rgba(255,0,127,.15)}
+    #brandLoader .bfill{position:relative;height:100%;width:4%;border-radius:3px;
+      background:linear-gradient(90deg,#ff007f 0%,#ff5a9c 60%,#ffce47 100%);
+      box-shadow:0 0 14px rgba(255,0,127,.7);
       transition:width .4s cubic-bezier(.16,1,.3,1)}
+    /* leading-edge spark on the fill */
+    #brandLoader .bfill::after{content:'';position:absolute;top:-2px;right:-3px;
+      width:8px;height:9px;border-radius:50%;
+      background:radial-gradient(circle,#fff 0%,#ffce47 40%,transparent 70%);
+      box-shadow:0 0 10px rgba(255,206,71,.9)}
     #brandLoader .bshine{position:absolute;top:0;left:0;height:100%;width:38%;
-      background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);
-      animation:bl-scan 1.4s ease-in-out infinite}
-    #brandLoader .bcap{font:600 11px/1 system-ui,sans-serif;letter-spacing:3px;
-      color:rgba(245,247,250,.5)}
-    @keyframes bl-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
-    @keyframes bl-fill{0%{width:0}80%{width:92%}100%{width:96%}}
+      pointer-events:none;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+      animation:bl-scan 1.5s ease-in-out infinite}
+    #brandLoader .cap{display:flex;align-items:baseline;gap:6px;
+      font:600 12px/1 'Fredoka',system-ui,sans-serif;
+      letter-spacing:10px;color:rgba(245,247,250,.7);text-transform:uppercase}
+    #brandLoader .cap b{display:inline-flex;gap:3px}
+    #brandLoader .cap b i{color:#ff007f;font-style:normal;
+      animation:bl-dot 1.4s ease-in-out infinite both}
+    #brandLoader .cap b i:nth-child(2){animation-delay:.18s}
+    #brandLoader .cap b i:nth-child(3){animation-delay:.36s}
+    #brandLoader .brand{position:absolute;bottom:32px;left:0;right:0;
+      text-align:center;font:600 10px/1 'Fredoka',system-ui,sans-serif;
+      letter-spacing:4px;color:rgba(245,247,250,.35)}
+    @keyframes bl-breathe{0%,100%{transform:scale(1) translateY(0)}
+      50%{transform:scale(1.025) translateY(-3px)}}
+    @keyframes bl-halo{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}
+      50%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}}
+    @keyframes bl-rays{to{transform:translate(-50%,-55%) rotate(360deg)}}
     @keyframes bl-scan{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}
+    @keyframes bl-dot{0%,80%,100%{opacity:.25}40%{opacity:1}}
     @media (prefers-reduced-motion:reduce){
-      #brandLoader .blogo,#brandLoader .bshine{animation:none}
+      #brandLoader .logo,#brandLoader .halo,#brandLoader .rays,
+      #brandLoader .bshine,#brandLoader .cap b i{animation:none}
     }
   </style>
 </head>
@@ -59,24 +123,81 @@
       </div>
     </div>
   <div id="brandLoader">
-    <div class="blogo">SHINING<b>POP&nbsp;&nbsp;V2</b></div>
-    <div class="bbar"><div class="bfill"></div><i class="bshine"></i></div>
-    <span class="bcap">LOADING</span>
+    <div class="bg"></div>
+    <div class="rays"></div>
+    <div class="corners"></div>
+    <div class="vign"></div>
+    <div class="halo"></div>
+    <img class="logo" src="loader/logo.png" alt="Shining Pop V2"/>
+    <div class="barwrap">
+      <div class="bbar"><div class="bfill"></div><i class="bshine"></i></div>
+      <span class="cap">LOADING<b><i>•</i><i>•</i><i>•</i></b></span>
+    </div>
+    <div class="brand">AN ARTEST | BRAINROCKET PRODUCTION</div>
   </div>
   <script>
+    /* Branded boot loader, driven by REAL asset progress (master parity).
+       4 stages of engine boot, then a hook on cc.assetManager.loadAny counts
+       every asset request the scene + view layer issues (resources.load) so
+       the bar advances PER ASSET, not on a timed staircase. Fades when the
+       request queue drains (started > 0 && done >= started) or the queue
+       plateaus for ~0.6s (catches synchronous-only boots). */
     (function () {
       var t0 = Date.now();
       var fill = null;
-      var setW = function (pct) { if (!fill) fill = document.querySelector('#brandLoader .bfill'); if (fill) fill.style.width = pct + '%'; };
+      var setW = function (pct) {
+        if (!fill) fill = document.querySelector('#brandLoader .bfill');
+        if (fill) fill.style.width = pct + '%';
+      };
+      var started = 0, done = 0;
+      var hooked = false;
+      function hookOnce() {
+        if (hooked) return;
+        var am = window.cc && window.cc.assetManager;
+        if (!am || typeof am.loadAny !== 'function') return;
+        var orig = am.loadAny.bind(am);
+        am.loadAny = function () {
+          started++;
+          var args = Array.prototype.slice.call(arguments);
+          for (var i = args.length - 1; i >= 0; i--) {
+            if (typeof args[i] === 'function') {
+              var prev = args[i];
+              args[i] = function (err, data) { done++; try { prev(err, data); } catch (e) {} };
+              return orig.apply(am, args);
+            }
+          }
+          var p = orig.apply(am, args);
+          if (p && typeof p.then === 'function') {
+            p.then(function () { done++; }, function () { done++; });
+          } else {
+            done++;
+          }
+          return p;
+        };
+        hooked = true;
+      }
+      var lastDone = 0, plateau = 0;
       var iv = setInterval(function () {
-        var stage = 0;
+        hookOnce();
+        var stage = 0, pct;
         try {
           if (window.cc) stage = 1;
           if (window.cc && window.cc.game && window.cc.game.inited) stage = 2;
           if (window.cc && window.cc.director && window.cc.director.getScene()) stage = 3;
         } catch (e) { stage = 0; }
-        setW([8, 38, 72, 100][stage]);
-        if (stage === 3 || Date.now() - t0 > 30000) {
+        if (stage < 3) {
+          pct = [4, 14, 26][stage];
+        } else {
+          // Scene up — drive the bar from real loadAny progress.
+          var ratio = started > 0 ? done / started : 0;
+          pct = Math.min(96, 26 + Math.round(ratio * 70));
+        }
+        setW(pct);
+        if (done === lastDone) plateau++;
+        else plateau = 0;
+        lastDone = done;
+        var assetsSettled = stage === 3 && started > 0 && done >= started && plateau >= 3;
+        if (assetsSettled || Date.now() - t0 > 30000) {
           clearInterval(iv);
           setW(100);
           var el = document.getElementById('brandLoader');

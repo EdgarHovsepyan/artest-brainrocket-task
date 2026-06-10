@@ -34,15 +34,15 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 
 ## 3. Betting bars
 
-| Case                                                                                       | Pixi | Cocos | Notes                              |
-| ------------------------------------------------------------------------------------------ | ---- | ----- | ---------------------------------- |
-| WEB bar: account / LAST WIN / TOTAL BET / carousel / coins / ×2 / turbo / auto / SPIN ring | ✅   | ✅    | faithful port, screenshot-verified |
-| Swipe bet carousel (drag, snap, center pill)                                               | ✅   | ✅    |                                    |
-| Floating VOLUME panel (track, knob, mute, close)                                           | ✅   | ✅    |                                    |
-| MOBILE bar (540×684 portrait overlay)                                                      | ✅   | ✅    | pre-existing, candy palette        |
-| Orientation-driven bar swap + resize rebuild                                               | n/a  | ✅    | Cocos-specific                     |
-| Spin arrow 360° flourish on press                                                          | ✅   | ✅    |                                    |
-| Demo-mode ribbon                                                                           | ✅   | ⬜ S  | mobile bar has it; web bar stub    |
+| Case                                                                                       | Pixi | Cocos | Notes                               |
+| ------------------------------------------------------------------------------------------ | ---- | ----- | ----------------------------------- |
+| WEB bar: account / LAST WIN / TOTAL BET / carousel / coins / ×2 / turbo / auto / SPIN ring | ✅   | ✅    | faithful port, screenshot-verified  |
+| Swipe bet carousel (drag, snap, center pill)                                               | ✅   | ✅    |                                     |
+| Floating VOLUME panel (track, knob, mute, close)                                           | ✅   | ✅    |                                     |
+| MOBILE bar (540×684 portrait overlay)                                                      | ✅   | ✅    | pre-existing, candy palette         |
+| Orientation-driven bar swap + resize rebuild                                               | n/a  | ✅    | Cocos-specific                      |
+| Spin arrow 360° flourish on press                                                          | ✅   | ✅    |                                     |
+| Demo-mode ribbon                                                                           | ✅   | ✅    | mobile + web (web added 2026-06-10) |
 
 ## 4. Panels & popups
 
@@ -89,14 +89,14 @@ PixiJS flagship, with its Cocos status. ✅ shipped & verified · 🔶 partial �
 
 ## 7. Boot, intro & identity
 
-| Case                                              | Pixi | Cocos | Notes                                          |
-| ------------------------------------------------- | ---- | ----- | ---------------------------------------------- |
-| Branded HTML loader (logo, gliding bar, shine)    | ✅   | ✅    | build-template port                            |
-| Loader progress driven by REAL asset loading      | ✅   | ⬜ M  | v2 bar is timed; hook cc.assetManager progress |
-| TAP-TO-PLAY intro with logo + pulsing CTA         | ✅   | ✅    |                                                |
-| Intro art parity (master uses full art treatment) | ✅   | 🔶 M  | v2 intro is text+plate; use logo.png + bg      |
-| Real logo / candy symbols / painted bg            | ✅   | ✅    | black-keyed offline                            |
-| Page title + meta branding                        | ✅   | ✅    |                                                |
+| Case                                              | Pixi | Cocos | Notes                                         |
+| ------------------------------------------------- | ---- | ----- | --------------------------------------------- |
+| Branded HTML loader (logo, gliding bar, shine)    | ✅   | ✅    | build-template port                           |
+| Loader progress driven by REAL asset loading      | ✅   | ✅    | hooks cc.assetManager.loadAny in index.ejs    |
+| TAP-TO-PLAY intro with logo + pulsing CTA         | ✅   | ✅    |                                               |
+| Intro art parity (master uses full art treatment) | ✅   | ✅    | brandFrames.logo + studio mark; verified live |
+| Real logo / candy symbols / painted bg            | ✅   | ✅    | black-keyed offline                           |
+| Page title + meta branding                        | ✅   | ✅    |                                               |
 
 ## 8. Compliance & responsiveness
 

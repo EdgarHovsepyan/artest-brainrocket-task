@@ -117,6 +117,29 @@ export class BettingBarWeb extends Component {
     this.buildCarousel();
     this.buildRightCluster();
     this.buildVolumePanel();
+    this.buildDemoBadge();
+  }
+
+  /** DEMO MODE chip (mobile-bar parity): a 120x24 candy pill above the banner
+   *  row, hidden by default, shown by setDemo(true). */
+  private demoBadge!: Node;
+  private buildDemoBadge(): void {
+    const x = 1140;
+    const y = 92;
+    const w = 120;
+    const h = 24;
+    const n = this.localNode(this.node, x, this.Y(y), w, h);
+    const g = n.addComponent(Graphics);
+    g.fillColor = col(C.panel);
+    g.roundRect(-w / 2, -h / 2, w, h, 12);
+    g.fill();
+    g.lineWidth = 1.1;
+    g.strokeColor = col(C.edge);
+    g.roundRect(-w / 2, -h / 2, w, h, 12);
+    g.stroke();
+    this.lbl('DEMO MODE', 0, 0, 11, C.cur, true, n, 0.5);
+    n.active = false;
+    this.demoBadge = n;
   }
 
   private Y(y: number): number {
@@ -663,8 +686,12 @@ export class BettingBarWeb extends Component {
   /** Master fitBottom rule: WIDTH-fit (capped), docked to the screen bottom.
    *  Returns the board inset in screen px — the solid control band's height
    *  (the upper 118 design px is a soft gradient the reels may overlap). */
+  /** Master fitBottom (width-fit, bottom-docked) — caps height so the bar never
+   *  eats more than ~22% of viewport on tall screens; small ratio means the
+   *  CONTROL band, not the whole 2400x300 surface, decides what the board may
+   *  use. Returns the control-band height in screen px for the view inset. */
   fit(viewW: number, viewH: number): number {
-    const s = Math.min(viewW / W, 0.62, (viewH * 0.42) / H);
+    const s = Math.min(viewW / W, 0.55, (viewH * 0.34) / H);
     this.node.setScale(s, s, 1);
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + H * s, 0));
     return (H - 118) * s;
@@ -721,7 +748,9 @@ export class BettingBarWeb extends Component {
       this.restyleCells();
     }
   }
-  setDemo(): void {}
+  setDemo(on: boolean): void {
+    if (this.demoBadge) this.demoBadge.active = !!on;
+  }
   /** Dress the spin control in the owner's real button art (over the vector ring). */
   setSpinArt(frame: SpriteFrame | null): void {
     if (!frame || !this.spinRing) return;
