@@ -183,9 +183,10 @@ export class ReelView extends Component {
   }
 
   /** Pulse the given window rows (cells in a winning line), offset by `delay`
-   *  seconds so the controller can stagger reels into an L->R wave blink. */
-  highlight(rows: number[], delay = 0): void {
-    rows.forEach((row, i) => this.cells[row]?.playWin(delay + i * 0.04));
+   *  seconds so the controller can stagger reels into an L->R wave blink. `rich`
+   *  enables the in-cell sheen/sparkle (focused wins only — off for dense wins). */
+  highlight(rows: number[], delay = 0, rich = true): void {
+    rows.forEach((row, i) => this.cells[row]?.playWin(delay + i * 0.04, rich));
   }
 
   /** Bounce the given window rows — sticky wilds/crowns celebrating each free

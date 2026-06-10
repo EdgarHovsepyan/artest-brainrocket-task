@@ -96,8 +96,11 @@ export class SymbolView extends Component {
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
   }
 
-  /** Win pulse + light-up — driven by Cocos Tween. `delay` enables an L→R ripple. */
-  playWin(delay = 0): void {
+  /** Win pulse + light-up — driven by Cocos Tween. `delay` enables an L→R ripple.
+   *  `rich` adds the in-cell sheen + edge sparkle (focused wins only — the caller
+   *  disables it on dense wins like a full wild reel where 20+ cells would stack
+   *  their white sheens into a wash). */
+  playWin(delay = 0, rich = true): void {
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
     const half = symbolPulseMs / 2 / 1000; // ms → s, two halves
     Tween.stopAllByTarget(this.node);
@@ -132,8 +135,10 @@ export class SymbolView extends Component {
         .repeat(3)
         .start();
     }
-    this.playSheen(delay);
-    this.playSparkles(delay);
+    if (rich) {
+      this.playSheen(delay);
+      this.playSparkles(delay);
+    }
   }
 
   /** SHEEN SWEEP (slot-vfx Layer 7): a bright diagonal specular streak rakes
@@ -147,7 +152,7 @@ export class SymbolView extends Component {
       this.node.addChild(n);
       const g = n.addComponent(Graphics);
       // thin bright parallelogram (diagonal streak), no circles
-      g.fillColor = new Color(255, 255, 255, 70);
+      g.fillColor = new Color(255, 236, 248, 40); // candy-white, low alpha (stack-safe)
       g.moveTo(-s * 0.12, s * 0.6);
       g.lineTo(s * 0.06, s * 0.6);
       g.lineTo(-s * 0.06, -s * 0.6);
@@ -174,7 +179,7 @@ export class SymbolView extends Component {
       .start();
     tween(op)
       .delay(delay)
-      .to(0.18, { opacity: 150 })
+      .to(0.18, { opacity: 95 })
       .to(0.37, { opacity: 0 })
       .delay(0.7)
       .union()
@@ -198,7 +203,7 @@ export class SymbolView extends Component {
         n.addComponent(UITransform).setContentSize(12, 12);
         n.setPosition(x, y, 0);
         const g = n.addComponent(Graphics);
-        g.fillColor = new Color(255, 224, 255, 255);
+        g.fillColor = new Color(255, 224, 255, 200);
         g.moveTo(0, 6);
         g.lineTo(5, 0);
         g.lineTo(0, -6);

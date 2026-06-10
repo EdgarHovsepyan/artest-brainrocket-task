@@ -45,7 +45,7 @@ import {
 } from '../logic/compliance';
 import { formatMoney } from '../logic/money';
 import { installLifecycle, LifecycleHandle } from './lifecycle';
-import { BONUS_MODES, BonusMode } from '../logic/game-config';
+import { BONUS_MODES, BonusMode, SETTINGS } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
 
@@ -178,6 +178,7 @@ export class SlotController extends Component {
           ceremony: (mult = 25, wild = 1) =>
             this.view.playCeremony(this.model.bet * mult, this.model.bet, wild),
           feature: (name = 'STICKY WILDS') => this.view.showFeatureUnlocked(name),
+          buy: (mode: BonusMode = 'reels') => void this.onBuy(mode),
         };
       }
     } catch {
@@ -550,8 +551,11 @@ export class SlotController extends Component {
     this.view.setBalance(outcome.balanceCents);
     this.bar.setBalance(outcome.balanceCents / 100);
 
-    const lineBetCents = this.model.bet / 10;
-    let runningCents = 0;
+    const lineBetCents = this.model.bet / SETTINGS.activeLines;
+    // Accumulate RAW payout and round ONCE per display (sum-then-round), the same
+    // way the model credits the total -> the HUD running total ends EXACTLY on the
+    // credited win (no round-then-sum drift) and is always clean integer cents.
+    let runningPayout = 0;
     const totalSpins = outcome.bonus.steps.length;
     this.view.setBonusHud(0, totalSpins, 0);
     for (let i = 0; i < outcome.bonus.steps.length; i++) {
@@ -563,8 +567,8 @@ export class SlotController extends Component {
       this.view.pulseSticky(step.sticky);
       if (step.sticky.length > 0) this.view.audio.stickyLock();
       if (step.payout > 0) this.view.showWins(evaluateSpin(step.grid));
-      runningCents += Math.round(step.payout * lineBetCents);
-      this.view.setBonusHud(i, totalSpins, runningCents);
+      runningPayout += step.payout;
+      this.view.setBonusHud(i, totalSpins, Math.round(runningPayout * lineBetCents));
       await this.wait(VIEW_CONFIG.bonus.stepPauseMs);
     }
 

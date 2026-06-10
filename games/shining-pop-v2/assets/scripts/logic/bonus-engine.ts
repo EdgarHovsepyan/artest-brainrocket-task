@@ -28,8 +28,17 @@ export interface BonusResult {
 /** Inject a mode's mechanic into a fresh grid (mutates it). */
 function applyMechanic(grid: Grid, mode: BonusMode, rng: Rng, sticky: Set<string>): void {
   if (mode === 'reels') {
-    const reel = rng.int(GRID.reels);
-    for (let row = 0; row < GRID.rows; row++) grid[reel][row] = WILD;
+    // WILD REELS — the wild reel STAYS for the whole feature (it does not jump to
+    // a new random reel each spin). Chosen once on the first step, stored in the
+    // sticky set, then re-applied every step so it reads as a locked full-wild
+    // reel while the others spin. Same wild density per step -> RTP unchanged
+    // (symmetric reels), so the cost anchor holds.
+    if (sticky.size === 0) sticky.add('reel:' + rng.int(GRID.reels));
+    for (const key of sticky) {
+      if (key.indexOf('reel:') !== 0) continue;
+      const reel = Number(key.slice(5));
+      for (let row = 0; row < GRID.rows; row++) grid[reel][row] = WILD;
+    }
   } else if (mode === 'wilds') {
     // STICKY WILDS (2026-06-09): every wild that lands PERSISTS for the rest of the
     // bonus (it bounces on wins instead of respinning). Seed 1 on the first step,
@@ -78,7 +87,11 @@ export function runFreeSpins(rng: Rng, mode: BonusMode, spins: number): BonusRes
     steps.push({
       grid,
       payout: result.totalPayout,
-      sticky: [...sticky].map((k) => k.split(',').map(Number) as [number, number]),
+      // Only real [reel,row] cell keys reach the view; the 'reel:N' WILD-REELS
+      // state key is internal and must not be parsed as a cell position.
+      sticky: [...sticky]
+        .filter((k) => k.indexOf('reel:') !== 0)
+        .map((k) => k.split(',').map(Number) as [number, number]),
     });
   }
   return { mode, steps, totalPayout };
