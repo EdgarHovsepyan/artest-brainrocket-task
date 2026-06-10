@@ -1683,25 +1683,15 @@
   // stage filter VFX-01 referenced — single matrix, single pass, four moods.)
   const _baseGradeMatrix = new Float32Array(gradeFilter.matrix);
   function _applyGradeMode(mode){
-    // Reset to base, then apply mode deltas via the helper API (multiply=true so each
-    // op composes on top, not on identity). Avoid hand matrix ops (audit constraint).
+    // User: the per-mode grade kept RE-TINTING the whole frame (esp. the mega
+    // fuchsia tint) — "the filter changing render color is a bad idea". So keep
+    // the single base grade for EVERY mode → scene colours stay correct and
+    // consistent. Bonus modes get only a tiny HUE-NEUTRAL brightness lift (no
+    // saturate, no tint, no contrast shift) so nothing recolours the scene.
     const m = gradeFilter.matrix;
     for(let i=0;i<m.length;i++) m[i] = _baseGradeMatrix[i];
-    if(mode === 'bonus_standard'){
-      gradeFilter.saturate(0.10, true);
-      gradeFilter.brightness(1.03, true);
-    } else if(mode === 'bonus_hot'){
-      gradeFilter.saturate(0.20, true);
-      gradeFilter.brightness(1.06, true);
-      gradeFilter.contrast(0.04, true);
-    } else if(mode === 'bonus_mega'){
-      // MEGA — the marquee mode is the MOST saturated + brightest, in-brand fuchsia
-      // (was a backwards desaturate + off-brand violet 0x8a2be2 that fought the
-      // electric-fuchsia frost wash + bloom). Cyan stays a rim accent only.
-      gradeFilter.saturate(0.26, true);
-      gradeFilter.tint(0xff2ad0, true);
-      gradeFilter.brightness(1.05, true);
-      gradeFilter.contrast(0.05, true);
+    if(mode === 'bonus_standard' || mode === 'bonus_hot' || mode === 'bonus_mega'){
+      gradeFilter.brightness(1.04, true);   // lift only — never shifts hue
     }
     // 'base' (or anything unknown) leaves the matrix at _baseGradeMatrix.
   }
@@ -9487,9 +9477,9 @@
         if(bdA > 0.001){
           const vR = Math.max(W, H) * 0.62;
           for(let k = 5; k >= 1; k--){
-            backdropG.circle(cx, cy, vR * (0.55 + k * 0.16)).fill({ color: 0x05030a, alpha: bdA * 0.18 * (k / 5) });
+            backdropG.circle(cx, cy, vR * (0.55 + k * 0.16)).fill({ color: 0x18092e, alpha: bdA * 0.18 * (k / 5) });
           }
-          backdropG.rect(0, 0, W, H).fill({ color: 0x05030a, alpha: bdA * 0.16 });   // faint even global dim
+          backdropG.rect(0, 0, W, H).fill({ color: 0x18092e, alpha: bdA * 0.16 });   // candy-dark dim (was near-black 0x05030a -> "crown on black")
         }
         // crown scale-in (0-0.16) → charge jitter (held) → discharge pop
         const inP = Math.min(1, t / 0.16), sIn = 0.34 + 0.66 * (1 - Math.pow(1 - inP, 3));
