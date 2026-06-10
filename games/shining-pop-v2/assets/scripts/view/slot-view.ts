@@ -180,6 +180,12 @@ export class SlotView extends Component {
     [
       ['ui2/logo', 'logo'],
       ['bg/bg', 'bg'],
+      ['ui2/btn_spin', 'spinArt'],
+      ['ui2/studio', 'studio'],
+      ['ui2/buy_bonus', 'buyArt'],
+      ['win/tier_standard', 'tier0'],
+      ['win/tier_hot', 'tier1'],
+      ['win/tier_mega', 'tier2'],
     ].forEach(([path, key]) => {
       jobs.push(
         new Promise<void>((res) =>
@@ -550,21 +556,25 @@ export class SlotView extends Component {
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
     const sg = sep.addComponent(Graphics);
-    // Alternating glass columns lift the symbols off the dark window.
+    // Master parity: PER-CELL candy plates — soft glass fill + cream border per
+    // cell (the flagship's cookie-tile window), not flat columns.
+    const { cell, gap } = VIEW_CONFIG.layout;
     for (let r = 0; r < GRID.reels; r++) {
-      const x = -this.gw / 2 + r * this.pitch;
-      sg.fillColor = new Color(255, 255, 255, r % 2 ? 5 : 9);
-      sg.roundRect(x, -this.gh / 2, VIEW_CONFIG.layout.cell, this.gh, 6);
-      sg.fill();
+      for (let row = 0; row < GRID.rows; row++) {
+        const x = -this.gw / 2 + r * this.pitch + 3;
+        const y = this.gh / 2 - row * (cell + gap) - cell + 3;
+        sg.fillColor = new Color(255, 255, 255, 8);
+        sg.roundRect(x, y, cell - 6, cell - 6, 10);
+        sg.fill();
+        sg.lineWidth = 2;
+        sg.strokeColor = new Color(244, 228, 205, 80); // cream candy rim
+        sg.roundRect(x, y, cell - 6, cell - 6, 10);
+        sg.stroke();
+        sg.fillColor = new Color(255, 255, 255, 10); // top sheen per cell
+        sg.roundRect(x + 3, y + cell - 26, cell - 12, 16, 8);
+        sg.fill();
+      }
     }
-    sg.lineWidth = 2;
-    sg.strokeColor = new Color(184, 111, 218, 30); // orchid hairline
-    for (let r = 1; r < GRID.reels; r++) {
-      const x = -this.gw / 2 + r * this.pitch - VIEW_CONFIG.layout.gap / 2;
-      sg.moveTo(x, -this.gh / 2 + 6);
-      sg.lineTo(x, this.gh / 2 - 6);
-    }
-    sg.stroke();
   }
 
   private buildReels(): void {
@@ -679,6 +689,14 @@ export class SlotView extends Component {
         menu,
       );
       void btn;
+      const tier = this.brandFrames['tier' + i];
+      if (tier) {
+        const m = this.mkNode('medal', 54, 54, menu);
+        m.setPosition(-186, y, 0);
+        const sp = m.addComponent(Sprite);
+        sp.sizeMode = Sprite.SizeMode.CUSTOM;
+        sp.spriteFrame = tier;
+      }
     });
     this.buyMenu = menu;
   }
@@ -1081,17 +1099,41 @@ export class SlotView extends Component {
   buildIntro(onDismiss: () => void): void {
     const ov = this.mkNode('intro', 2600, 2200, this.node);
     const g = ov.addComponent(Graphics);
-    g.fillColor = new Color(6, 3, 12, 235);
+    g.fillColor = new Color(6, 3, 12, 225);
     g.rect(-1300, -1100, 2600, 2200);
     g.fill();
-    g.fillColor = new Color(255, 0, 127, 30);
-    g.roundRect(-200, -64, 400, 150, 20);
-    g.fill();
-    const t1 = this.mkLabel('SHINING', 0, 54, 34, new Color(245, 247, 250, 255), ov);
-    t1.isItalic = true;
-    const t2 = this.mkLabel('POP  V2', 0, 14, 38, ACID, ov);
-    t2.isItalic = true;
-    const cta = this.mkLabel('TAP TO PLAY', 0, -40, 18, MUTED, ov);
+    if (this.brandFrames.logo) {
+      // Master parity: the intro leads with the REAL logo art, large.
+      const ln = this.mkNode('introLogo', 440, 276, ov);
+      ln.setPosition(0, 60, 0);
+      const sp = ln.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.spriteFrame = this.brandFrames.logo;
+      tween(ln)
+        .to(1.6, { scale: new Vec3(1.04, 1.04, 1) }, { easing: 'sineInOut' })
+        .to(1.6, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+        .union()
+        .repeatForever()
+        .start();
+    } else {
+      g.fillColor = new Color(255, 0, 127, 30);
+      g.roundRect(-200, -64, 400, 150, 20);
+      g.fill();
+      const t1 = this.mkLabel('SHINING', 0, 54, 34, new Color(245, 247, 250, 255), ov);
+      t1.isItalic = true;
+      const t2 = this.mkLabel('POP  V2', 0, 14, 38, ACID, ov);
+      t2.isItalic = true;
+    }
+    const cta = this.mkLabel('TAP TO PLAY', 0, -120, 20, MUTED, ov);
+    if (this.brandFrames.studio) {
+      const mark = this.mkNode('studioMark', 120, 120, ov);
+      mark.setPosition(0, -240, 0);
+      const sp = mark.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.spriteFrame = this.brandFrames.studio;
+      const op = mark.addComponent(UIOpacity);
+      op.opacity = 170;
+    }
     tween(cta.node)
       .to(0.8, { scale: new Vec3(1.08, 1.08, 1) }, { easing: 'sineInOut' })
       .to(0.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
