@@ -74,6 +74,9 @@ export class BuyBonusModal extends Component {
   private cardScale = 1;
   private tiers: BuyTier[] = [];
   private tileNodes: Node[] = [];
+  private medallions: Node[] = [];
+  private rings: Node[] = [];
+  private tileOps: UIOpacity[] = [];
   private selected = 0;
   private betValue!: Label;
   private buyLabel!: Label;
@@ -237,13 +240,37 @@ export class BuyBonusModal extends Component {
     const gap = 22;
     const totalW = this.tiers.length * TILE_W + (this.tiers.length - 1) * gap;
     const startX = -totalW / 2 + TILE_W / 2;
+    this.medallions = [];
+    this.rings = [];
+    this.tileOps = [];
     this.tiers.forEach((tier, i) => {
       const tx = startX + i * (TILE_W + gap);
       const tile = this.node2(card, tx, 24, TILE_W, TILE_H);
       const tg = tile.addComponent(Graphics);
       this.tileNodes.push(tile);
+      this.tileOps.push(tile.getComponent(UIOpacity) ?? tile.addComponent(UIOpacity));
 
-      const medallion = this.node2(tile, 0, TILE_H / 2 - 78, 96, 96);
+      // Glow ring BEHIND the medallion — layered candy-pink fades + a crisp rim
+      // (the flagship's selected-tier halo). Hidden until this tier is selected.
+      const my = TILE_H / 2 - 78;
+      const ring = this.node2(tile, 0, my, 116, 116);
+      const rg = ring.addComponent(Graphics);
+      for (let k = 5; k >= 1; k--) {
+        rg.fillColor = col(tier.accent, 0.05 + (5 - k) * 0.02);
+        rg.circle(0, 0, 50 + k * 5);
+        rg.fill();
+      }
+      rg.lineWidth = 3;
+      rg.strokeColor = col(tier.accent, 0.95);
+      rg.circle(0, 0, 54);
+      rg.fill();
+      rg.fillColor = col('#ffffff', 0.12);
+      rg.circle(0, 0, 50);
+      rg.fill();
+      ring.active = false;
+      this.rings.push(ring);
+
+      const medallion = this.node2(tile, 0, my, 96, 96);
       if (tier.frame) {
         const sp = medallion.addComponent(Sprite);
         sp.sizeMode = Sprite.SizeMode.CUSTOM;
@@ -252,6 +279,7 @@ export class BuyBonusModal extends Component {
         const mg = medallion.addComponent(Graphics);
         this.gem(mg, 0, 0, 42, tier.accent);
       }
+      this.medallions.push(medallion);
 
       this.text(tile, tier.name, 0, 14, 19, tier.accent, true);
       this.text(tile, `${tier.spins} FREE SPINS`, 0, -16, 13, C.label);
@@ -314,7 +342,8 @@ export class BuyBonusModal extends Component {
     this.select(0);
   }
 
-  /** Highlight the chosen tier (bright rim + lift) and reflect cost on the BUY btn. */
+  /** Highlight the chosen tier (flagship treatment): glow-ring halo + medallion
+   *  scale-pop + lift + bright accent rim, while the others dim back. */
   private select(i: number): void {
     this.selected = i;
     this.tileNodes.forEach((tile, idx) => {
@@ -335,6 +364,27 @@ export class BuyBonusModal extends Component {
         );
       }
       tile.setPosition(tile.position.x, on ? 32 : 24, 0);
+      // Unselected tiers dim back so the chosen one reads as the hero.
+      const op = this.tileOps[idx];
+      if (op) op.opacity = on ? 255 : 150;
+      // Glow ring fades in under the chosen medallion.
+      const ring = this.rings[idx];
+      if (ring) {
+        ring.active = true;
+        const rop = ring.getComponent(UIOpacity) ?? ring.addComponent(UIOpacity);
+        tween(rop).stop();
+        rop.opacity = on ? 0 : 0;
+        if (on) tween(rop).to(0.18, { opacity: 255 }).start();
+        else ring.active = false;
+      }
+      // Medallion pops up on select, settles back otherwise.
+      const med = this.medallions[idx];
+      if (med) {
+        tween(med).stop();
+        tween(med)
+          .to(0.22, { scale: new Vec3(on ? 1.12 : 1, on ? 1.12 : 1, 1) }, { easing: 'backOut' })
+          .start();
+      }
     });
     if (this.buyLabel) {
       this.buyLabel.string = `BUY  ${this.tiers[i].costText}`;

@@ -1321,50 +1321,188 @@ export class SlotView extends Component {
   buildIntro(onDismiss: () => void): void {
     const ov = this.mkNode('intro', 2600, 2200, this.node);
     const g = ov.addComponent(Graphics);
-    g.fillColor = new Color(6, 3, 12, 225);
+    g.fillColor = new Color(6, 3, 12, 232);
     g.rect(-1300, -1100, 2600, 2200);
     g.fill();
+    // Corner vignette so the eye pulls to the centre (matches the board ART-04).
+    g.fillColor = new Color(0, 0, 0, 120);
+    [
+      [-1300, 1100, 1, -1],
+      [1300, 1100, -1, -1],
+      [-1300, -1100, 1, 1],
+      [1300, -1100, -1, 1],
+    ].forEach(([cx, cy, dx, dy]) => {
+      g.moveTo(cx, cy);
+      g.lineTo(cx + dx * 620, cy);
+      g.lineTo(cx, cy + dy * 480);
+      g.close();
+      g.fill();
+    });
+
+    // Soft candy glow behind the logo — layered pink diamonds (no circles),
+    // slowly breathing. Gives the arrival depth instead of a flat black field.
+    const glow = this.mkNode('introGlow', 10, 10, ov);
+    glow.setPosition(0, 70, 0);
+    const gg = glow.addComponent(Graphics);
+    for (let k = 6; k > 0; k--) {
+      const t = k / 6;
+      const w = 520 * t;
+      const h = 360 * t;
+      gg.fillColor = new Color(255, 90, 156, Math.round(3 + (1 - t) * 9));
+      gg.moveTo(0, -h);
+      gg.lineTo(w, 0);
+      gg.lineTo(0, h);
+      gg.lineTo(-w, 0);
+      gg.close();
+      gg.fill();
+    }
+    tween(glow)
+      .to(2.4, { scale: new Vec3(1.06, 1.06, 1) }, { easing: 'sineInOut' })
+      .to(2.4, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+
+    // Deterministic floating candy sparkles (seeded — identical every boot).
+    const spk = this.mkNode('introSparks', 10, 10, ov);
+    const sg = spk.addComponent(Graphics);
+    const rng = createRng(20260611).next;
+    for (let i = 0; i < 16; i++) {
+      const x = (rng() - 0.5) * 1200;
+      const y = (rng() - 0.5) * 900;
+      const r = 4 + rng() * 9;
+      sg.fillColor =
+        rng() > 0.5
+          ? new Color(255, 120, 180, Math.round(40 + rng() * 60))
+          : new Color(160, 210, 255, Math.round(30 + rng() * 50));
+      sg.moveTo(x, y - r);
+      sg.lineTo(x + r, y);
+      sg.lineTo(x, y + r);
+      sg.lineTo(x - r, y);
+      sg.close();
+      sg.fill();
+    }
+    tween(spk)
+      .to(3.6, { position: new Vec3(0, 22, 0) }, { easing: 'sineInOut' })
+      .to(3.6, { position: new Vec3(0, 0, 0) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+
+    // LOGO — entrance pop (scale + fade) then a gentle breathing loop.
+    const logoNode = this.mkNode('introLogo', 440, 276, ov);
+    logoNode.setPosition(0, 70, 0);
+    const logoOp = logoNode.addComponent(UIOpacity);
+    logoOp.opacity = 0;
     if (this.brandFrames.logo) {
-      // Master parity: the intro leads with the REAL logo art, large.
-      const ln = this.mkNode('introLogo', 440, 276, ov);
-      ln.setPosition(0, 60, 0);
-      const sp = ln.addComponent(Sprite);
+      const sp = logoNode.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.spriteFrame = this.brandFrames.logo;
-      tween(ln)
-        .to(1.6, { scale: new Vec3(1.04, 1.04, 1) }, { easing: 'sineInOut' })
-        .to(1.6, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
-        .union()
-        .repeatForever()
-        .start();
     } else {
-      g.fillColor = new Color(255, 0, 127, 30);
-      g.roundRect(-200, -64, 400, 150, 20);
-      g.fill();
-      const t1 = this.mkLabel('SHINING', 0, 54, 34, new Color(245, 247, 250, 255), ov);
+      const t1 = this.mkLabel('SHINING', 0, 40, 34, new Color(245, 247, 250, 255), logoNode);
       t1.isItalic = true;
-      const t2 = this.mkLabel('POP  V2', 0, 14, 38, ACID, ov);
+      const t2 = this.mkLabel('POP  V2', 0, 2, 38, ACID, logoNode);
       t2.isItalic = true;
     }
-    const cta = this.mkLabel('TAP TO PLAY', 0, -120, 20, MUTED, ov);
+    logoNode.setScale(0.72, 0.72, 1);
+    tween(logoOp).to(0.4, { opacity: 255 }, { easing: 'quadOut' }).start();
+    tween(logoNode)
+      .to(0.55, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .call(() => {
+        tween(logoNode)
+          .to(1.8, { scale: new Vec3(1.035, 1.035, 1) }, { easing: 'sineInOut' })
+          .to(1.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+          .union()
+          .repeatForever()
+          .start();
+      })
+      .start();
+
+    // MAX-WIN teaser line (fades in under the logo).
+    const teaser = this.mkLabel(
+      `MAX WIN ${maxWinMultiple().toLocaleString('en-US')}× · WILD STRIKE`,
+      0,
+      -70,
+      14,
+      MUTED,
+      ov,
+    );
+    const teaserOp = teaser.node.addComponent(UIOpacity);
+    teaserOp.opacity = 0;
+    tween(teaserOp).delay(0.45).to(0.4, { opacity: 220 }).start();
+
+    // CTA — a candy pill with a brighter label so it reads as a button, not text.
+    const ctaGroup = this.mkNode('introCta', 320, 72, ov);
+    ctaGroup.setPosition(0, -150, 0);
+    const cg = ctaGroup.addComponent(Graphics);
+    const drawCta = (glowA: number) => {
+      cg.clear();
+      cg.fillColor = new Color(255, 90, 156, Math.round(40 + glowA * 50));
+      cg.roundRect(-150, -34, 300, 68, 34);
+      cg.fill();
+      cg.fillColor = new Color(255, 0, 127, 235);
+      cg.roundRect(-138, -28, 276, 56, 28);
+      cg.fill();
+      cg.fillColor = new Color(255, 255, 255, 30);
+      cg.roundRect(-132, -22, 264, 20, 18);
+      cg.fill();
+      cg.lineWidth = 2;
+      cg.strokeColor = new Color(255, 200, 235, 235);
+      cg.roundRect(-138, -28, 276, 56, 28);
+      cg.stroke();
+    };
+    drawCta(0);
+    this.mkLabel('TAP TO PLAY', 0, 0, 22, new Color(255, 255, 255, 255), ctaGroup);
+    const ctaOp = ctaGroup.addComponent(UIOpacity);
+    ctaOp.opacity = 0;
+    tween(ctaOp).delay(0.5).to(0.4, { opacity: 255 }).start();
+    tween(ctaGroup)
+      .delay(0.5)
+      .to(0.9, { scale: new Vec3(1.06, 1.06, 1) }, { easing: 'sineInOut' })
+      .to(0.9, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+    // Pulse the pill's outer glow in sync (proxy tween drives the redraw).
+    const glowProxy = { v: 0 };
+    tween(glowProxy)
+      .delay(0.5)
+      .to(0.9, { v: 1 }, { onUpdate: () => drawCta(glowProxy.v) })
+      .to(0.9, { v: 0 }, { onUpdate: () => drawCta(glowProxy.v) })
+      .union()
+      .repeatForever()
+      .start();
+
     if (this.brandFrames.studio) {
       const mark = this.mkNode('studioMark', 120, 120, ov);
-      mark.setPosition(0, -240, 0);
+      mark.setPosition(0, -260, 0);
       const sp = mark.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.spriteFrame = this.brandFrames.studio;
       const op = mark.addComponent(UIOpacity);
-      op.opacity = 170;
+      op.opacity = 0;
+      tween(op).delay(0.6).to(0.5, { opacity: 170 }).start();
     }
-    tween(cta.node)
-      .to(0.8, { scale: new Vec3(1.08, 1.08, 1) }, { easing: 'sineInOut' })
-      .to(0.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
-      .union()
-      .repeatForever()
-      .start();
+
+    // Tap anywhere → a quick confirming flash + logo punch, then fade the gate.
     ov.once(Node.EventType.TOUCH_END, () => {
+      this.audio.click();
+      Tween.stopAllByTarget(logoNode);
+      tween(logoNode)
+        .to(0.12, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'quadOut' })
+        .to(0.18, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
+        .start();
+      const flash = this.mkNode('introFlash', 2600, 2200, ov);
+      const fg = flash.addComponent(Graphics);
+      fg.fillColor = new Color(255, 255, 255, 255);
+      fg.rect(-1300, -1100, 2600, 2200);
+      fg.fill();
+      const fop = flash.addComponent(UIOpacity);
+      fop.opacity = 0;
+      tween(fop).to(0.1, { opacity: 90 }).to(0.3, { opacity: 0 }).start();
       const op = ov.getComponent(UIOpacity) ?? ov.addComponent(UIOpacity);
       tween(op)
+        .delay(0.18)
         .to(0.4, { opacity: 0 }, { easing: 'quadOut' })
         .call(() => ov.destroy())
         .start();
