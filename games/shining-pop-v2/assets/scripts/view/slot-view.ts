@@ -21,7 +21,7 @@ import {
   Vec3,
   view,
 } from 'cc';
-import { GRID, PAYLINES, SYMBOLS } from '../logic/game-config';
+import { BONUS_MODES, BonusMode, GRID, PAYLINES, SYMBOLS } from '../logic/game-config';
 import {
   CONTROLS_LINES,
   maxWinMultiple,
@@ -40,6 +40,7 @@ import { AnticipationLayer } from './anticipation-layer';
 import { ParticleLayer } from './particle-layer';
 import { AudioManager } from './audio-manager';
 import { applyFont, loadFonts } from './fonts';
+import { BuyBonusModal, BuyTier } from './buy-bonus-modal';
 
 const { ccclass } = _decorator;
 
@@ -120,6 +121,8 @@ export class SlotView extends Component {
   private autoBtn: DeckButton | null = null;
   private soundBtn: DeckButton | null = null;
   private buyMenu: Node | null = null;
+  private buyModal: BuyBonusModal | null = null;
+  private buyBetStepCb: ((dir: number) => void) | null = null;
   private autoplayPanel: Node | null = null;
   private autoplayStartCb: ((spins: number) => void) | null = null;
   private autoplayOptionCb: ((key: AutoplayOptionKey, value: boolean) => void) | null = null;
@@ -898,53 +901,73 @@ export class SlotView extends Component {
     this.node.setPosition(0, this.bottomInset / 2, 0);
   }
 
-  // ---- buy menu -------------------------------------------------------------
-  /** (Re)build the buy-feature menu from the model's modes + costs (hidden until BUY). */
+  // ---- buy menu (premium modal — flagship parity) ---------------------------
+  /** Per-mode presentation (accent + one-line special). Visual only — costs and
+   *  spin counts come from the model/config, never invented here. */
+  private static BUY_PRESENT: Record<string, { accent: string; special: string }> = {
+    wilds: { accent: '#ff5ab0', special: 'Wilds stick & bounce every spin' },
+    crowns: { accent: '#ffcf5a', special: 'Crowns lock in for the feature' },
+    reels: { accent: '#b86fda', special: 'Full wild reels strike in' },
+  };
+
+  /** (Re)build the premium buy-feature modal from the model's modes + costs.
+   *  Same signature as the old plain list — the controller is unchanged; only the
+   *  surface is upgraded to the flagship 3-tier card (committed BuyBonusModal). */
   configureBuyMenu(options: BuyOption[]): void {
-    this.buyMenu?.destroy();
-    const menu = this.mkNode('buyMenu', 360, 60 + options.length * 64, this.node);
-    menu.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
-    menu.active = false;
-    const h = 60 + options.length * 64;
-    this.surfChrome(menu, 360, h, 46);
-    this.mkLabel('BUY FEATURE', 0, h / 2 - 28, 22, ACID, menu);
-    options.forEach((o, i) => {
-      const y = h / 2 - 72 - i * 64;
-      const btn = this.mkTextButton(
-        `${o.name}   ${o.costText}`,
-        0,
-        y,
-        320,
-        50,
-        () => {
-          menu.active = false;
-          this.buyCb?.(o.mode);
-        },
-        menu,
-      );
-      void btn;
-      const tier = this.brandFrames['tier' + i];
-      if (tier) {
-        const m = this.mkNode('medal', 54, 54, menu);
-        m.setPosition(-186, y, 0);
-        const sp = m.addComponent(Sprite);
-        sp.sizeMode = Sprite.SizeMode.CUSTOM;
-        sp.spriteFrame = tier;
-      }
+    if (!this.buyModal) {
+      const host = this.mkNode('buyModal', 10, 10, this.node);
+      host.setPosition(0, VIEW_CONFIG.layout.reelCenterY - 10, 0);
+      this.buyModal = host.addComponent(BuyBonusModal);
+      this.buyModal.on('buy', (mode) => {
+        this.buyModal?.close();
+        this.buyCb?.(mode as string);
+      });
+      this.buyModal.on('bet:inc', () => this.buyBetStepCb?.(1));
+      this.buyModal.on('bet:dec', () => this.buyBetStepCb?.(-1));
+      this.buyModal.on('ui:click', () => this.audio.click());
+    }
+    const tiers: BuyTier[] = options.map((o, i) => {
+      const present = SlotView.BUY_PRESENT[o.mode] ?? { accent: '#ff7ad0', special: '' };
+      return {
+        mode: o.mode,
+        name: o.name,
+        spins: BONUS_MODES[o.mode as BonusMode]?.spins ?? 8,
+        costText: o.costText,
+        special: present.special,
+        accent: present.accent,
+        frame: this.brandFrames['tier' + i] ?? null,
+      };
     });
-    this.buyMenu = menu;
+    this.buyModal.configure(tiers, this.buyBetText);
+  }
+
+  private buyBetText = '';
+  /** Push the current bet text into the modal's inline stepper (controller sets it). */
+  setBuyBet(betText: string): void {
+    this.buyBetText = betText;
+    this.buyModal?.setBet(betText);
+  }
+  /** Refresh each tier's live cost after a bet change (controller supplies texts). */
+  refreshBuyCosts(costTexts: string[]): void {
+    this.buyModal?.setCosts(costTexts);
+  }
+  /** Wire the modal's inline bet stepper back to the controller's bet ladder. */
+  onBuyBetStep(cb: (dir: number) => void): void {
+    this.buyBetStepCb = cb;
   }
 
   private toggleBuyMenu(): void {
-    if (this.buyMenu) this.buyMenu.active = !this.buyMenu.active;
+    if (this.buyModal?.isOpen()) this.closeBuyMenu();
+    else this.openBuyMenu();
   }
 
   closeBuyMenu(): void {
-    if (this.buyMenu) this.buyMenu.active = false;
+    this.buyModal?.close();
   }
 
   openBuyMenu(): void {
-    if (this.buyMenu) this.buyMenu.active = true;
+    this.closeOverlays();
+    this.buyModal?.open();
     this.audio.buyOpen();
   }
 
