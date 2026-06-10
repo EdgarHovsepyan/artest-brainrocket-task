@@ -101,6 +101,9 @@ export class SlotController extends Component {
         costText: this.fmt(this.model.bonusCost(mode)),
       })),
     );
+    this.view.setBuyBet(this.fmt(this.model.bet));
+    // The modal's inline bet stepper walks the same ladder as the bar.
+    this.view.onBuyBetStep((dir) => this.changeBet(dir));
     this.refreshAutoplayPanel();
     this.view.onAutoplayStart((spins) => this.startAuto(spins));
     this.view.onAutoplayOption((key, value) => {
@@ -117,6 +120,7 @@ export class SlotController extends Component {
       this.view.audio.bet();
       this.view.configureQuickBetPanel(BET_LEVELS_CENTS, this.model.bet);
       this.syncHud();
+      this.refreshBuyMenu();
     });
 
     // INTRO GATE + first-gesture audio bootstrap (master learning: ANY first
@@ -272,6 +276,16 @@ export class SlotController extends Component {
     this.view.audio.bet();
     this.view.configureQuickBetPanel(BET_LEVELS_CENTS, this.model.bet);
     this.syncHud();
+    this.refreshBuyMenu();
+  }
+
+  /** Keep the buy modal's tier costs + bet readout in sync after a bet change. */
+  private refreshBuyMenu(): void {
+    const costs = (Object.keys(BONUS_MODES) as BonusMode[]).map((m) =>
+      this.fmt(this.model.bonusCost(m)),
+    );
+    this.view.refreshBuyCosts(costs);
+    this.view.setBuyBet(this.fmt(this.model.bet));
   }
 
   /** Wall-clock for the session timer (Date.now is fine at game runtime). */
@@ -313,6 +327,7 @@ export class SlotController extends Component {
     this.view.audio.bet();
     this.view.configureQuickBetPanel(BET_LEVELS_CENTS, this.model.bet);
     this.syncHud();
+    this.refreshBuyMenu();
   }
 
   onDestroy(): void {
