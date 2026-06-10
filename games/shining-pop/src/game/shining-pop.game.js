@@ -4178,13 +4178,41 @@
     if (buyCm) { const o = { b: 1 }; g.to(o, { b: 1.16, duration: 1.2, ease: 'sine.inOut', repeat: -1, yoyo: true, onUpdate() { try { buyCm.brightness(o.b, false); } catch (e) {} } }); }
   })();
   try { if (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || /[?&]debug=/.test(location.search)) { window.__buyFab = buyFab; window.__buyModal = buyModal; } } catch (e) {}
+  // Live reel-grid rect (screen px) — set by layout() each pass so the floating
+  // Buy-Bonus FAB can dock in the empty side-margin instead of over the reels.
+  const _gridRect = { x: 0, y: 0, w: 0, h: 0 };
   function layoutBuyFab() {
     const W = app.screen.width, H = app.screen.height;
     const portrait = H > W * 1.05;
-    const targetW = portrait ? Math.min(W * 0.17, 88) : Math.min(W * 0.13, 184);   // mobile ~2x smaller per request
-    buyFabInner.scale.set(targetW / _buyBaseW);
-    if (portrait) buyFab.position.set(W * 0.17, H * 0.77);   // bottom-left by the spin
-    else buyFab.position.set(W * 0.085, H * 0.46);            // left of the reels, vertical centre
+    // Anchor to the ACTUAL reel rect (_gridRect, set by layout() once the grid
+    // is computed) so the FAB lives in the empty side-margin and never overlaps
+    // the reels. Falls back to viewport fractions before the first layout pass.
+    const g = _gridRect.w > 0 ? _gridRect : { x: W * 0.1, y: H * 0.2, w: W * 0.8, h: H * 0.6 };
+    const leftMargin = g.x;                       // empty space left of the reels
+    const midY = g.y + g.h / 2;                   // vertical centre of the reels
+    if (portrait) {
+      // PORTRAIT — the reels fill the width; tuck the FAB low-left near the spin.
+      const targetW = Math.min(W * 0.17, 88);
+      buyFabInner.scale.set(targetW / _buyBaseW);
+      buyFab.position.set(Math.max(targetW * 0.6, leftMargin * 0.5), H * 0.77);
+    } else {
+      // LANDSCAPE — dock in the empty left side-margin, RIGHT-aligned with an 18px
+      // gap to the reels so it never overlaps reel 1. Size to the desired width but
+      // shrink to fit a thin margin (near-square viewports); only when the margin
+      // can't hold a tappable ~48px chip do we tuck it into the lower-left corner.
+      const gap = 18;
+      const desired = Math.min(W * 0.13, 184);
+      if (leftMargin - gap >= 48) {
+        const targetW = Math.min(desired, leftMargin - gap);
+        buyFabInner.scale.set(targetW / _buyBaseW);
+        buyFab.position.set(g.x - gap - targetW / 2, midY);
+      } else {
+        // No usable side-margin — sit in the lower-left corner above the bar.
+        const targetW = Math.min(desired, 96);
+        buyFabInner.scale.set(targetW / _buyBaseW);
+        buyFab.position.set(targetW * 0.62, g.y + g.h - targetW * 0.55);
+      }
+    }
   }
   layoutBuyFab();
   // VISIBILITY — show ONLY when buying is actually possible: idle phase, policy
@@ -7270,7 +7298,6 @@
     const W=app.screen.width, H=app.screen.height;
     const portrait = H > W*1.05;
     const tiny = H < 330;   // genuinely short viewports only (Popout S) — a tall phone is NOT tiny
-    try { layoutBuyFab(); } catch(e){}   // reposition the floating Buy Bonus button per preset
     // 25 px breathing room on every edge for normal viewports; Popout S (tiny)
     // keeps a slim margin — 25 px all-round would crush a 225 px-tall window.
     // Portrait gets EXTRA bottom padding (award-tier audit #7) — the spin
@@ -7371,6 +7398,10 @@
     reelMask.clear().rect(GX,GY,GW,GH).fill(0xffffff);
     drawReelFrame();
     reelArea.position.set(0,0);
+    // Publish the live grid rect + dock the Buy-Bonus FAB in the side-margin
+    // (now that GX/GY/GW/GH are computed — must run AFTER the grid is sized).
+    _gridRect.x = GX; _gridRect.y = GY; _gridRect.w = GW; _gridRect.h = GH;
+    try { layoutBuyFab(); } catch(e){}
     swipeZone.hitArea = new PIXI.Rectangle(GX,GY,GW,GH);   // swipe-to-spin zone
 
     // reels + symbol cells
