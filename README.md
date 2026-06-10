@@ -1,4 +1,5 @@
-# ARTEST | BrainRocket — Slot Games Studio
+# ARTEST | BrainRocket — Slot Game Task
+<img width="2752" height="1536" alt="artest-brainrocket" src="https://github.com/user-attachments/assets/f1a2b62f-db87-410d-a631-765c4eb0ebf7" />
 
 **by Edgar Hovsepyan** — one engineer, two engines, one provably-correct math core.
 
