@@ -34,25 +34,41 @@ export class SymbolView extends Component {
   // Win-VFX layers (slot-vfx artist): built lazily on first win, killed in clear.
   private sheen: Node | null = null;
   private sparkles: Node[] = [];
+  // SY1 idle breathing — the sprite lives on `art` (a child) so the per-frame
+  // breathe composes with the win/land tweens that scale the CELL node, with no
+  // tween conflict. Phase-offset per cell so the grid never breathes in unison.
+  private art: Node | null = null;
+  private idleT = 0;
+  private idlePhase = 0;
+  private idleAmp = 0;
+  private idleOn = false;
 
-  /** Build the cell's sprite + text fallback at `size` px square. */
-  build(size: number, frames: SpriteFrame[]): void {
+  /** Build the cell's sprite + text fallback at `size` px square. `phase` desyncs
+   *  this cell's idle breathing from its neighbours. */
+  build(size: number, frames: SpriteFrame[], phase = 0): void {
     this.frames = frames;
     this.size = size;
+    this.idlePhase = phase;
 
     const art = size * VIEW_CONFIG.layout.symbolFill;
     (this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform)).setContentSize(
       art,
       art,
     );
-    const sp = this.node.addComponent(Sprite);
+    // Sprite on a centred child so idle breathing (scales `art`) never fights the
+    // win/land tweens (which scale this.node).
+    const artNode = new Node('art');
+    artNode.addComponent(UITransform).setContentSize(art, art);
+    this.node.addChild(artNode);
+    this.art = artNode;
+    const sp = artNode.addComponent(Sprite);
     sp.sizeMode = Sprite.SizeMode.CUSTOM;
     sp.type = Sprite.Type.SIMPLE;
     this.sprite = sp;
 
     const lblNode = new Node('fallback');
     lblNode.addComponent(UITransform).setContentSize(size, size);
-    this.node.addChild(lblNode);
+    artNode.addChild(lblNode);
     const lbl = lblNode.addComponent(Label);
     lbl.fontSize = Math.round(size * 0.34);
     lbl.lineHeight = lbl.fontSize + 2;
@@ -94,6 +110,26 @@ export class SymbolView extends Component {
     const frame = this.frames[id] ?? null;
     if (this.sprite) this.sprite.spriteFrame = frame;
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
+    // High-value symbols (wild + H1..H4 = ids 0..4) carry more visual "weight" —
+    // they breathe a touch deeper, the textbook AAA cue that they matter more.
+    this.idleAmp = id <= 4 ? 0.03 : 0.018;
+  }
+
+  /** SY1 idle breathing: a desynced sine scale on the art child while the reel is
+   *  at rest, so the grid is alive, never a static template. Composes with the
+   *  win/land tweens (those scale the cell node, not `art`). Gated off during
+   *  spin + under reduced-motion. */
+  update(dt: number): void {
+    if (!this.idleOn || !this.art) return;
+    this.idleT += dt;
+    const sc = 1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp;
+    this.art.setScale(sc, sc, 1);
+  }
+
+  /** Toggle idle breathing (ReelView: on when settled, off while spinning). */
+  setIdle(on: boolean): void {
+    this.idleOn = on;
+    if (!on && this.art) this.art.setScale(1, 1, 1);
   }
 
   /** Win pulse + light-up — driven by Cocos Tween. `delay` enables an L→R ripple.

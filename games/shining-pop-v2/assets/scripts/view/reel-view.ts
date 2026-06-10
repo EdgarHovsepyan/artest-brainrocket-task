@@ -64,6 +64,9 @@ export class ReelView extends Component {
   /** WCAG reduced-motion gate (driven by SlotView.setReducedFx). */
   setReducedMotion(on: boolean): void {
     this.reducedMotion = on;
+    // Reduced-motion: freeze idle breathing immediately; else (re)start it on the
+    // settled window cells.
+    this.cells.forEach((c) => c.setIdle(!on && !this.spinning));
   }
 
   /** Per-frame velocity-stretch on the strip = vector motion blur (no shader).
@@ -106,6 +109,9 @@ export class ReelView extends Component {
     this.node.addChild(strip);
     this.strip = strip;
 
+    // Per-reel phase offset so the 5 columns never breathe in unison (the
+    // golden-ratio step keeps it organic within a column too).
+    const reelOffset = this.node.position.x * 0.011;
     for (let k = 0; k < len; k++) {
       // k=0 → top window row (+pitch), k=1 → mid, k=2 → bottom; k>=3 below the fold.
       const cellNode = new Node(`cell_${k}`);
@@ -113,15 +119,18 @@ export class ReelView extends Component {
       cellNode.setPosition(0, this.pitch - k * this.pitch, 0);
       strip.addChild(cellNode);
       const sv = cellNode.addComponent(SymbolView);
-      sv.build(cell, frames);
+      sv.build(cell, frames, k * 0.618 + reelOffset);
       this.stripCells[k] = sv;
     }
     this.cells = [this.stripCells[0], this.stripCells[1], this.stripCells[2]];
   }
 
-  /** Paint the visible window immediately (no animation). */
+  /** Paint the visible window immediately (no animation) + start idle breathing. */
   show(column: number[]): void {
-    this.cells.forEach((c, row) => c.setSymbol(column[row]));
+    this.cells.forEach((c, row) => {
+      c.setSymbol(column[row]);
+      c.setIdle(!this.reducedMotion);
+    });
   }
 
   /**
@@ -133,6 +142,8 @@ export class ReelView extends Component {
     if (!strip) return Promise.resolve();
     const rows = GRID.rows;
 
+    // Idle breathing OFF for the spin (the strip scrolls + motion-blurs instead).
+    this.cells.forEach((c) => c.setIdle(false));
     // Seed the strip: window gets the result, buffer cells get random fillers.
     for (let k = 0; k < this.stripCells.length; k++) {
       const id = k < rows ? final[k] : Math.floor(Math.random() * SYMBOL_COUNT);
@@ -149,6 +160,8 @@ export class ReelView extends Component {
         this.blurStretch = 1;
         strip.setScale(1, 1, 1); // clear any residual motion-blur stretch
         this.cells.forEach((c) => c.playLand(VIEW_CONFIG.spin.landSquash));
+        // Resume idle breathing once the reel has settled.
+        if (!this.reducedMotion) this.cells.forEach((c) => c.setIdle(true));
         resolve();
       };
       strip.setPosition(0, this.startY, 0);
