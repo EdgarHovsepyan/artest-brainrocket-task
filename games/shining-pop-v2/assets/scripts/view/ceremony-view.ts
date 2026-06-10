@@ -21,6 +21,7 @@ import {
 } from 'cc';
 import { resolveBigWinTier, VIEW_CONFIG } from './view-config';
 import { PAL } from './palette';
+import { applyFont } from './fonts';
 
 const { ccclass } = _decorator;
 
@@ -333,6 +334,8 @@ export class CeremonyView extends Component {
     l.isBold = true;
     l.color = col;
     l.horizontalAlign = Label.HorizontalAlign.CENTER;
+    // The ceremony shouts — heavy display font (Luckiest Guy) for header + amount.
+    applyFont(l, 'display');
     return l;
   }
 }

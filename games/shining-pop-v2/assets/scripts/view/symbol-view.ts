@@ -19,6 +19,7 @@ import {
 } from 'cc';
 import { SYMBOL_NAMES } from '../logic/game-config';
 import { VIEW_CONFIG } from './view-config';
+import { applyFont } from './fonts';
 
 const { ccclass } = _decorator;
 
@@ -52,6 +53,7 @@ export class SymbolView extends Component {
     lbl.lineHeight = lbl.fontSize + 2;
     lbl.isBold = true;
     lbl.color = new Color(245, 247, 250, 255); // white-smoke (brand: no acid yellow)
+    applyFont(lbl, 'display');
     this.label = lbl;
 
     // Win light-up: a bright ACID diamond light-frame (outline + faint fill, NEVER a

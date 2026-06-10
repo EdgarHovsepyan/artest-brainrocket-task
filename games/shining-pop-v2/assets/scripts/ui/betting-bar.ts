@@ -30,6 +30,7 @@ import {
   EventTouch,
   tween,
 } from 'cc';
+import { applyFont } from '../view/fonts';
 const { ccclass } = _decorator;
 
 const W = 540;
@@ -514,6 +515,7 @@ export class BettingBarMobile extends Component {
     lab.lineHeight = size + 2;
     lab.color = col(color);
     lab.isBold = true;
+    applyFont(lab, color === C.value ? 'display' : 'body');
     n.setPosition(new Vec3(x, this.Y(y), 0));
     this.labels[name] = lab;
     return lab;

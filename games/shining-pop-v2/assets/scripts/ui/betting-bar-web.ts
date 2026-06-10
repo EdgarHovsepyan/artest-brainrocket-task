@@ -29,6 +29,7 @@ import {
   UITransform,
   Vec3,
 } from 'cc';
+import { applyFont } from '../view/fonts';
 const { ccclass } = _decorator;
 
 const W = 2400;
@@ -158,6 +159,7 @@ export class BettingBarWeb extends Component {
     l.lineHeight = size + 4;
     l.isBold = bold;
     l.color = col(color);
+    applyFont(l, color === C.value ? 'display' : 'body');
     return l;
   }
 

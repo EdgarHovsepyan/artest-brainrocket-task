@@ -38,6 +38,7 @@ import { CeremonyView } from './ceremony-view';
 import { AnticipationLayer } from './anticipation-layer';
 import { ParticleLayer } from './particle-layer';
 import { AudioManager } from './audio-manager';
+import { applyFont, loadFonts } from './fonts';
 
 const { ccclass } = _decorator;
 
@@ -154,7 +155,7 @@ export class SlotView extends Component {
   }
 
   private loadAssets(): Promise<void> {
-    const jobs: Promise<void>[] = [];
+    const jobs: Promise<void>[] = [loadFonts()];
     SYM_RES.forEach((name, id) => {
       jobs.push(
         new Promise<void>((res) =>
@@ -272,6 +273,7 @@ export class SlotView extends Component {
     size: number,
     col: Color,
     parent = this.node,
+    display = false,
   ): Label {
     const n = this.mkNode('lbl', 460, size + 8, parent);
     n.setPosition(x, y, 0);
@@ -282,6 +284,7 @@ export class SlotView extends Component {
     l.color = col;
     l.isBold = true;
     l.horizontalAlign = Label.HorizontalAlign.CENTER;
+    applyFont(l, display ? 'display' : 'body');
     return l;
   }
 
@@ -392,7 +395,7 @@ export class SlotView extends Component {
       this.buildHud();
       this.buildControlDeck();
     }
-    this.bannerLabel = this.mkLabel('', 0, 250, 36, ACID);
+    this.bannerLabel = this.mkLabel('', 0, 250, 36, ACID, this.node, true);
 
     // ceremony on top of everything; shakes the whole view node
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);

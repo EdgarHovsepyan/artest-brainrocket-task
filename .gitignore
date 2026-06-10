@@ -31,3 +31,6 @@ native/
 **/settings/mcp-server.json
 
 games/*/extensions/
+
+games/*/build-qa/
+games/*/build/
