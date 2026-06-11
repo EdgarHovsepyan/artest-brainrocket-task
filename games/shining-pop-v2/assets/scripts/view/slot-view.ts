@@ -684,7 +684,10 @@ export class SlotView extends Component {
     }
     // Dock in the left margin (gap from the frame edge), centred on the reels.
     fab.setPosition(-(this.gw / 2 + 14 + targetW / 2), VIEW_CONFIG.layout.reelCenterY, 0);
-    // Idle life — breathe (fabAnim scale) + float (fab position). Node tweens only.
+    // Idle life — breathe (fabAnim scale) + float (fabAnim position). BOTH on the
+    // INNER node so fit() stays the sole owner of the OUTER fab.position; putting
+    // the float on `fab` let it overwrite fit()'s dock every frame, pinning the
+    // FAB to its build-time left position (the landscape right-dock never took).
     if (!this.reducedFx) {
       tween(fabAnim)
         .to(1.5, { scale: new Vec3(1.05, 1.05, 1) }, { easing: 'sineInOut' })
@@ -692,7 +695,7 @@ export class SlotView extends Component {
         .union()
         .repeatForever()
         .start();
-      tween(fab)
+      tween(fabAnim)
         .by(1.9, { position: new Vec3(0, 7, 0) }, { easing: 'sineInOut' })
         .by(1.9, { position: new Vec3(0, -7, 0) }, { easing: 'sineInOut' })
         .union()

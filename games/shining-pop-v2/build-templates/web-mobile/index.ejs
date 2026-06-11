@@ -185,13 +185,17 @@
        viewport — safe + idempotent, and it hardens real browsers too. */
     (function () {
       function kick() { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }
+      // Kick on load + the next two frames (covers late layout settle)...
       window.addEventListener('load', function () {
         requestAnimationFrame(function () { kick(); requestAnimationFrame(kick); });
       });
-      var n = 0, iv = setInterval(function () { kick(); if (++n > 15) clearInterval(iv); }, 200);
+      // ...and exactly ONCE more when the engine reports the scene is up, then stop.
+      // (Deliberately NOT a long interval — repeatedly re-laying a full-size canvas
+      // hammers throttled/headless renderers for no benefit.)
       var poll = setInterval(function () {
         if (window.cc && cc.director && cc.director.getScene()) { kick(); clearInterval(poll); }
-      }, 100);
+      }, 120);
+      setTimeout(function () { clearInterval(poll); }, 6000); // safety stop
     })();
   </script>
 </body>
