@@ -49,7 +49,7 @@ Status legend: ⬜ pending · 🔶 doing · ✅ done. Each item names the lens s
 
 ## PHASE 6 — WebGPU evaluation · `webgpu`, `pascal-slots-asset-performance`
 
-- ⬜ 6.1 Eval Cocos `useWebGPU` build flag: does it boot on the target browsers? perf vs WebGL2? Enables the shader tier (Phase 3.4/4.4) if green; else stay WebGL2 + Graphics FX. Decision documented, no regression.
+- ✅ 6.1 **DECISION: STAY ON WebGL2 + Graphics FX — no change.** Audited: `settings/v2/packages/engine.json` has `gfx-webgpu` `{_value:false}` and excluded from `includeModules`; the compiled engine's AUTO renderMode would pick WEBGPU if `navigator.gpu` exists, BUT the WebGPU device class is never compiled in (0 hits for requestAdapter/WGSL/createShaderModule in the bundle), so init safely falls back to WebGL2. The whole FX tier is faked with `cc.Graphics` + Node/Component tweens (no `.effect`/Material assets anywhere); this is a 2D batched, draw-call/CPU-bound workload, so WebGPU offers no upside and adds an experimental mobile-flaky device path. Enabling it while renderMode stays AUTO would silently switch capable browsers to the immature backend with no fallback. Custom-shader tier (true specular/bloom/dissolve, SY8/4.4) does NOT need WebGPU — it can use CCEffect materials on WebGL2 today; deferred as a future enhancement, not a blocker.
 
 ## PHASE 7 — Intro / info surfaces · `high-end-visual-design`, `web-animations`, `game-info-author`, (optional) `remotion-best-practices`
 
@@ -73,3 +73,37 @@ Status legend: ⬜ pending · 🔶 doing · ✅ done. Each item names the lens s
 P1 (bar, most-requested) → P2 (FAB, quick win) → P3 (symbols) → P4 (win FX) →
 P5 (reel/spin feel) → P6 (WebGPU gate) → P7 (intro/info) → P8 (QA sign-off).
 Each phase: edit → test/typecheck → build → QA-loop verify → commit → tick here.
+
+## SESSION STATUS (2026-06-11)
+
+Shipped + verified on a fresh web-mobile build (build-qa @ :7461, 1280×720), tsc
+clean for assets/scripts, 44/44 node tests, console-silent through boot → intro →
+spin → resolve → ceremony:
+
+- **Bugs**: reel-crush on win/lose (ceremony shake now kicks pos+angle only, fit()
+  owns scale — verified reel scale held 1.24 through a 50× ceremony); pre-spin
+  symbol flash (result dropped at settle via `pendingFinal`); reel size jitter at
+  launch (blur gated behind `launching`); spin button rebuilt as concentric annuli.
+- **Count-ups** (correctness): both ceremony + HUD migrated off plain-object tweens
+  to `Component.schedule` steppers — verified the ceremony amount counts 0 → 500.00.
+- **Win-lines**: charged L→R reveal + hot spark + per-line colour (10 hues) +
+  accelerating cadence + idle breathe; reduced-motion instant fallback.
+- **Ceremony**: unclamped intensity band (>100× keeps escalating), living
+  warm→crystal tint, capped shake, AV-sync (impact braam + count pips).
+- **Free spins**: per-spin money moments (win lines + tiered sting + savour dwell,
+  brisk dead spins), big-step banner, LDW-safe floored finale.
+- **Intro**: removed EXTRA STUDIO mark; data-derived game-info peek (top-4 symbols +
+  ×payouts + RTP/vol/lines + buy names); single clean close fade (no white-flash
+  flicker, full-cover bloom).
+- **Bar (landscape/web)**: compacted via a single `Y()` CROP offset — H 300→214,
+  reads as a slim slab, reels reclaim space; carousel hardened (empty guard, index
+  clamp, drag rubber-band).
+- **Buy-bonus FAB**: ported from Pixi — docked in the left margin, breathe/float/
+  glow life, press squash, hides behind its picker + during features.
+
+**Outstanding (spawned as a follow-up task):** PORTRAIT/mobile bar layout —
+`betting-bar.ts` centres itself over the reels so the spin cluster + title logo
+overlap the grid; needs a portrait bottom-inset + safe-area + 44px targets +
+shrink-to-fit. Landscape (web bar) is the verified-good path; do not regress it
+(shared board fit). Both games confirmed running: Cocos build-qa @ :7461, Pixi
+flagship dev @ :5173.
