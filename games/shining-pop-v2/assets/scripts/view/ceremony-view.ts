@@ -27,6 +27,7 @@ const { ccclass } = _decorator;
 
 const RIM = new Color().fromHEX(PAL.accent); // magenta accent
 const CRYSTAL = new Color().fromHEX(PAL.valueText); // crystal white-pink amount
+const WARM = new Color(255, 196, 92, 255); // hot-gold the amount rolls THROUGH
 const TITLE = new Color().fromHEX(PAL.title); // soft-magenta header default
 const fmt = (cents: number) => (cents / 100).toFixed(2);
 
@@ -50,6 +51,20 @@ export class CeremonyView extends Component {
   private shakeRest: { pos: Vec3; angle: number } | null = null;
   private countTarget = 0;
   private counting = false;
+  // Count-up state — driven by Component.schedule, NOT a plain-object tween.
+  // tween({v:0}) targets a bare object the TweenSystem never ticks in this
+  // 3.8.8 web runtime, so the big-win amount could snap/freeze; a scheduled
+  // frame-stepper with the easing sampled by hand always ticks. (See MEMORY
+  // cocos-web-runtime-animation-gotchas.)
+  private countFrom = 0;
+  private countDur = 1;
+  private countElapsed = 0;
+  /** Optional hooks the controller registers so the VIEW's detonation/roll
+   *  stays AV-synced (audio lives in the controller). */
+  onDetonate: ((tierName: string) => void) | null = null;
+  onCountPip: (() => void) | null = null;
+  private pipAccum = 0;
+  private readonly _tintTmp = new Color();
 
   /** Build the (hidden) overlay + a fullscreen dim used for the micro-silence beat. */
   build(shakeNode: Node): void {
@@ -104,8 +119,15 @@ export class CeremonyView extends Component {
     const tier = resolveBigWinTier(multiple);
     if (!tier) return false;
 
-    // continuous 0..1 intensity across the whole ceremony band (8x .. 100x+)
+    // continuous 0..1 intensity across the main band (8x .. 100x). Past 100x the
+    // ceremony USED to clamp here — so a 500x or a max-win looked identical to a
+    // 100x, the escalation dying exactly where the biggest wins begin. `boost`
+    // keeps rays/shake/duration growing (log-scaled, saturates ~1000x+) while the
+    // saturating `t` still governs colour/fontSize so text never blows up.
     const t = Math.max(0, Math.min(1, (multiple - 8) / 92));
+    const over = Math.max(0, multiple - 100);
+    const boost = over > 0 ? Math.min(1, Math.log10(1 + over / 60)) : 0;
+    const tx = Math.min(1.6, t + boost * 0.6); // extended intensity for >100x
 
     this.headerLabel.string = `${tier.name} WIN`;
     this.headerLabel.color = new Color().fromHEX(tier.color);
@@ -121,22 +143,28 @@ export class CeremonyView extends Component {
         .to(0.3, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
         .start();
       if (!reduced) {
-        this.drawRays(Math.round(8 + 10 * t), 300 + 280 * t, 0.5 + 0.5 * t);
+        this.drawRays(Math.round(8 + 12 * tx), 300 + 320 * tx, 0.5 + 0.5 * t);
         this.raysNode.angle = 0;
         tween(this.raysNode)
-          .by(6, { angle: 14 + 10 * t })
+          .by(6, { angle: 14 + 12 * tx })
           .repeatForever()
           .start();
-        this.fireShock(220 + 160 * t);
-        this.shake(tier.shakeAmp);
+        this.fireShock(220 + 180 * tx);
+        // amplitude tracks the realised win continuously, but CAP it (~tier*4)
+        // so a max-win can't nauseate (slot-vfx restraint rule).
+        this.shake(Math.min(tier.shakeAmp * 1.8, tier.shakeAmp + 14 * tx));
       }
+      // AV-sync hook: the controller fires the braam/win sting on this exact
+      // frame so the detonation never plays in silence (audio lives there).
+      this.onDetonate?.(tier.name);
       // header overshoot pop on top of the panel scale-in
       this.headerLabel.node.setScale(0.3, 0.3, 1);
       tween(this.headerLabel.node)
         .to(0.34, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'backOut' })
         .to(0.12, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
         .start();
-      this.countUp(winCents, 0.8 + 0.8 * t);
+      // bigger wins savour longer — duration tracks the extended intensity.
+      this.countUp(winCents, 0.8 + 1.0 * tx);
     };
 
     // beat 1 — micro-silence: dim, hold, then detonate.
@@ -147,7 +175,7 @@ export class CeremonyView extends Component {
       .to(0.5, { opacity: reduced ? 60 : 110 })
       .start();
 
-    this.scheduleOnce(() => this.hide(), (VIEW_CONFIG.ceremony.holdMs + 900 * t) / 1000);
+    this.scheduleOnce(() => this.hide(), (VIEW_CONFIG.ceremony.holdMs + 1100 * tx) / 1000);
     return true;
   }
 
@@ -227,8 +255,9 @@ export class CeremonyView extends Component {
   private fastForward(): void {
     if (!this.overlay.active) return;
     if (this.counting) {
-      Tween.stopAllByTarget(this.amountLabel);
+      this.unschedule(this.tickCount);
       this.amountLabel.string = fmt(this.countTarget);
+      this.amountLabel.color = CRYSTAL;
       this.landingPop();
       this.counting = false;
     }
@@ -237,24 +266,43 @@ export class CeremonyView extends Component {
   }
 
   private countUp(toCents: number, dur: number): void {
-    const proxy = { v: 0 };
     this.counting = true;
+    this.countTarget = toCents;
+    this.countFrom = 0;
+    this.countDur = Math.max(0.2, dur);
+    this.countElapsed = 0;
+    this.pipAccum = 0;
     this.amountLabel.string = '0.00';
-    tween(proxy)
-      .to(
-        dur,
-        { v: toCents },
-        {
-          easing: 'quartOut',
-          onUpdate: () => (this.amountLabel.string = fmt(Math.round(proxy.v))),
-        },
-      )
-      .call(() => {
-        this.counting = false;
-        this.landingPop();
-      })
-      .start();
+    this.unschedule(this.tickCount);
+    this.schedule(this.tickCount, 0); // every frame — guaranteed to tick (not a plain-object tween)
   }
+
+  /** Frame-stepped count-up (arrow fn so `this` binds + unschedule matches the
+   *  same ref). Samples quartOut by hand, fires a throttled audio pip, and
+   *  lerps the amount colour warm-gold -> crystal as it lands (the "living tint"
+   *  WC6 beat — the hero number is no longer static-coloured). */
+  private tickCount = (dt: number): void => {
+    this.countElapsed += dt;
+    const p = Math.min(1, this.countElapsed / this.countDur);
+    const e = 1 - Math.pow(1 - p, 4); // quartOut
+    const v = this.countFrom + (this.countTarget - this.countFrom) * e;
+    this.amountLabel.string = fmt(Math.round(v));
+    Color.lerp(this._tintTmp, WARM, CRYSTAL, e);
+    this.amountLabel.color = this._tintTmp; // reassign so the Label marks dirty
+    // per-pip tick ~ every 70ms while rolling (skips the final settle)
+    this.pipAccum += dt;
+    if (p < 0.98 && this.pipAccum >= 0.07) {
+      this.pipAccum = 0;
+      this.onCountPip?.();
+    }
+    if (p >= 1) {
+      this.unschedule(this.tickCount);
+      this.amountLabel.string = fmt(this.countTarget);
+      this.amountLabel.color = CRYSTAL;
+      this.counting = false;
+      this.landingPop();
+    }
+  };
 
   /** Damped-elastic pop when the count lands (counter.landingPop spec). */
   private landingPop(): void {

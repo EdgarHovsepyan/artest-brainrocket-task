@@ -1459,8 +1459,9 @@ export class SlotView extends Component {
     tween(teaserOp).delay(0.45).to(0.4, { opacity: 220 }).start();
 
     // CTA — a candy pill with a brighter label so it reads as a button, not text.
+    // Dropped below the game-info peek that now occupies the mid-band.
     const ctaGroup = this.mkNode('introCta', 320, 72, ov);
-    ctaGroup.setPosition(0, -150, 0);
+    ctaGroup.setPosition(0, -288, 0);
     const cg = ctaGroup.addComponent(Graphics);
     const drawCta = (glowA: number) => {
       if (!cg.isValid) return; // guard: tween may tick a frame after destroy
@@ -1501,23 +1502,59 @@ export class SlotView extends Component {
       .repeatForever()
       .start();
 
-    if (this.brandFrames.studio) {
-      const mark = this.mkNode('studioMark', 120, 120, ov);
-      mark.setPosition(0, -260, 0);
-      const sp = mark.addComponent(Sprite);
-      sp.sizeMode = Sprite.SizeMode.CUSTOM;
-      sp.spriteFrame = this.brandFrames.studio;
-      const op = mark.addComponent(UIOpacity);
-      op.opacity = 0;
-      tween(op).delay(0.6).to(0.5, { opacity: 170 }).start();
-    }
+    // GAME-INFO PEEK — show OUR game (top-paying symbols + their payouts +
+    // RTP/volatility/lines + the buy-feature names), not just a MAX teaser, and
+    // NOT the removed third-party studio badge. Every value is read-only from the
+    // LOCKED math/data (paytableRows / RTP_DISPLAY / VOLATILITY_DISPLAY /
+    // PAYLINES / BONUS_MODES) so the intro can never drift from the paytable.
+    const peek = this.mkNode('introPeek', 460, 170, ov);
+    peek.setPosition(0, -150, 0);
+    const peekOp = peek.addComponent(UIOpacity);
+    peekOp.opacity = 0;
+    const top = paytableRows().slice(0, 4); // Wild + top highs (PAYTABLE order)
+    const gapX = 100;
+    top.forEach((row, i) => {
+      const cx = (i - (top.length - 1) / 2) * gapX;
+      const cell = this.mkNode(`peekSym${row.id}`, 58, 58, peek);
+      cell.setPosition(cx, 22, 0);
+      const sf = this.frames[row.id];
+      if (sf) {
+        const sp = cell.addComponent(Sprite);
+        sp.sizeMode = Sprite.SizeMode.CUSTOM;
+        sp.spriteFrame = sf;
+      } else {
+        this.mkLabel(row.name, 0, 0, 12, new Color(245, 247, 250, 255), cell);
+      }
+      this.mkLabel(`×${row.pay5}`, cx, -16, 16, ACID, peek);
+    });
+    this.mkLabel(
+      `RTP ${RTP_DISPLAY}  ·  VOL ${VOLATILITY_DISPLAY}  ·  ${PAYLINES.length} LINES`,
+      0,
+      -56,
+      14,
+      MUTED,
+      peek,
+    );
+    this.mkLabel(
+      `BUY: ${Object.values(BONUS_MODES)
+        .map((m) => m.name)
+        .join('   ·   ')}`,
+      0,
+      -82,
+      13,
+      new Color(255, 150, 200, 255),
+      peek,
+    );
+    tween(peekOp).delay(0.6).to(0.5, { opacity: 235 }).start();
 
     // Screen-fit the gate (it's a Canvas overlay now, not board-space): scale so
     // the logo→studio band fits the viewport, centred at screen centre. Raise it
     // above the bar — the bar node is created AFTER the intro in boot, so re-assert
     // the top sibling index next frame (when the bar exists).
     const vis = view.getVisibleSize();
-    const introS = Math.min(vis.width / 470, vis.height / 780, 1.3);
+    // Taller content band now (logo → peek → CTA), so fit to ~880 of height so
+    // the bottom CTA never clips on a short/portrait viewport.
+    const introS = Math.min(vis.width / 480, vis.height / 880, 1.3);
     ov.setScale(introS, introS, 1);
     ov.setPosition(0, 0, 0);
     const raise = (): void => {
@@ -1538,18 +1575,22 @@ export class SlotView extends Component {
         .to(0.12, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'quadOut' })
         .to(0.18, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
         .start();
-      const flash = this.mkNode('introFlash', 2600, 2200, ov);
+      // Soft confirming bloom — sized to FULLY cover the 4000×3200 scrim (the old
+      // 2600×2200 flash left a dim border ring that read as a white rectangle),
+      // kept brief + low-alpha so it can't pop as a separate white stage.
+      const flash = this.mkNode('introFlash', 4000, 3200, ov);
       const fg = flash.addComponent(Graphics);
-      fg.fillColor = new Color(255, 255, 255, 255);
-      fg.rect(-1300, -1100, 2600, 2200);
+      fg.fillColor = new Color(255, 240, 250, 255);
+      fg.rect(-2000, -1600, 4000, 3200);
       fg.fill();
       const fop = flash.addComponent(UIOpacity);
       fop.opacity = 0;
-      tween(fop).to(0.1, { opacity: 90 }).to(0.3, { opacity: 0 }).start();
+      tween(fop).to(0.08, { opacity: 55 }).to(0.24, { opacity: 0 }).start();
+      // Single clean fade — the gate starts dimming IMMEDIATELY (no 0.18 delay),
+      // so there's no "dim lingers under a white flash then flickers out" stage.
       const op = ov.getComponent(UIOpacity) ?? ov.addComponent(UIOpacity);
       tween(op)
-        .delay(0.18)
-        .to(0.4, { opacity: 0 }, { easing: 'quadOut' })
+        .to(0.32, { opacity: 0 }, { easing: 'quadOut' })
         .call(() => ov.destroy())
         .start();
       onDismiss();
@@ -1729,29 +1770,45 @@ export class SlotView extends Component {
     });
   }
 
+  // Count-up state — driven by Component.schedule, NOT tween({v:0}). A
+  // plain-object tween target is never ticked by the TweenSystem in this 3.8.8
+  // web runtime (MEMORY cocos-web-runtime-animation-gotchas), so the HUD WIN
+  // could snap/freeze; a scheduled frame-stepper always advances.
+  private winCountTo = 0;
+  private winCountDur = 1;
+  private winCountElapsed = 0;
+  private winCountLastTick = 0;
+
   /** Kinetic count-up of the win amount, with audio ticks. */
   countUp(toCents: number): void {
     const { baseMs, logScaleMs, maxMs } = VIEW_CONFIG.counter;
-    const dur = Math.min(maxMs, baseMs + Math.log10(toCents + 1) * logScaleMs) / 1000;
-    const proxy = { v: 0 };
-    let lastTick = 0;
-    tween(proxy)
-      .to(
-        dur,
-        { v: toCents },
-        {
-          onUpdate: () => {
-            this.setWin(Math.round(proxy.v));
-            const p = proxy.v / Math.max(1, toCents);
-            if (p - lastTick > 0.12) {
-              lastTick = p;
-              this.audio.countTick(p);
-            }
-          },
-        },
-      )
-      .start();
+    this.winCountDur = Math.max(
+      0.2,
+      Math.min(maxMs, baseMs + Math.log10(toCents + 1) * logScaleMs) / 1000,
+    );
+    this.winCountTo = toCents;
+    this.winCountElapsed = 0;
+    this.winCountLastTick = 0;
+    this.setWin(0);
+    this.unschedule(this.tickWin);
+    this.schedule(this.tickWin, 0);
   }
+
+  /** Frame-stepped HUD count-up (arrow fn so `this` binds + unschedule matches). */
+  private tickWin = (dt: number): void => {
+    this.winCountElapsed += dt;
+    const p = Math.min(1, this.winCountElapsed / this.winCountDur);
+    const v = Math.round(this.winCountTo * p);
+    this.setWin(v);
+    if (p - this.winCountLastTick > 0.12) {
+      this.winCountLastTick = p;
+      this.audio.countTick(p);
+    }
+    if (p >= 1) {
+      this.unschedule(this.tickWin);
+      this.setWin(this.winCountTo);
+    }
+  };
 
   /** Big-win ceremony (tiered). Returns false for small wins (HUD count-up only).
    *  Audio is the CONTROLLER's job (it owns the LDW gate) — no sound here. */

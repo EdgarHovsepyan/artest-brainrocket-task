@@ -33,7 +33,16 @@ import { applyFont } from '../view/fonts';
 const { ccclass } = _decorator;
 
 const W = 2400;
-const H = 300;
+// Compact slab: the controls only occupy design-y ~88..256 (spin-ring halo top
+// down to its bottom). The old 300-tall surface left ~88px of dead gradient
+// above them, so the bar read as a tall washed slab (owner: "betting part
+// height / compact"). CROP shifts the design->node mapping up so the bar's top
+// edge sits just above the halo; H is trimmed to the real content extent. Every
+// control routes through Y(), so this single offset moves the whole band
+// together — no per-control re-pointing.
+const H = 214;
+const CROP = 78; // design-y that maps to the bar's TOP edge (node y = 0)
+const RING_TOP = 116; // spin ring top edge in design-y (cy 186 − R 70)
 /** Master type-scale (FS=1.1 in betting-bar-web.js): the design font sizes are
  *  built for a 30%-viewport-tall bar; with our 42% cap the bar IS bigger but
  *  the text was still reading thin at small presets. Bumping every lbl() by
@@ -111,16 +120,14 @@ export class BettingBarWeb extends Component {
     ui.setAnchorPoint(0, 1);
 
     const bg = this.gfx('bg');
-    // 3-stop vertical depth ramp (master uses FillGradient — Graphics has none,
-    // so a stack of softening alpha rects approximates the smooth wash).
-    bg.fillColor = col('#241652', 0.94); // upper warm violet
+    // 2-stop depth ramp on the now-slim slab (Graphics has no gradient, so a warm
+    // base + one deeper grounding band reads as a smooth wash; the redundant mid
+    // stop is dropped for a finer, more elegant band).
+    bg.fillColor = col('#241652', 0.96); // warm-violet base
     bg.rect(0, -H, W, H);
     bg.fill();
-    bg.fillColor = col(C.stage, 0.55); // mid stop
-    bg.rect(0, -H, W, H - 56);
-    bg.fill();
-    bg.fillColor = col(C.stageDeep, 0.7); // deepest band that grounds the controls
-    bg.rect(0, -H, W, H - 130);
+    bg.fillColor = col(C.stageDeep, 0.55); // deeper band grounding the controls (lower 60%)
+    bg.rect(0, -H, W, Math.round(H * 0.6));
     bg.fill();
     // Soft top contour — a 2px candy-pink hairline that lifts the bar off the
     // reels above (master 2-color rim system).
@@ -149,7 +156,7 @@ export class BettingBarWeb extends Component {
   private demoBadge!: Node;
   private buildDemoBadge(): void {
     const x = 1140;
-    const y = 92;
+    const y = 104; // nudged down into the slim slab so the chip clears the top edge
     const w = 120;
     const h = 24;
     const n = this.localNode(this.node, x, this.Y(y), w, h);
@@ -167,7 +174,7 @@ export class BettingBarWeb extends Component {
   }
 
   private Y(y: number): number {
-    return -y;
+    return CROP - y; // crop the dead top band: design-y CROP -> node top edge (0)
   }
 
   private gfx(name: string, parent: Node = this.node): Graphics {
@@ -431,7 +438,19 @@ export class BettingBarWeb extends Component {
       const dx = (x - this.dragX) / (this.node.scale.x || 1);
       this.dragX = x;
       this.moved += Math.abs(dx);
-      this.track.setPosition(this.track.position.x + dx, this.track.position.y, 0);
+      const n = this.levels.length;
+      const nx = this.track.position.x + dx;
+      // Rubber-band clamp: at most one cell of overscroll past either end so a
+      // fling can NEVER drag the whole strip out of the mask and leave a blank
+      // window (the owner's "empty space bug in the quick bets carousel"). The
+      // ends now feel like a soft wall instead of an empty void.
+      if (n > 0) {
+        const lo = this.trackXFor(n - 1) - this.CELLW;
+        const hi = this.trackXFor(0) + this.CELLW;
+        this.track.setPosition(Math.max(lo, Math.min(hi, nx)), this.track.position.y, 0);
+      } else {
+        this.track.setPosition(nx, this.track.position.y, 0);
+      }
     });
     const end = () => {
       if (!this.dragging) return;
@@ -451,6 +470,7 @@ export class BettingBarWeb extends Component {
     return this.PCX - (i * this.CELLW + this.CELLW / 2);
   }
   private nearestIdx(): number {
+    if (this.levels.length === 0) return 0; // never emit a negative phantom index
     const i = Math.round((this.PCX - this.track.position.x - this.CELLW / 2) / this.CELLW);
     return Math.max(0, Math.min(this.levels.length - 1, i));
   }
@@ -801,10 +821,15 @@ export class BettingBarWeb extends Component {
    *  CONTROL band, not the whole 2400x300 surface, decides what the board may
    *  use. Returns the control-band height in screen px for the view inset. */
   fit(viewW: number, viewH: number): number {
-    const s = Math.min(viewW / W, 0.55, (viewH * 0.34) / H);
+    // Slimmer surface → relax the height cap (was 0.34/300) and raise the abs cap
+    // a touch since the bar is shorter; keeps it dense, not chunky.
+    const s = Math.min(viewW / W, 0.6, (viewH * 0.32) / H);
     this.node.setScale(s, s, 1);
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + H * s, 0));
-    return (H - 118) * s;
+    // Reels reserve just enough to clear the spin-ring TOP (design RING_TOP),
+    // with a 2px gap. The faint halo above the ring may bleed harmlessly behind
+    // the reel band. Derived from the same CROP mapping so it tracks the slab.
+    return (H - (RING_TOP - CROP) - 2) * s;
   }
 
   private fmt(n: number): string {
@@ -895,31 +920,52 @@ export class BettingBarWeb extends Component {
   }
   setBetLevels(valuesCents: number[], activeIdx: number, fmt?: (v: number) => string): void {
     if (fmt) this.carFmt = fmt;
-    const same =
-      this.levels.length === valuesCents.length &&
-      this.levels[0] === valuesCents[0] &&
-      this.levels[this.levels.length - 1] === valuesCents[valuesCents.length - 1];
-    if (!same) {
-      this.levels = valuesCents.slice();
+    const vals = valuesCents ?? [];
+    const ai = Number.isFinite(activeIdx) ? activeIdx : 0;
+    // Empty ladder → render nothing rather than a corrupt strip with a negative
+    // active index (the old code let [] satisfy `same` and fall through, leaving
+    // a phantom pill + negative bet:set). Defensive: the real ladder is never
+    // empty, but a model/ladder mismatch must degrade cleanly.
+    if (vals.length === 0) {
       this.track.removeAllChildren();
       this.cells = [];
-      valuesCents.forEach((v, i) => {
+      this.levels = [];
+      this.activeIdx = 0;
+      this.track.setPosition(this.trackXFor(0), 0, 0);
+      return;
+    }
+    const same =
+      this.levels.length > 0 &&
+      this.levels.length === vals.length &&
+      this.levels[0] === vals[0] &&
+      this.levels[this.levels.length - 1] === vals[vals.length - 1];
+    if (!same) {
+      this.levels = vals.slice();
+      this.track.removeAllChildren();
+      this.cells = [];
+      vals.forEach((v, i) => {
         const t = this.lbl(this.carFmt(v), 0, 0, 27, C.value, true, this.track);
         t.horizontalAlign = Label.HorizontalAlign.CENTER;
         t.node.getComponent(UITransform)!.setAnchorPoint(0.5, 0.5);
         t.node.setPosition(i * this.CELLW + this.CELLW / 2, -30, 0);
         this.cells.push(t);
       });
-      this.activeIdx = Math.max(0, Math.min(valuesCents.length - 1, activeIdx));
+      this.activeIdx = Math.max(0, Math.min(vals.length - 1, ai));
       this.track.setPosition(this.trackXFor(this.activeIdx), 0, 0);
       this.restyleCells();
-    } else if (!this.dragging && activeIdx !== this.activeIdx) {
-      this.activeIdx = activeIdx;
-      tween(this.track)
-        .to(0.3, { position: new Vec3(this.trackXFor(activeIdx), 0, 0) }, { easing: 'quadOut' })
-        .call(() => this.restyleCells())
-        .start();
-      this.restyleCells();
+    } else if (!this.dragging) {
+      // Clamp the update-branch index too (the rebuild branch already clamped):
+      // a stray -1 from indexOf() on a ladder mismatch would tween to a phantom
+      // off-window position and blank the carousel.
+      const clamped = Math.max(0, Math.min(vals.length - 1, ai));
+      if (clamped !== this.activeIdx) {
+        this.activeIdx = clamped;
+        tween(this.track)
+          .to(0.3, { position: new Vec3(this.trackXFor(clamped), 0, 0) }, { easing: 'quadOut' })
+          .call(() => this.restyleCells())
+          .start();
+        this.restyleCells();
+      }
     }
   }
   setDemo(on: boolean): void {
