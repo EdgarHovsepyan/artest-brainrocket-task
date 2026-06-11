@@ -1334,8 +1334,13 @@ export class SlotView extends Component {
    *  AudioContext (master learning) — the controller wires that; this is the
    *  branded surface. */
   buildIntro(onDismiss: () => void): void {
+    // The intro is a SCREEN overlay, not part of the game board. Parent it to the
+    // Canvas root (sibling of the view + bar) so the board fit() transform never
+    // drags it, and a high sibling index keeps it ABOVE the betting bar — the old
+    // bug where the bar covered the lower intro (CTA/studio "only logo showing").
+    const root = this.node.parent ?? this.node;
     // Oversized so it covers any aspect even before the board fit settles.
-    const ov = this.mkNode('intro', 4000, 3200, this.node);
+    const ov = this.mkNode('intro', 4000, 3200, root);
     const g = ov.addComponent(Graphics);
     // Softer dim (was 232 ≈ opaque) so the painted candy world reads THROUGH the
     // gate — branded arrival over the real bg, not a flat black card.
@@ -1506,6 +1511,20 @@ export class SlotView extends Component {
       op.opacity = 0;
       tween(op).delay(0.6).to(0.5, { opacity: 170 }).start();
     }
+
+    // Screen-fit the gate (it's a Canvas overlay now, not board-space): scale so
+    // the logo→studio band fits the viewport, centred at screen centre. Raise it
+    // above the bar — the bar node is created AFTER the intro in boot, so re-assert
+    // the top sibling index next frame (when the bar exists).
+    const vis = view.getVisibleSize();
+    const introS = Math.min(vis.width / 470, vis.height / 780, 1.3);
+    ov.setScale(introS, introS, 1);
+    ov.setPosition(0, 0, 0);
+    const raise = (): void => {
+      if (ov.isValid && ov.parent) ov.setSiblingIndex(ov.parent.children.length - 1);
+    };
+    raise();
+    this.scheduleOnce(raise, 0);
 
     // Tap anywhere → a quick confirming flash + logo punch, then fade the gate.
     ov.once(Node.EventType.TOUCH_END, () => {

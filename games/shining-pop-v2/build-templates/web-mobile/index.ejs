@@ -136,68 +136,32 @@
     <div class="brand">AN ARTEST | BRAINROCKET PRODUCTION</div>
   </div>
   <script>
-    /* Branded boot loader, driven by REAL asset progress (master parity).
-       4 stages of engine boot, then a hook on cc.assetManager.loadAny counts
-       every asset request the scene + view layer issues (resources.load) so
-       the bar advances PER ASSET, not on a timed staircase. Fades when the
-       request queue drains (started > 0 && done >= started) or the queue
-       plateaus for ~0.6s (catches synchronous-only boots). */
+    /* Branded boot loader — READ-ONLY progress (no engine monkey-patch). Reads
+       cc boot stages (loaded / inited / scene-up) and EASES the bar toward each
+       stage target so it feels continuous, not a hard staircase. The earlier
+       cc.assetManager.loadAny override was removed: patching a core engine method
+       during boot risked the asset pipeline (and a console error). */
     (function () {
       var t0 = Date.now();
       var fill = null;
+      var shown = 4;
       var setW = function (pct) {
         if (!fill) fill = document.querySelector('#brandLoader .bfill');
-        if (fill) fill.style.width = pct + '%';
+        if (fill) fill.style.width = pct.toFixed(1) + '%';
       };
-      var started = 0, done = 0;
-      var hooked = false;
-      function hookOnce() {
-        if (hooked) return;
-        var am = window.cc && window.cc.assetManager;
-        if (!am || typeof am.loadAny !== 'function') return;
-        var orig = am.loadAny.bind(am);
-        am.loadAny = function () {
-          started++;
-          var args = Array.prototype.slice.call(arguments);
-          for (var i = args.length - 1; i >= 0; i--) {
-            if (typeof args[i] === 'function') {
-              var prev = args[i];
-              args[i] = function (err, data) { done++; try { prev(err, data); } catch (e) {} };
-              return orig.apply(am, args);
-            }
-          }
-          var p = orig.apply(am, args);
-          if (p && typeof p.then === 'function') {
-            p.then(function () { done++; }, function () { done++; });
-          } else {
-            done++;
-          }
-          return p;
-        };
-        hooked = true;
-      }
-      var lastDone = 0, plateau = 0;
       var iv = setInterval(function () {
-        hookOnce();
-        var stage = 0, pct;
+        var stage = 0;
         try {
           if (window.cc) stage = 1;
           if (window.cc && window.cc.game && window.cc.game.inited) stage = 2;
           if (window.cc && window.cc.director && window.cc.director.getScene()) stage = 3;
         } catch (e) { stage = 0; }
-        if (stage < 3) {
-          pct = [4, 14, 26][stage];
-        } else {
-          // Scene up — drive the bar from real loadAny progress.
-          var ratio = started > 0 ? done / started : 0;
-          pct = Math.min(96, 26 + Math.round(ratio * 70));
-        }
-        setW(pct);
-        if (done === lastDone) plateau++;
-        else plateau = 0;
-        lastDone = done;
-        var assetsSettled = stage === 3 && started > 0 && done >= started && plateau >= 3;
-        if (assetsSettled || Date.now() - t0 > 30000) {
+        var target = [8, 34, 70, 100][stage];
+        // ease toward the stage target → smooth fill (CSS width-transition adds
+        // the final polish); never jumps backward.
+        shown += (target - shown) * 0.16;
+        setW(shown);
+        if ((stage === 3 && shown > 99.3) || Date.now() - t0 > 30000) {
           clearInterval(iv);
           setW(100);
           var el = document.getElementById('brandLoader');
@@ -205,10 +169,10 @@
             setTimeout(function () {
               el.classList.add('gone');
               setTimeout(function () { el.parentNode && el.parentNode.removeChild(el); }, 600);
-            }, 220);
+            }, 240);
           }
         }
-      }, 120);
+      }, 60);
     })();
   </script>
   <%- include(cocosTemplate, {}) %>
