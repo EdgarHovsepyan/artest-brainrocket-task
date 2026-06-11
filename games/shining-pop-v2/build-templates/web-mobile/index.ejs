@@ -176,5 +176,23 @@
     })();
   </script>
   <%- include(cocosTemplate, {}) %>
+  <script>
+    /* RESPONSIVE CANVAS KICK. The engine sizes the frame from window.innerWidth
+       captured at BOOT and only refreshes on a real 'resize' event. In an embed /
+       automated viewport / late-settling layout that first measure can be stale
+       (tiny innerWidth), freezing the canvas at a small size in the top-left. A
+       no-op resize re-runs the engine's _resizeFrame against the now-correct
+       viewport — safe + idempotent, and it hardens real browsers too. */
+    (function () {
+      function kick() { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }
+      window.addEventListener('load', function () {
+        requestAnimationFrame(function () { kick(); requestAnimationFrame(kick); });
+      });
+      var n = 0, iv = setInterval(function () { kick(); if (++n > 15) clearInterval(iv); }, 200);
+      var poll = setInterval(function () {
+        if (window.cc && cc.director && cc.director.getScene()) { kick(); clearInterval(poll); }
+      }, 100);
+    })();
+  </script>
 </body>
 </html>

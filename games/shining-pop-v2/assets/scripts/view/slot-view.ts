@@ -171,6 +171,12 @@ export class SlotView extends Component {
   private gw = 0;
   private gh = 0;
   private pitch = 0;
+  // Title block — stored so fit() can shrink + reparent it to the upper-LEFT in
+  // landscape (it stays top-centre in portrait). logoArt holds the breathing
+  // sprite on an INNER child so fit()'s scale on logoNode never fights the
+  // idle breathe tween.
+  private logoNode: Node | null = null;
+  private titleCaption: Node | null = null;
 
   private winLines: { lineIndex: number; count: number }[] = [];
   private winCycle = 0;
@@ -826,27 +832,30 @@ export class SlotView extends Component {
   }
 
   private buildTitle(): void {
+    // OUTER node = the transform fit() moves/scales per orientation. The art +
+    // breathe live on an INNER child so the responsive scale never fights the
+    // idle breathe tween.
     const logo = this.mkNode('logo', 300, 150, this.node);
-    // Compact logo, sat just above the reel frame (was oversized + crowding the
-    // board). 232x108 keeps the wordmark legible without dominating the screen.
     logo.setPosition(0, 312, 0);
+    this.logoNode = logo;
+    const art = this.mkNode('logoArt', 300, 150, logo);
     if (this.brandFrames.logo) {
       // The REAL game logo (master art, black-keyed offline).
-      const sp = logo.addComponent(Sprite);
+      const sp = art.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.spriteFrame = this.brandFrames.logo;
-      logo.getComponent(UITransform)!.setContentSize(232, 145);
+      art.getComponent(UITransform)!.setContentSize(232, 145);
     } else {
       // Fallback: brand-family text block.
-      const back = logo.addComponent(Graphics);
+      const back = art.addComponent(Graphics);
       back.fillColor = new Color(255, 0, 127, 26);
       back.roundRect(-185, -40, 370, 84, 18);
       back.fill();
-      const shining = this.mkLabel('SHINING', 0, 22, 30, new Color(245, 247, 250, 255), logo);
+      const shining = this.mkLabel('SHINING', 0, 22, 30, new Color(245, 247, 250, 255), art);
       shining.isItalic = true;
-      const pop = this.mkLabel('POP  V2', 0, -12, 34, ACID, logo);
+      const pop = this.mkLabel('POP  V2', 0, -12, 34, ACID, art);
       pop.isItalic = true;
-      const gg = this.mkNode('logo_gems', 10, 10, logo).addComponent(Graphics);
+      const gg = this.mkNode('logo_gems', 10, 10, art).addComponent(Graphics);
       [-208, 208].forEach((x) => {
         gg.fillColor = new Color(255, 90, 156, 200);
         gg.moveTo(x, 14);
@@ -857,19 +866,19 @@ export class SlotView extends Component {
         gg.fill();
       });
     }
-    tween(logo)
+    tween(art)
       .to(1.8, { scale: new Vec3(1.025, 1.025, 1) }, { easing: 'sineInOut' })
       .to(1.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
       .union()
       .repeatForever()
       .start();
-    this.mkLabel(
+    this.titleCaption = this.mkLabel(
       `MAX WIN ${maxWinMultiple().toLocaleString('en-US')}× · 10 LINES · WILD STRIKE`,
       0,
       230,
       12,
       MUTED,
-    );
+    ).node;
   }
 
   private buildFrame(): void {
@@ -1058,6 +1067,35 @@ export class SlotView extends Component {
     this.node.setScale(s, s, 1);
     // Land the content centre at the centre of the area above the bar.
     this.node.setPosition(0, this.bottomInset / 2 - contentCenter * s, 0);
+
+    // Orientation-gated title + FAB placement (same threshold the rest of the app
+    // uses). LANDSCAPE: the big top-centre logo crowded the reels and the FAB was
+    // a lone heavy mass on the left making the (already-centred) reels read
+    // off-centre. Shrink the logo to the upper-LEFT shoulder and move the FAB to
+    // the RIGHT margin so the composition is balanced around the centred reels.
+    // PORTRAIT: untouched (top-centre logo, left FAB) — that layout is correct.
+    const isLandscape = vis.width > vis.height * 1.05;
+    if (this.logoNode) {
+      if (isLandscape) {
+        this.logoNode.setScale(0.6, 0.6, 1);
+        this.logoNode.setPosition(-this.gw / 2 + 30, 322, 0); // above the frame's left shoulder
+      } else {
+        this.logoNode.setScale(1, 1, 1);
+        this.logoNode.setPosition(0, 312, 0);
+      }
+    }
+    if (this.titleCaption) {
+      // The long MAX-WIN caption is orphaned at top-centre once the logo moves
+      // left; hide it in landscape (the same info lives in the intro peek + info
+      // panel) and keep it under the logo in portrait.
+      this.titleCaption.active = !isLandscape;
+    }
+    if (this.buyFab) {
+      const fabX = this.gw / 2 + 14 + 50;
+      this.buyFab.setPosition(isLandscape ? fabX : -fabX, reelCenterY, 0);
+    }
+    // Keep the (screen-space) buy modal sized/centred above the bar on resize.
+    if (this.buyModal?.isOpen()) this.fitBuyModal();
   }
 
   // ---- buy menu (premium modal — flagship parity) ---------------------------
@@ -1074,8 +1112,15 @@ export class SlotView extends Component {
    *  surface is upgraded to the flagship 3-tier card (committed BuyBonusModal). */
   configureBuyMenu(options: BuyOption[]): void {
     if (!this.buyModal) {
-      const host = this.mkNode('buyModal', 10, 10, this.node);
-      host.setPosition(0, VIEW_CONFIG.layout.reelCenterY - 10, 0);
+      // SCREEN-SPACE overlay (like the intro), NOT a board child — otherwise the
+      // board's contain-fit scale + offset drag the card down into the betting
+      // bar and clip its bottom rows. Parent to the Canvas-level root + a high
+      // sibling index so it sits above the bar; fitBuyModal() then sizes/centres
+      // it within the safe area above the bar.
+      const root = this.node.parent ?? this.node;
+      const host = this.mkNode('buyModal', 10, 10, root);
+      host.setPosition(0, 0, 0);
+      host.setSiblingIndex(root.children.length - 1);
       this.buyModal = host.addComponent(BuyBonusModal);
       this.buyModal.on('buy', (mode) => {
         this.buyModal?.close();
@@ -1127,9 +1172,18 @@ export class SlotView extends Component {
 
   openBuyMenu(): void {
     this.closeOverlays();
+    this.fitBuyModal(); // size + centre within the safe area above the bar before showing
     this.buyModal?.open();
     this.audio.buyOpen();
     this.setBuyFabVisible(false); // hide the FAB behind its own picker
+  }
+
+  /** Drive the screen-space buy modal's fit with the live bar inset so its bottom
+   *  rows (YOUR BET stepper + CANCEL/BUY) never clip behind the betting bar. */
+  private fitBuyModal(): void {
+    if (!this.buyModal) return;
+    const vis = view.getVisibleSize();
+    this.buyModal.fit(vis.width, vis.height, this.bottomInset);
   }
 
   // ---- autoplay panel (parity port of the master's AUTOPLAY drawer) ----------

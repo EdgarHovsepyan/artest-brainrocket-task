@@ -429,11 +429,20 @@ export class BuyBonusModal extends Component {
     return this.node.active;
   }
 
-  /** Fit the card to the viewport (master fitScale): shrink if the card is taller
-   *  or wider than the available area, honouring a small margin. */
-  fit(viewW: number, viewH: number): void {
-    const s = Math.min(1, (viewW - 40) / CARD_W, (viewH - 40) / CARD_H);
+  /** Fit the card to the SAFE AREA ABOVE THE BETTING BAR. `bottomInset` is the
+   *  screen-px the bar reserves at the bottom; the card shrinks to fit the height
+   *  that remains AND is raised by half the inset so it centres in that band
+   *  instead of the full screen — otherwise its bottom rows (YOUR BET stepper +
+   *  CANCEL/BUY) clip behind the bar. Host is a screen-space overlay, so this
+   *  scale/position is absolute (no board scale applied). */
+  fit(viewW: number, viewH: number, bottomInset = 0): void {
+    const margin = 36;
+    const availH = Math.max(220, viewH - bottomInset - margin);
+    const s = Math.min(1, (viewW - margin) / CARD_W, availH / CARD_H);
     this.cardScale = s;
-    if (this.card) this.card.setScale(s, s, 1);
+    if (this.card) {
+      this.card.setScale(s, s, 1);
+      this.card.setPosition(0, bottomInset / 2, 0); // centre within the area above the bar
+    }
   }
 }
