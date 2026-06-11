@@ -42,20 +42,18 @@ export class CeremonyView extends Component {
   private badgeLabel!: Label;
   private dim!: UIOpacity;
   private shakeNode: Node | null = null;
-  private shakeBase: { pos: Vec3; angle: number; scale: Vec3 } | null = null;
+  // Rest transform captured LIVE at each shake start (NOT at build time). The
+  // shake target is the responsive root that fit() rescales/repositions, so a
+  // build-time snapshot goes stale → the old "crush" (board snapped to abs scale
+  // 1.0 on every win/settle). The shake now only kicks position+angle and resets
+  // to this live rest; scale is owned solely by fit() and never written here.
+  private shakeRest: { pos: Vec3; angle: number } | null = null;
   private countTarget = 0;
   private counting = false;
 
   /** Build the (hidden) overlay + a fullscreen dim used for the micro-silence beat. */
   build(shakeNode: Node): void {
     this.shakeNode = shakeNode;
-    // Snapshot the shake target's resting transform ONCE so an interrupted shake
-    // always resets to the true base (not a mid-shake position captured at call-time).
-    this.shakeBase = {
-      pos: shakeNode.position.clone(),
-      angle: shakeNode.angle,
-      scale: shakeNode.scale.clone(),
-    };
 
     // fullscreen dim behind the light show (held-breath beat + ray contrast)
     const dimNode = this.mk('dim', 4000, 4000, this.node);
@@ -270,27 +268,24 @@ export class CeremonyView extends Component {
 
   private shake(amp: number): void {
     const n = this.shakeNode;
-    const b = this.shakeBase;
-    if (!n || !b) return;
+    if (!n) return;
     Tween.stopAllByTarget(n);
-    const at = (dx: number, dy: number) => new Vec3(b.pos.x + dx, b.pos.y + dy, b.pos.z);
-    const punch = new Vec3(b.scale.x * 1.03, b.scale.y * 1.03, b.scale.z);
-    // 3-axis impact: horizontal + vertical kick, a small angle snap, and a zoom punch
-    // that all decay back to the resting base — reads as a HIT, not a slide.
+    // Capture the LIVE resting transform (fit() owns scale + y-position). We kick
+    // ONLY position + angle and decay back to this rest — never scale, so the
+    // board can't snap to an absolute scale (the crush). Reads as a HIT via the
+    // positional/angular impulse alone.
+    const rest = { pos: n.position.clone(), angle: n.angle };
+    this.shakeRest = rest;
+    const at = (dx: number, dy: number) => new Vec3(rest.pos.x + dx, rest.pos.y + dy, rest.pos.z);
     tween(n)
-      .to(0.04, { position: at(amp, amp * 0.55), angle: b.angle + 1.5, scale: punch })
-      .to(0.04, { position: at(-amp * 0.8, -amp * 0.4), angle: b.angle - 1.1 })
-      .to(0.04, {
-        position: at(amp * 0.5, amp * 0.25),
-        angle: b.angle + 0.6,
-        scale: b.scale.clone(),
+      .to(0.04, { position: at(amp, amp * 0.55), angle: rest.angle + 1.5 })
+      .to(0.04, { position: at(-amp * 0.8, -amp * 0.4), angle: rest.angle - 1.1 })
+      .to(0.04, { position: at(amp * 0.5, amp * 0.25), angle: rest.angle + 0.6 })
+      .to(0.04, { position: at(-amp * 0.3, -amp * 0.15), angle: rest.angle - 0.3 })
+      .to(0.05, { position: rest.pos.clone(), angle: rest.angle }, { easing: 'quadOut' })
+      .call(() => {
+        this.shakeRest = null;
       })
-      .to(0.04, { position: at(-amp * 0.3, -amp * 0.15), angle: b.angle - 0.3 })
-      .to(
-        0.05,
-        { position: b.pos.clone(), angle: b.angle, scale: b.scale.clone() },
-        { easing: 'quadOut' },
-      )
       .start();
   }
 
@@ -303,10 +298,14 @@ export class CeremonyView extends Component {
     if (this.amountLabel) Tween.stopAllByTarget(this.amountLabel);
     if (this.shakeNode) {
       Tween.stopAllByTarget(this.shakeNode);
-      if (this.shakeBase) {
-        this.shakeNode.setPosition(this.shakeBase.pos);
-        this.shakeNode.angle = this.shakeBase.angle;
-        this.shakeNode.setScale(this.shakeBase.scale);
+      // Reset ONLY an in-flight shake back to its live rest (pos+angle). Never
+      // touch scale — fit() owns it. If no shake is active (shakeRest null), leave
+      // the transform exactly as fit() set it (this was the crush: abort used to
+      // stamp a stale absolute scale onto the responsive root).
+      if (this.shakeRest) {
+        this.shakeNode.setPosition(this.shakeRest.pos);
+        this.shakeNode.angle = this.shakeRest.angle;
+        this.shakeRest = null;
       }
     }
     this.unscheduleAllCallbacks();

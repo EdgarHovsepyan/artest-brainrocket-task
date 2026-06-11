@@ -4,7 +4,7 @@ Single source of truth for the frontend-only push to a BAFTA/SiGMA-grade,
 production-ready Cocos build. **No math** — render what the model supplies.
 Parallel session is done; this session owns the whole frontend now.
 
-Status legend: ⬜ pending · �doing · ✅ done. Each item names the lens skill.
+Status legend: ⬜ pending · 🔶 doing · ✅ done. Each item names the lens skill.
 
 ## Guard rails (every change)
 
@@ -30,7 +30,7 @@ Status legend: ⬜ pending · �doing · ✅ done. Each item names the lens ski
 
 ## PHASE 3 — Symbols / crystals: basic → premium · `slot-vfx-artist`, `high-end-visual-design`, `cocos-aaa-visual-gate` (SY1–SY8, RQ2/RQ9)
 
-- ⬜ 3.1 Per-symbol idle breathing (phase-offset, heavier highs) — kill the static grid.
+- ✅ 3.1 Per-symbol idle breathing (phase-offset, heavier highs) — kill the static grid. [bbe8fec — verified by engine-step]
 - ⬜ 3.2 Land impact: squash-stretch + dust + neighbor recoil, per turbo mode.
 - ⬜ 3.3 Win-pop wave-blink + behind-glow (already partial — refine, keep the ≤8-cell white-out gate).
 - ⬜ 3.4 Material identity on the "crystal"/high symbols: specular sweep + Fresnel rim (shader if WebGPU/perf allows, else Graphics fallback).

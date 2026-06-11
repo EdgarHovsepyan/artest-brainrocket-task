@@ -60,6 +60,11 @@ export class ReelView extends Component {
   private blurStretch = 1;
   private blurActive = false;
   private reducedMotion = false;
+  /** Result to drop into the window AT settle (not before — pre-painting the
+   *  window was the "symbols change before spinning" flash). */
+  private pendingFinal: number[] | null = null;
+  /** True during the wind-up so the launch velocity spike doesn't pop the blur. */
+  private launching = false;
 
   /** WCAG reduced-motion gate (driven by SlotView.setReducedFx). */
   setReducedMotion(on: boolean): void {
@@ -75,7 +80,10 @@ export class ReelView extends Component {
   update(dt: number): void {
     if (!this.strip || dt <= 0) return;
     const y = this.strip.position.y;
-    if (this.blurActive) {
+    // Skip the stretch during the wind-up: the up→down launch reversal spikes the
+    // per-frame velocity and popped the whole column's size (the owner's "reels
+    // change size at spin start"). Hold scale at 1 until the reel is truly cruising.
+    if (this.blurActive && !this.launching) {
       const { triggerSpd, span, strengthYFrac, rampInDecay, rampOutDecay } = VIEW_CONFIG.spin.blur;
       const cellsPerFrame = Math.abs(y - this.lastStripY) / (this.pitch || 1) / (dt * 60);
       // Subtle smear only — capped at ~1.18x so the reel reads as fast, never as
@@ -144,10 +152,13 @@ export class ReelView extends Component {
 
     // Idle breathing OFF for the spin (the strip scrolls + motion-blurs instead).
     this.cells.forEach((c) => c.setIdle(false));
-    // Seed the strip: window gets the result, buffer cells get random fillers.
-    for (let k = 0; k < this.stripCells.length; k++) {
-      const id = k < rows ? final[k] : Math.floor(Math.random() * SYMBOL_COUNT);
-      this.stripCells[k].setSymbol(id);
+    // DON'T re-paint the visible window (cells 0..2) here — leaving the current
+    // symbols means nothing changes before the strip lifts (kills the "symbols
+    // change before spinning" flash). Only the off-screen buffer (k>=rows) gets
+    // random fillers; the real result is dropped into the window AT settle.
+    this.pendingFinal = final;
+    for (let k = rows; k < this.stripCells.length; k++) {
+      this.stripCells[k].setSymbol(Math.floor(Math.random() * SYMBOL_COUNT));
     }
 
     return new Promise<void>((resolve) => {
@@ -155,9 +166,16 @@ export class ReelView extends Component {
         if (!this.settle) return;
         this.settle = null;
         Tween.stopAllByTarget(strip);
+        // Drop the result into the window exactly at the stop — the land squash
+        // masks the swap, so the result never shows before or during the spin.
+        const fin = this.pendingFinal;
+        if (fin) this.cells.forEach((c, row) => c.setSymbol(fin[row]));
+        this.pendingFinal = null;
         strip.setPosition(0, 0, 0);
         this.blurActive = false;
+        this.launching = false;
         this.blurStretch = 1;
+        this.lastStripY = 0; // fresh velocity baseline for the next spin
         strip.setScale(1, 1, 1); // clear any residual motion-blur stretch
         this.cells.forEach((c) => c.playLand(VIEW_CONFIG.spin.landSquash));
         // Resume idle breathing once the reel has settled.
@@ -168,6 +186,14 @@ export class ReelView extends Component {
       this.lastStripY = this.startY;
       this.blurStretch = 1;
       this.blurActive = !this.reducedMotion;
+      // Gate the blur through the wind-up so the up→down launch reversal can't
+      // pop the column's size; clear once the reel is cruising.
+      this.launching = true;
+      const windDur =
+        (speedMul === 1 && VIEW_CONFIG.spin.windupMs > 0 ? VIEW_CONFIG.spin.windupMs : 50) / 1000;
+      this.scheduleOnce(() => {
+        this.launching = false;
+      }, windDur);
       const t = tween(strip);
       // Anticipatory wind-up "slingshot": base spins only pull UP a touch, then
       // launch down — reads as loading the reel (a Signature game-feel touch).

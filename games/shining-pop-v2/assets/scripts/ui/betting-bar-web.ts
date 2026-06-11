@@ -603,61 +603,71 @@ export class BettingBarWeb extends Component {
       .repeatForever()
       .start();
 
-    // ── Ring body (gradient approximation via stacked offset circles).
+    // ── Ring body: CONCENTRIC annuli (all centred at 0,0 → perfectly circular,
+    //    no offset-disc banding/muddy crescents). A stepped colour lerp from a
+    //    bright outer tint to a darker inner tint fakes a smooth 3D bevel.
     const bodyN = this.localNode(ring, 0, 0, R * 2, R * 2);
     const rg = bodyN.addComponent(Graphics);
+    const INNER = R * 0.74;
+    const cHi = col(C.ringHi);
+    const cLo = col(C.ringLo);
+    const STEPS = 10;
+    for (let k = 0; k < STEPS; k++) {
+      const t = k / (STEPS - 1);
+      const lc = new Color();
+      Color.lerp(lc, cHi, cLo, t);
+      rg.fillColor = lc;
+      rg.circle(0, 0, R - t * (R * 0.1));
+      rg.fill();
+    }
+    // Candy-pink ring track — the band read as "the ring".
     rg.fillColor = col(C.ringMid);
-    rg.circle(0, 0, R);
+    rg.circle(0, 0, R * 0.94);
     rg.fill();
-    rg.fillColor = col(C.ringHi, 0.85);
-    rg.circle(-R * 0.16, R * 0.2, R * 0.92);
-    rg.fill();
-    rg.fillColor = col(C.ringLo);
-    rg.circle(R * 0.1, -R * 0.16, R * 0.9);
-    rg.fill();
-    // Inner glass face — slightly larger inner radius for a thicker premium ring.
-    const INNER = R * 0.76;
+    // Dark glass face for glyph contrast.
     rg.fillColor = col(C.spinFace);
     rg.circle(0, 0, INNER);
     rg.fill();
-    // Subtle inner shadow ring (top-inner dark, bottom-inner light = lit from above).
-    rg.lineWidth = 3;
-    rg.strokeColor = col('#000000', 0.32);
-    rg.arc(0, 0, INNER - 1.5, -Math.PI, 0, false);
+    // Crisp edges — FULL circles (no top/bottom arc seam): bright outer rim +
+    // dark inner face shadow.
+    rg.lineWidth = 2;
+    rg.strokeColor = col(C.centerRim, 0.9);
+    rg.circle(0, 0, R * 0.94);
     rg.stroke();
-    rg.strokeColor = col('#ffffff', 0.18);
-    rg.arc(0, 0, INNER - 1.5, 0, Math.PI, false);
-    rg.stroke();
-    // Bright candy rim around the inner face.
-    rg.lineWidth = R * 0.04;
-    rg.strokeColor = col(C.centerRim, 0.65);
+    rg.lineWidth = 2;
+    rg.strokeColor = col('#000000', 0.35);
     rg.circle(0, 0, INNER);
     rg.stroke();
-    // Top gloss highlight on the ring.
-    rg.fillColor = col('#ffffff', 0.18);
-    rg.ellipse(-R * 0.18, R * 0.32, R * 0.42, R * 0.16);
-    rg.fill();
-    rg.fillColor = col('#ffffff', 0.1);
-    rg.ellipse(-R * 0.06, R * 0.5, R * 0.55, R * 0.12);
+    // One crisp top sheen on the face (Y-up: +y is the visual top).
+    rg.fillColor = col('#ffffff', 0.22);
+    rg.ellipse(0, R * 0.4, R * 0.5, R * 0.14);
     rg.fill();
 
     const arrowNode = this.localNode(ring, 0, 0, R, R);
     const ag = arrowNode.addComponent(Graphics);
     const ar = R * 0.4;
-    ag.lineWidth = R * 0.107;
+    // dark under-stroke halo first → crisp contrast on the dark face
+    ag.lineWidth = R * 0.16;
+    ag.strokeColor = col('#000000', 0.4);
+    ag.arc(0, 0, ar, -1.206, -1.936 + Math.PI * 2, true);
+    ag.stroke();
+    ag.lineWidth = R * 0.13;
     ag.strokeColor = col(C.value);
     ag.arc(0, 0, ar, -1.206, -1.936 + Math.PI * 2, true);
     ag.stroke();
     ag.fillColor = col(C.value);
-    ag.moveTo(0, ar + R * 0.05);
-    ag.lineTo(-R * 0.114, ar - R * 0.06);
-    ag.lineTo(-R * 0.171, ar + R * 0.09);
+    ag.moveTo(0, ar + R * 0.06);
+    ag.lineTo(-R * 0.135, ar - R * 0.07);
+    ag.lineTo(-R * 0.2, ar + R * 0.1);
     ag.close();
     ag.fill();
     this.spinArrow = arrowNode;
 
     const stopNode = this.localNode(ring, 0, 0, R, R);
     const sg = stopNode.addComponent(Graphics);
+    sg.fillColor = col('#000000', 0.4); // under-fill for a crisp edge
+    sg.roundRect(-R * 0.28, -R * 0.28, R * 0.56, R * 0.56, R * 0.14);
+    sg.fill();
     sg.fillColor = col(C.value, 0.98);
     sg.roundRect(-R * 0.26, -R * 0.26, R * 0.52, R * 0.52, R * 0.12);
     sg.fill();
