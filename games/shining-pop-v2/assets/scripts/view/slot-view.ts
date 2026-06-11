@@ -143,6 +143,7 @@ export class SlotView extends Component {
   private soundBtn: DeckButton | null = null;
   private buyMenu: Node | null = null;
   private buyModal: BuyBonusModal | null = null;
+  private buyFab: Node | null = null;
   private buyBetStepCb: ((dir: number) => void) | null = null;
   private autoplayPanel: Node | null = null;
   private autoplayStartCb: ((spins: number) => void) | null = null;
@@ -617,7 +618,109 @@ export class SlotView extends Component {
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);
     this.ceremony.build(this.node);
 
+    // Always-visible buy-feature FAB docked in the empty side margin (Pixi parity)
+    this.buildBuyFab();
+
     this.fit();
+  }
+
+  /** Floating Buy-Feature button ported from the Pixi flagship: a candy FAB that
+   *  lives in the empty left margin, vertically centred on the reels, with idle
+   *  breathe/float/glow life and a press squash. A child of this.node, so fit()
+   *  rescales/repositions it with the board automatically — no per-frame layout.
+   *  Visual-only; taps the SAME buy modal the menu hub uses. */
+  private buildBuyFab(): void {
+    const sf = this.brandFrames.buyArt ?? null;
+    const fab = this.mkNode('buyFab', 96, 96, this.node);
+    const fabAnim = this.mkNode('buyFabAnim', 96, 96, fab);
+    // Separate press node so the press squash never fights the breathe on fabAnim.
+    const fabPress = this.mkNode('buyFabPress', 96, 96, fabAnim);
+    let targetW = 100;
+    if (sf) {
+      const os = sf.originalSize;
+      const aw = Math.max(1, os.width);
+      const ah = Math.max(1, os.height);
+      [fab, fabAnim, fabPress].forEach((n) => n.getComponent(UITransform)!.setContentSize(aw, ah));
+      // Glow = tinted, scaled, low-opacity duplicate (Cocos has no BlurFilter, so
+      // this approximates the Pixi additive blur).
+      const glowN = this.mkNode('buyGlow', aw, ah, fabPress);
+      const gsp = glowN.addComponent(Sprite);
+      gsp.sizeMode = Sprite.SizeMode.CUSTOM;
+      gsp.spriteFrame = sf;
+      gsp.color = new Color(255, 90, 156, 255);
+      glowN.setScale(1.1, 1.1, 1);
+      const gop = glowN.addComponent(UIOpacity);
+      gop.opacity = 120;
+      if (!this.reducedFx) {
+        tween(gop)
+          .to(1.2, { opacity: 210 }, { easing: 'sineInOut' })
+          .to(1.2, { opacity: 120 }, { easing: 'sineInOut' })
+          .union()
+          .repeatForever()
+          .start();
+      }
+      const artN = this.mkNode('buyArtSprite', aw, ah, fabPress);
+      const asp = artN.addComponent(Sprite);
+      asp.sizeMode = Sprite.SizeMode.CUSTOM;
+      asp.spriteFrame = sf;
+      fab.setScale(targetW / aw, targetW / aw, 1);
+    } else {
+      // Fallback candy pill if the art frame is missing.
+      const g = fabPress.addComponent(Graphics);
+      g.fillColor = new Color(179, 36, 126, 255);
+      g.roundRect(-48, -48, 96, 96, 22);
+      g.fill();
+      g.lineWidth = 3;
+      g.strokeColor = new Color(143, 232, 255, 255);
+      g.roundRect(-48, -48, 96, 96, 22);
+      g.stroke();
+      this.mkLabel('BUY\nBONUS', 0, 0, 17, new Color(255, 255, 255, 255), fabPress, true);
+    }
+    // Dock in the left margin (gap from the frame edge), centred on the reels.
+    fab.setPosition(-(this.gw / 2 + 14 + targetW / 2), VIEW_CONFIG.layout.reelCenterY, 0);
+    // Idle life — breathe (fabAnim scale) + float (fab position). Node tweens only.
+    if (!this.reducedFx) {
+      tween(fabAnim)
+        .to(1.5, { scale: new Vec3(1.05, 1.05, 1) }, { easing: 'sineInOut' })
+        .to(1.5, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+        .union()
+        .repeatForever()
+        .start();
+      tween(fab)
+        .by(1.9, { position: new Vec3(0, 7, 0) }, { easing: 'sineInOut' })
+        .by(1.9, { position: new Vec3(0, -7, 0) }, { easing: 'sineInOut' })
+        .union()
+        .repeatForever()
+        .start();
+    }
+    // Press squash + tap → open the buy modal (same entry as the menu hub).
+    let downAt = 0;
+    fab.on(Node.EventType.TOUCH_START, () => {
+      downAt = 1;
+      Tween.stopAllByTarget(fabPress);
+      tween(fabPress)
+        .to(0.1, { scale: new Vec3(0.94, 0.94, 1) }, { easing: 'cubicOut' })
+        .start();
+    });
+    const release = (tap: boolean): void => {
+      Tween.stopAllByTarget(fabPress);
+      tween(fabPress)
+        .to(0.42, { scale: new Vec3(1, 1, 1) }, { easing: 'elasticOut' })
+        .start();
+      if (tap && downAt) {
+        this.audio.click();
+        this.openBuyMenu();
+      }
+      downAt = 0;
+    };
+    fab.on(Node.EventType.TOUCH_END, () => release(true));
+    fab.on(Node.EventType.TOUCH_CANCEL, () => release(false));
+    this.buyFab = fab;
+  }
+
+  /** Hide the FAB while the picker is open / future replay mode; show otherwise. */
+  setBuyFabVisible(on: boolean): void {
+    if (this.buyFab) this.buyFab.active = on;
   }
 
   private buildBackground(): void {
@@ -1019,12 +1122,14 @@ export class SlotView extends Component {
 
   closeBuyMenu(): void {
     this.buyModal?.close();
+    this.setBuyFabVisible(true);
   }
 
   openBuyMenu(): void {
     this.closeOverlays();
     this.buyModal?.open();
     this.audio.buyOpen();
+    this.setBuyFabVisible(false); // hide the FAB behind its own picker
   }
 
   // ---- autoplay panel (parity port of the master's AUTOPLAY drawer) ----------

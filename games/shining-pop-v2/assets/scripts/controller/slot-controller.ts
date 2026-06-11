@@ -539,6 +539,7 @@ export class SlotController extends Component {
     this.state = 'bonus';
     this.bar.setSpinning(true);
     this.view.setInteractable(false);
+    this.view.setBuyFabVisible(false); // no buying mid-feature
     this.view.clearWins();
     this.view.setWin(0);
     this.view.setBanner(BONUS_MODES[mode].name);
@@ -604,6 +605,7 @@ export class SlotController extends Component {
       this.state = 'idle';
       this.bar.setSpinning(false);
       this.view.setInteractable(true);
+      this.view.setBuyFabVisible(true); // feature over — buying allowed again
     }, 0.4);
   }
 
