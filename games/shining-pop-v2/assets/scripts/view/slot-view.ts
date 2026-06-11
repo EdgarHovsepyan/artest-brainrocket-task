@@ -53,6 +53,22 @@ const PLATE_EDGE = new Color(184, 111, 218, 255); // orchid rim (#b86fda)
 const SHADOW = new Color(5, 2, 12, 170); // obsidian shadow
 const MUTED = new Color(201, 206, 216, 255); // white-smoke caption (kill purple text)
 
+// Per-payline colour identity (WL6): 10 max-contrast candy hues so overlapping
+// lines stay readable instead of collapsing into one magenta jumble. All vivid
+// enough to clear ~3:1 on the deep-violet bg.
+const LINE_HUES = [
+  '#ff4fa3', // magenta
+  '#ffd23f', // gold
+  '#3fe0ff', // cyan
+  '#7cff5c', // lime
+  '#ff7a3f', // orange
+  '#b98cff', // violet
+  '#ff6b6b', // coral
+  '#5cffd0', // teal
+  '#ffa6e6', // pink
+  '#c6ff4f', // chartreuse
+].map((h) => new Color().fromHEX(h));
+
 const SYM_RES = [
   'sym_wild',
   'sym_h1_crown',
@@ -111,6 +127,11 @@ export class SlotView extends Component {
   private winLabel: Label | null = null;
   private bannerLabel: Label | null = null;
   private winLineG: Graphics | null = null;
+  private winSpark: Node | null = null;
+  // Sequential charged-reveal state (WL1/WL3) — driven by Component.schedule.
+  private revealIdx = 0;
+  private revealP = 0;
+  private revealDur = 0.24;
 
   private ceremony!: CeremonyView;
   private anticipation!: AnticipationLayer;
@@ -559,6 +580,26 @@ export class SlotView extends Component {
     this.buildReels();
 
     this.winLineG = this.mkNode('winLines', 10, 10, this.node).addComponent(Graphics);
+    // Hot leading-edge spark that rides along each line as it draws L->R (WL1).
+    // Sibling created AFTER winLines so it renders on top of the stroke.
+    const spark = this.mkNode('winSpark', 26, 26, this.node);
+    const sg = spark.addComponent(Graphics);
+    sg.fillColor = new Color(255, 255, 255, 235);
+    sg.moveTo(0, 12);
+    sg.lineTo(8, 0);
+    sg.lineTo(0, -12);
+    sg.lineTo(-8, 0);
+    sg.close();
+    sg.fill();
+    sg.fillColor = new Color(255, 220, 245, 120);
+    sg.moveTo(0, 20);
+    sg.lineTo(5, 0);
+    sg.lineTo(0, -20);
+    sg.lineTo(-5, 0);
+    sg.close();
+    sg.fill();
+    spark.active = false;
+    this.winSpark = spark;
 
     // VFX layers above the reels/win-lines
     this.anticipation = this.mkNode('anticipation', 10, 10, this.node).addComponent(
@@ -1747,16 +1788,99 @@ export class SlotView extends Component {
 
     this.winLines = result.lineWins.map((w) => ({ lineIndex: w.lineIndex, count: w.count }));
     if (this.winLines.length === 0) return;
-    this.winCycle = 0;
-    this.cycleWinLine();
-    this.schedule(this.cycleWinLine, VIEW_CONFIG.win.lineCycleSeconds);
+    this.startWinLinePulse();
+    if (this.reducedFx) {
+      // WL8: reduced-motion swaps the animated draw for an instant reveal, but
+      // keeps colour identity + the readability cycle.
+      this.winCycle = 0;
+      this.cycleWinLine();
+      this.schedule(this.cycleWinLine, VIEW_CONFIG.win.lineCycleSeconds);
+      return;
+    }
+    // WL3: sequential charged reveal with momentum — more lines draw faster, so
+    // dense wins build rhythm instead of one mushy simultaneous flash. Then fall
+    // into the existing one-bright cycle for readability.
+    this.revealDur = Math.max(0.1, 0.26 - this.winLines.length * 0.016);
+    this.revealIdx = 0;
+    this.revealP = 0;
+    this.schedule(this.tickReveal, 0);
   }
 
   clearWins(): void {
     this.unschedule(this.cycleWinLine);
+    this.unschedule(this.tickReveal);
+    if (this.winSpark) this.winSpark.active = false;
+    this.stopWinLinePulse();
     this.winLines = [];
     this.winLineG?.clear();
     this.reels.forEach((reel) => reel.clearHighlight());
+  }
+
+  /** Subtle idle breathe on the whole win-line overlay once drawn (WL1 tail). */
+  private startWinLinePulse(): void {
+    const node = this.winLineG?.node;
+    if (!node) return;
+    const op = node.getComponent(UIOpacity) ?? node.addComponent(UIOpacity);
+    Tween.stopAllByTarget(op);
+    op.opacity = 255;
+    if (this.reducedFx) return;
+    tween(op)
+      .to(0.55, { opacity: 205 }, { easing: 'sineInOut' })
+      .to(0.55, { opacity: 255 }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+  }
+
+  private stopWinLinePulse(): void {
+    const node = this.winLineG?.node;
+    if (!node) return;
+    const op = node.getComponent(UIOpacity);
+    if (op) {
+      Tween.stopAllByTarget(op);
+      op.opacity = 255;
+    }
+  }
+
+  /** Per-frame charged-draw stepper: fully-revealed lines dim, current line drawn
+   *  up to revealP with the hot spark at its head, rest not yet shown. */
+  private tickReveal = (dt: number): void => {
+    if (this.revealIdx >= this.winLines.length) {
+      this.unschedule(this.tickReveal);
+      if (this.winSpark) this.winSpark.active = false;
+      this.winCycle = 0;
+      this.cycleWinLine();
+      this.schedule(this.cycleWinLine, VIEW_CONFIG.win.lineCycleSeconds);
+      return;
+    }
+    this.revealP += dt / this.revealDur;
+    if (this.revealP >= 1) {
+      this.revealP = 0;
+      this.revealIdx++;
+      this.audio.countTick(0.5); // per-line tick as each trace lands
+    }
+    this.redrawReveal();
+  };
+
+  private redrawReveal(): void {
+    const g = this.winLineG;
+    if (!g) return;
+    g.clear();
+    for (let i = 0; i < this.revealIdx && i < this.winLines.length; i++) {
+      const w = this.winLines[i];
+      this.strokeLine(this.linePts(w), false, LINE_HUES[w.lineIndex % LINE_HUES.length]);
+    }
+    const cur = this.winLines[this.revealIdx];
+    if (cur) {
+      const pts = this.linePts(cur);
+      const drawn: Vec3[] = [];
+      const head = this.polyAt(pts, this.revealP, drawn);
+      this.strokeLine(drawn, true, LINE_HUES[cur.lineIndex % LINE_HUES.length]);
+      if (this.winSpark) {
+        this.winSpark.active = true;
+        this.winSpark.setPosition(head.x, head.y, 0);
+      }
+    }
   }
 
   /** Bounce the sticky cells (persistent wilds/crowns) after a free spin so they
@@ -1811,8 +1935,15 @@ export class SlotView extends Component {
   };
 
   /** Big-win ceremony (tiered). Returns false for small wins (HUD count-up only).
-   *  Audio is the CONTROLLER's job (it owns the LDW gate) — no sound here. */
+   *  The CONTROLLER owns the triumphant win sting + LDW gate; here we only AV-sync
+   *  the ceremony's OWN beats — a physical braam on the detonation frame and a
+   *  per-pip tick as the big number rolls (both safe: the ceremony only shows for
+   *  8x+ wins, never an LDW return). */
   playCeremony(winCents: number, betCents: number, multiplier: number): boolean {
+    this.ceremony.onDetonate = () => {
+      if (!this.reducedFx) this.audio.impact();
+    };
+    this.ceremony.onCountPip = () => this.audio.countTick(0.6);
     return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }
 
@@ -1856,21 +1987,70 @@ export class SlotView extends Component {
     );
   }
 
-  private drawWinLine(w: { lineIndex: number; count: number }, bright: boolean): void {
-    const g = this.winLineG;
-    if (!g) return;
+  /** The cell-centre polyline for a winning line. */
+  private linePts(w: { lineIndex: number; count: number }): Vec3[] {
     const rows = PAYLINES[w.lineIndex];
     const pts: Vec3[] = [];
     for (let reel = 0; reel < w.count; reel++) pts.push(this.cellCenter(reel, rows[reel]));
-    const stroke = (width: number, c: Color) => {
-      g.lineWidth = width;
-      g.strokeColor = c;
+    return pts;
+  }
+
+  /** Walk `pts` to a fraction of total arc length; push the visited points into
+   *  `out` and return the interpolated head (for the leading spark). */
+  private polyAt(pts: Vec3[], frac: number, out: Vec3[]): Vec3 {
+    out.length = 0;
+    if (pts.length === 0) return new Vec3();
+    out.push(pts[0]);
+    if (pts.length < 2 || frac >= 1) {
+      out.length = 0;
+      out.push(...pts);
+      return pts[pts.length - 1];
+    }
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) total += Vec3.distance(pts[i - 1], pts[i]);
+    let target = total * Math.max(0, frac);
+    let head = pts[0];
+    for (let i = 1; i < pts.length; i++) {
+      const seg = Vec3.distance(pts[i - 1], pts[i]);
+      if (target <= seg) {
+        const t = seg > 0 ? target / seg : 0;
+        head = new Vec3(
+          pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t,
+          pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t,
+          0,
+        );
+        out.push(head);
+        return head;
+      }
+      target -= seg;
+      out.push(pts[i]);
+      head = pts[i];
+    }
+    return head;
+  }
+
+  /** Stroke a (possibly partial) polyline: dark underlay + per-line coloured core. */
+  private strokeLine(pts: Vec3[], bright: boolean, color: Color): void {
+    const g = this.winLineG;
+    if (!g || pts.length < 2) return;
+    const path = () => {
       g.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
-      g.stroke();
     };
-    stroke(bright ? 12 : 8, new Color(0, 0, 0, bright ? 210 : 120));
-    stroke(bright ? 6 : 4, bright ? ACID : new Color(255, 90, 156, 130)); // magenta win-line
+    g.lineWidth = bright ? 11 : 7;
+    g.strokeColor = new Color(0, 0, 0, bright ? 205 : 115);
+    path();
+    g.stroke();
+    g.lineWidth = bright ? 6 : 3.5;
+    g.strokeColor = bright
+      ? new Color(color.r, color.g, color.b, 255)
+      : new Color(color.r, color.g, color.b, 150);
+    path();
+    g.stroke();
+  }
+
+  private drawWinLine(w: { lineIndex: number; count: number }, bright: boolean): void {
+    this.strokeLine(this.linePts(w), bright, LINE_HUES[w.lineIndex % LINE_HUES.length]);
   }
 
   private cycleWinLine = (): void => {

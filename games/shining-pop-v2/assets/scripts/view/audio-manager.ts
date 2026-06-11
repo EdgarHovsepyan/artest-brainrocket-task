@@ -300,6 +300,15 @@ export class AudioManager {
     this.voice(440 + progress * 660, 0.03, 'sine', 0.05);
   }
 
+  /** Physical detonation "braam" layered under the ceremony's shock/shake — a
+   *  low boom distinct from the melodic win sting. Fired on the detonation frame
+   *  (ceremony only shows for 8x+ wins, so this is never an LDW case). */
+  impact(): void {
+    if (this.playSample('impact_braam', 'win', 0.9)) return;
+    this.voice(72, 0.6, 'sawtooth', 0.34);
+    this.voice(110, 0.5, 'triangle', 0.22);
+  }
+
   bonusIntro(): void {
     this.playSample('bonus_intro', 'win', 0.95);
     this.playMusic('bonus_loop');

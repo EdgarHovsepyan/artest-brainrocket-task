@@ -155,8 +155,15 @@ export const VIEW_CONFIG = {
   bonus: {
     /** Speed multiplier applied to each bonus reel spin (faster than base). */
     speedMul: 0.5,
-    /** Pause between consecutive free spins (ms). */
+    /** Pause between consecutive free spins (ms) — legacy flat fallback. */
     stepPauseMs: 200,
+    /** Dwell after a DEAD spin (ms) — keep the loop brisk. */
+    deadPauseMs: 170,
+    /** Dwell after a WINNING spin (ms) — savour the win before the next spin. */
+    winPauseMs: 560,
+    /** A single step paying >= this multiple of the TOTAL bet earns its own
+     *  in-bonus money beat (banner + extra dwell). */
+    bigStepMultiple: 8,
   },
 } as const;
 

@@ -558,6 +558,7 @@ export class SlotController extends Component {
     let runningPayout = 0;
     const totalSpins = outcome.bonus.steps.length;
     this.view.setBonusHud(0, totalSpins, 0);
+    const { deadPauseMs, winPauseMs, bigStepMultiple } = VIEW_CONFIG.bonus;
     for (let i = 0; i < outcome.bonus.steps.length; i++) {
       const step = outcome.bonus.steps[i];
       this.view.clearWins();
@@ -566,21 +567,39 @@ export class SlotController extends Component {
       // locked + alive each spin (not respun). [reel,row][] from the bonus engine.
       this.view.pulseSticky(step.sticky);
       if (step.sticky.length > 0) this.view.audio.stickyLock();
-      if (step.payout > 0) this.view.showWins(evaluateSpin(step.grid));
       runningPayout += step.payout;
       this.view.setBonusHud(i, totalSpins, Math.round(runningPayout * lineBetCents));
-      await this.wait(VIEW_CONFIG.bonus.stepPauseMs);
+      // Per-spin MONEY MOMENT: a winning free spin gets its win lines, a tiered
+      // sting and a savour dwell so a 40x spin no longer reads like a 0x dead one
+      // (owner: "every free spin ceremony effects all need busting").
+      if (step.payout > 0) {
+        this.view.showWins(evaluateSpin(step.grid));
+        const stepCents = Math.round(step.payout * lineBetCents);
+        const stepMult = this.model.bet > 0 ? stepCents / this.model.bet : 0; // total-bet multiple
+        const big = stepMult >= bigStepMultiple;
+        this.view.audio.win(big ? 3 : 1);
+        if (big) this.view.setBanner(`FREE SPIN ×${Math.round(stepMult)}`);
+        await this.wait(big ? winPauseMs + 280 : winPauseMs);
+      } else {
+        await this.wait(deadPauseMs);
+      }
     }
 
     this.view.audio.bonusEnd();
     this.view.setBonusHud(null, 0, 0);
     this.view.setBonusAtmosphere('idle');
     this.view.countUp(outcome.winCents);
+    // FS finale: floor the ceremony tier so completing a feature with a genuine
+    // win always feels rewarding (flagship parity), and label it as a free-spins
+    // win — LDW-safe wording when the feature returned <= 1x the buy/bet.
+    const fsLdw = outcome.winCents <= this.model.bet;
     // BonusOutcome has no betCents — passing it was undefined at runtime and
-    // corrupted the ceremony's win-vs-bet tier scaling. Tier against the live bet.
-    this.view.playCeremony(outcome.winCents, this.model.bet, 1);
+    // corrupted the ceremony's win-vs-bet tier scaling. Tier against the live bet,
+    // floored so a real feature win lands at least at the BIG band.
+    const fsTierBet = Math.min(this.model.bet, Math.max(1, Math.round(outcome.winCents / 9)));
+    this.view.playCeremony(outcome.winCents, fsLdw ? this.model.bet : fsTierBet, 1);
     this.bar.setLastWin(outcome.winCents / 100);
-    this.view.setBanner('FEATURE WON');
+    this.view.setBanner(fsLdw ? 'FREE SPINS COMPLETE' : 'FREE SPINS WIN');
     this.scheduleOnce(() => {
       this.state = 'idle';
       this.bar.setSpinning(false);
