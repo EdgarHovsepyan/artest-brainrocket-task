@@ -254,7 +254,7 @@ export class BettingBarWeb extends PIXI.Container {
     this.position.set((W - this.DESIGN_W * s) / 2, H - this.DESIGN_H * s);
     return { scale: s, barTopY: this.y + 118 * s };
   }
-  _fmt(n) { return Number(n).toLocaleString('en-US'); }
+  _fmt(n) { const v = Number(n); return (Number.isFinite(v) ? v : 0).toLocaleString('en-US'); }
   setBalance(n) {
     const a = this.elements.account; a._bval.text = this._fmt(n);
     a._bval.scale.set(1);

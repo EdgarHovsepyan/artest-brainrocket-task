@@ -211,6 +211,9 @@ export class SlotController extends Component {
     this.bar.on('volume', (v: number) => this.view.setVolume(v));
     this.bar.on('menu', () => this.view.openMenuHub());
     this.bar.on('ui:click', () => this.view.audio.click());
+    // Task 7.2 — portrait bar emits 'buy' from its new Buy control next to
+    // the spin ring. Web bar already routes to openBuyMenu via the FAB.
+    this.bar.on('buy', () => this.view.openBuyMenu());
     // Defer state writes one frame so the bar's onLoad has built its labels.
     this.scheduleOnce(() => {
       // Code-created nodes default to the DEFAULT layer, which the 2D UI renderer
@@ -229,22 +232,17 @@ export class SlotController extends Component {
     }, 0);
   }
 
-  /** Fit the bar to the viewport. The web bar returns its solid-band height and
-   *  the board contain-fits ABOVE it (master fitBottom contract); the portrait
-   *  mobile overlay centres and the board keeps the full viewport. */
+  /** Fit the bar to the viewport. BOTH bars are bottom-docked and return their
+   *  opaque control-band height; the board contain-fits ABOVE that inset (master
+   *  fitBottom contract). Portrait used to centre the bar with a 0 inset, which
+   *  rendered the spin cluster on top of the reels — the mobile bar now docks and
+   *  reserves its band the same way the web bar does. */
   private fitBar(): void {
     const vs = view.getVisibleSize();
-    if (this.barIsWeb) {
-      const inset = (this.bar as BettingBarWeb).fit(vs.width, vs.height);
-      this.view.setBottomInset(inset);
-      return;
-    }
-    this.view.setBottomInset(0);
-    const { designWidth, designHeight, reelCenterY, cell, gap } = VIEW_CONFIG.layout;
-    const boardScale = Math.min(vs.width / designWidth, vs.height / designHeight);
-    const gh = 3 * cell + 2 * gap;
-    const boardBottomY = (reelCenterY - gh / 2 - 28) * boardScale;
-    (this.bar as BettingBarMobile).fit(vs.width, vs.height, boardBottomY);
+    const inset = this.barIsWeb
+      ? (this.bar as BettingBarWeb).fit(vs.width, vs.height)
+      : (this.bar as BettingBarMobile).fit(vs.width, vs.height);
+    this.view.setBottomInset(inset);
   }
 
   /** Recursively move a node subtree onto the UI_2D layer so the UI renderer draws it. */

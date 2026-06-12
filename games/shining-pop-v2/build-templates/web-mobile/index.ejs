@@ -22,6 +22,15 @@
 
   <link rel="stylesheet" type="text/css" href="<%= cssUrl %>"/>
   <style>
+    /* ROOT BG — the canonical game-bg color. Without this, the browser's default
+       white shows through ANY frame the Cocos canvas hasn't repainted (intro
+       fade-out + first-paint gap + occasional throttled-tab re-rasterisation).
+       Setting it here means there is NEVER a white frame, period — independent
+       of what the engine is doing. (2026-06-11: the recurring "white flash after
+       intro hides" bug — fixed at the right layer this time.) */
+    html, body { background-color: #0a0610; margin: 0; padding: 0; }
+    #GameDiv, #Cocos3dGameContainer, #GameCanvas { background-color: #0a0610; }
+
     /* CINEMATIC boot loader — Pixi popLoader port: real bg.jpg darkened + blurred,
        magenta radial vignette, animated rays, halo behind the real logo, 3-stop
        gradient bar with shine sweep, animated dots. Same anatomy + same beats as

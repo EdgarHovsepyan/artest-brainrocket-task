@@ -29,6 +29,11 @@ PixiJS v8 flagship slot · `games/shining-pop` · Vite. Big frontend/visual/audi
 **Bonus scenes**
 - [x] Removed the per-mode frame re-tint (`_applyGradeMode` mega `tint(0xff2ad0)` etc.) — "the filter changing render colour is bad". Base grade + hue-neutral brightness only.
 - [x] Mega ceremony backdrop near-black `0x05030a` → candy-dark `0x18092e` (first pass on "crown on black").
+- [x] **Mega "bad crown asset" — FULLY fixed** (2026-06-10, commit `768f272`). Hero + side chromatic rims already used the clean 900px logo crest (`TEX.logo`), but the **back rim-light + the surface-FX mask** still pulled the rough keyed crown JPG (`SYM_TEX[7]`). `crScl` is logo-derived → those JPG copies sized/shaped wrong = a 2nd rough crown ghost behind the hero + surface FX clipped to a mismatched silhouette. Every hero-coupled sprite now shares `TEX.logo` → one consistent composite.
+
+**Win VFX**
+- [x] **Catch-light on EVERY symbol** (2026-06-10, commit `768f272`). Simple fruit winners (id<6) stay static (no hero copy / no double-image, per the prior decision) but were the only winners with zero surface life — now they get the SAME premium raking light-glint the hero symbols get, drawn on `winSheenG`, clamped strictly inside the cell (size-proportional → no neighbour bleed), one-shot.
+- [x] **Visual anticipation glow** (2026-06-10, commit `e0e0bb7`). Scatter anticipation was audio + reel-crawl only; the bonus-deciding reels (4-5) now GLOW during the crawl — faint candy column wash + pulsing double halo + "incoming" slam-zone bars. Self-contained rAF, zIndex 50 (above reels, below win-pop), idempotent, reduced-motion-skipped, fades out + self-destroys on reels-resolve, defensive stop so it never leaks across spins.
 
 ---
 
@@ -37,7 +42,7 @@ PixiJS v8 flagship slot · `games/shining-pop` · Vite. Big frontend/visual/audi
 - [ ] **Verify the candy theme direction** in browser (bars / mega bonus / mute-slash). Palette lives in 3 files + skin — one-place tune if off.
 - [ ] **Quick-bets icon → bet menu**: confirm the stack/quick-bets icon opens `showBetMenu()`/`betMenu` (not a tooltip, not buy-bonus). Wire if missing.
 - [ ] **Info panel from the menu icon**: today it's menu → settings drawer → GAME INFO. User wants info reachable more directly from the menu icon — make the menu a hub (Settings + Game Info) or add a direct info entry.
-- [ ] **Mega "crown on black"**: confirm the warmer backdrop is enough; if still flat, boost the light-pool/pedestal behind the crown or add a candy radial glow.
+- [x] ~~**Mega "crown on black" / "bad crown asset"**~~ — RESOLVED (see DONE → Bonus scenes). All crown sprites unified to the clean logo crest; light-pool + pedestal already added. Verify in browser.
 - [ ] **Volume "many bugs"**: confirm the mute-slash resolves it; check the web-bar volume slider path (`on2('volume')`) for drag/icon bugs.
 - [ ] **Mobile ↔ web parity**: autoplay + turbo behave/position differently between `betting-bar-mobile.js` and `-web.js` — reconcile.
 - [ ] **Icon quality pass**: menu / sound / stepper / autoplay / turbo glyphs → refine proportions + gloss to top-tier.

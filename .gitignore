@@ -34,3 +34,9 @@ games/*/extensions/
 
 games/*/build-qa/
 games/*/build/
+
+# Cocos build outputs (any variant) + session-local files
+games/*/build-*/
+**/.asset-backups/
+.claude/
+**/.claude/

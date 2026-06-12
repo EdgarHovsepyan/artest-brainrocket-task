@@ -68,6 +68,29 @@ test('model.buyBonus deducts the cost and credits the feature win', () => {
   assert.equal(out.balanceCents, before - out.costCents + out.winCents);
 });
 
+test('runFreeSpins step.sticky is always Array<[number,number]> for every mode', () => {
+  // Regression for the 2026-06-11 crash: `[...sticky]` compiled to
+  // `[].concat(sticky)` in the Cocos 3.8.8 web-mobile bundle, pushing the
+  // whole Set as one element so the downstream `.filter(k => k.indexOf(...))`
+  // crashed with "k.indexOf is not a function". Fixed by using Array.from().
+  // This test catches a regression to the source by asserting the shape.
+  for (const mode of ['wilds', 'crowns', 'reels'] as const) {
+    for (const seed of [1, 5, 42, 777, 2026]) {
+      const m = new SlotModel({ seed, balanceCents: 100_000_00, betCents: 1_00 });
+      const out = m.buyBonus(mode);
+      for (const step of out.bonus.steps) {
+        assert.ok(Array.isArray(step.sticky), `${mode} seed=${seed} step.sticky must be Array`);
+        for (const cell of step.sticky) {
+          assert.ok(Array.isArray(cell), `${mode} sticky cell must be [reel,row] tuple`);
+          assert.equal(cell.length, 2, `${mode} sticky cell must be length 2`);
+          assert.ok(Number.isInteger(cell[0]), `${mode} sticky[0] (reel) must be integer`);
+          assert.ok(Number.isInteger(cell[1]), `${mode} sticky[1] (row) must be integer`);
+        }
+      }
+    }
+  }
+});
+
 test('game engine matches @artest/math-core for the same config + seed (no drift)', () => {
   const config: SlotMathConfig = {
     reels: GRID.reels,

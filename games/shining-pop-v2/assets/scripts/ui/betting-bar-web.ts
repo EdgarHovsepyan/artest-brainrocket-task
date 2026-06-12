@@ -30,6 +30,7 @@ import {
   Vec3,
 } from 'cc';
 import { applyFont } from '../view/fonts';
+import { VIEW_CONFIG } from '../view/view-config';
 const { ccclass } = _decorator;
 
 const W = 2400;
@@ -83,6 +84,39 @@ function col(hex: string, a?: number): Color {
   return c;
 }
 
+/** Task 2.5 — CSS-style cubic-bezier easing as a (t: number) => number fn.
+ *  Solves x(s)=t via 8 Newton iterations, then returns y(s). Returns a stable
+ *  function reference so tween can capture it without re-allocating per call. */
+function cubicBezier(p1x: number, p1y: number, p2x: number, p2y: number): (t: number) => number {
+  const ax = 3 * p1x;
+  const bx = 3 * (p2x - p1x) - ax;
+  const cx = 1 - ax - bx;
+  const ay = 3 * p1y;
+  const by = 3 * (p2y - p1y) - ay;
+  const cy = 1 - ay - by;
+  const sampleX = (s: number) => ((cx * s + bx) * s + ax) * s;
+  const sampleY = (s: number) => ((cy * s + by) * s + ay) * s;
+  const sampleDx = (s: number) => (3 * cx * s + 2 * bx) * s + ax;
+  return (t: number) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    let s = t;
+    for (let i = 0; i < 8; i++) {
+      const x = sampleX(s) - t;
+      const dx = sampleDx(s);
+      if (Math.abs(dx) < 1e-6) break;
+      s -= x / dx;
+    }
+    return sampleY(s);
+  };
+}
+
+/** Touch-device detection. First TOUCH_START anywhere flips this — once true,
+ *  hover handlers no-op (touch devices don't have a true hover state, and
+ *  fake-hovering on tap would feel laggy). Module-scoped so all bar buttons
+ *  share the same flag for the session. */
+let __touchDetected = false;
+
 @ccclass('BettingBarWeb')
 export class BettingBarWeb extends Component {
   private events = new EventTarget();
@@ -93,6 +127,7 @@ export class BettingBarWeb extends Component {
   private sndGlyphOp!: UIOpacity;
   private sndSlash!: Node;
   private volPanel!: Node;
+  private volPanelOp!: UIOpacity;
   private volFill!: Graphics;
   private volKnob!: Node;
   private volume = 0.5;
@@ -120,26 +155,30 @@ export class BettingBarWeb extends Component {
     ui.setAnchorPoint(0, 1);
 
     const bg = this.gfx('bg');
-    // 2-stop depth ramp on the now-slim slab (Graphics has no gradient, so a warm
-    // base + one deeper grounding band reads as a smooth wash; the redundant mid
-    // stop is dropped for a finer, more elegant band).
-    bg.fillColor = col('#241652', 0.96); // warm-violet base
-    bg.rect(0, -H, W, H);
-    bg.fill();
-    bg.fillColor = col(C.stageDeep, 0.55); // deeper band grounding the controls (lower 60%)
-    bg.rect(0, -H, W, Math.round(H * 0.6));
-    bg.fill();
-    // Soft top contour — a 2px candy-pink hairline that lifts the bar off the
-    // reels above (master 2-color rim system).
-    bg.lineWidth = 2;
-    bg.strokeColor = col(C.edge, 0.55);
-    bg.moveTo(0, 0);
-    bg.lineTo(W, 0);
-    bg.stroke();
-    // Top inner glow — a faint additive band that sells the gloss.
-    bg.fillColor = col('#ffffff', 0.06);
-    bg.rect(0, -8, W, 8);
-    bg.fill();
+    // Task 2.1 — bar background. 2026-06-11: when bgBaseAlpha is 0 the slab is
+    // REMOVED entirely (user request) — controls float directly over the
+    // painted game bg, no panel behind them, no top hairline, no inner glow.
+    // The whole slab paint is gated on bgBaseAlpha so "remove the bar bg" is a
+    // single config flip.
+    const barCfg = VIEW_CONFIG.bar.web;
+    if (barCfg.bgBaseAlpha > 0) {
+      bg.fillColor = col('#241652', barCfg.bgBaseAlpha); // warm-violet base
+      bg.rect(0, -H, W, H);
+      bg.fill();
+      bg.fillColor = col(C.stageDeep, barCfg.bgGroundAlpha); // deeper grounding band
+      bg.rect(0, -H, W, Math.round(H * barCfg.bgGroundFrac));
+      bg.fill();
+      // Soft top contour — candy-pink hairline lifting the bar off the reels.
+      bg.lineWidth = 2;
+      bg.strokeColor = col(C.edge, 0.55);
+      bg.moveTo(0, 0);
+      bg.lineTo(W, 0);
+      bg.stroke();
+      // Top inner glow — faint additive band that sells the gloss.
+      bg.fillColor = col('#ffffff', 0.06);
+      bg.rect(0, -8, W, 8);
+      bg.fill();
+    }
 
     this.buildAccount();
     this.buildBanner(500, 320, 'LAST WIN', (l) => (this.lastWinValue = l));
@@ -263,6 +302,21 @@ export class BettingBarWeb extends Component {
    *  0.94 on touch, spring back on release (Emil's highest-ROI micro-interaction).
    *  Every tap also emits ui:click for the controller's click sample — except
    *  `silent` surfaces (the carousel: drag-end already feeds audio via bet:set). */
+  /** Task 2.5 — cached cubic-bezier ease used by every bar button. Recomputed
+   *  only if the bar.buttons.ease tuple changes. */
+  private __easeCache: {
+    tuple: readonly [number, number, number, number] | null;
+    fn: (t: number) => number;
+  } = { tuple: null, fn: (t) => t };
+  private getButtonEase(): (t: number) => number {
+    const tuple = VIEW_CONFIG.bar.buttons.ease;
+    if (this.__easeCache.tuple !== tuple) {
+      this.__easeCache.tuple = tuple;
+      this.__easeCache.fn = cubicBezier(tuple[0], tuple[1], tuple[2], tuple[3]);
+    }
+    return this.__easeCache.fn;
+  }
+
   private hitNode(
     x: number,
     y: number,
@@ -279,14 +333,90 @@ export class BettingBarWeb extends Component {
     ui.setAnchorPoint(0, 1);
     ui.setContentSize(w, h);
     n.setPosition(x, this.Y(y), 0);
-    n.on(Node.EventType.TOUCH_START, () => visuals.forEach((v) => v.setScale(0.94, 0.94, 1)));
-    const restore = () => visuals.forEach((v) => v.setScale(1, 1, 1));
-    n.on(Node.EventType.TOUCH_CANCEL, restore);
+
+    // Task 2.5 — formal 4-state machine. The bar button cycles between idle /
+    // hover / pressed / disabled. Each transition tweens the visual scale via
+    // a cached cubic-bezier ease so the feel matches across every control.
+    // Hover handlers gate behind enableHover + the touch-detection flag so
+    // touch devices keep their native press-only behavior.
+    let state: 'idle' | 'hover' | 'pressed' | 'disabled' = 'idle';
+    let disabled = false;
+    const targetScaleFor = (s: 'idle' | 'hover' | 'pressed' | 'disabled'): number => {
+      const cfg = VIEW_CONFIG.bar.buttons;
+      switch (s) {
+        case 'pressed':
+          return cfg.pressScale;
+        case 'hover':
+          return cfg.hoverScale;
+        case 'disabled':
+          return 1.0;
+        default:
+          return 1.0;
+      }
+    };
+    const durFor = (from: typeof state, to: typeof state): number => {
+      const cfg = VIEW_CONFIG.bar.buttons;
+      if (to === 'pressed') return cfg.pressMs / 1000;
+      if (to === 'idle' && from === 'pressed') return cfg.releaseMs / 1000;
+      return cfg.hoverMs / 1000;
+    };
+    const apply = (next: typeof state) => {
+      if (state === next) return;
+      const prev = state;
+      state = next;
+      const target = targetScaleFor(next);
+      const dur = durFor(prev, next);
+      const ease = this.getButtonEase();
+      // Premium glow: hover = soft bloom, pressed = hot, idle/disabled = off.
+      const glowTarget = next === 'pressed' ? 235 : next === 'hover' ? 150 : 0;
+      visuals.forEach((v) => {
+        Tween.stopAllByTarget(v);
+        tween(v)
+          .to(dur, { scale: new Vec3(target, target, 1) }, { easing: ease })
+          .start();
+        const gop = (v as unknown as { __glowOp?: UIOpacity }).__glowOp;
+        if (gop) {
+          Tween.stopAllByTarget(gop);
+          tween(gop).to(dur, { opacity: glowTarget }).start();
+        }
+      });
+    };
+
+    n.on(Node.EventType.MOUSE_ENTER, () => {
+      if (!VIEW_CONFIG.bar.buttons.enableHover || __touchDetected || disabled) return;
+      if (state === 'idle') apply('hover');
+    });
+    n.on(Node.EventType.MOUSE_LEAVE, () => {
+      if (disabled || state === 'pressed') return;
+      apply('idle');
+    });
+    n.on(Node.EventType.TOUCH_START, () => {
+      __touchDetected = true; // session-wide latch: future MOUSE events drop
+      if (disabled) return;
+      apply('pressed');
+    });
+    n.on(Node.EventType.TOUCH_CANCEL, () => {
+      if (disabled) return;
+      apply('idle');
+    });
     n.on(Node.EventType.TOUCH_END, () => {
-      restore();
+      if (disabled) return;
+      // If still hovered (cursor stayed over the button), return to hover —
+      // else back to idle. Cocos doesn't track "is currently inside" cheaply,
+      // so default to idle; the next MOUSE_ENTER on re-hover re-enables it.
+      apply(VIEW_CONFIG.bar.buttons.enableHover && !__touchDetected ? 'hover' : 'idle');
       if (!silent) this.events.emit('ui:click');
       cb();
     });
+
+    // Disabled flag — gate set externally via the `(n as any).setDisabled(on)`
+    // attached below. Future setters on the bar (setSpinning, setAutoplay)
+    // can flip it for spin/bonus gating.
+    (n as unknown as { setDisabled: (on: boolean) => void }).setDisabled = (on: boolean) => {
+      if (disabled === on) return;
+      disabled = on;
+      apply(on ? 'disabled' : 'idle');
+    };
     return n;
   }
 
@@ -303,20 +433,22 @@ export class BettingBarWeb extends Component {
     this.hitNode(60, 148, 70, 76, () => this.events.emit('menu'));
 
     const snd = this.gfx('snd');
+    // Cleaner speaker cone (back box + triangle) + TWO concentric right-facing
+    // wave arcs (was a single rough chevron). Centred ~design (158,186).
     snd.fillColor = col(C.icon);
-    snd.moveTo(152, this.Y(180));
-    snd.lineTo(158, this.Y(180));
-    snd.lineTo(166, this.Y(173));
-    snd.lineTo(166, this.Y(199));
-    snd.lineTo(158, this.Y(192));
-    snd.lineTo(152, this.Y(192));
+    snd.moveTo(150, this.Y(182));
+    snd.lineTo(156, this.Y(182));
+    snd.lineTo(165, this.Y(173));
+    snd.lineTo(165, this.Y(199));
+    snd.lineTo(156, this.Y(190));
+    snd.lineTo(150, this.Y(190));
     snd.close();
     snd.fill();
-    snd.lineWidth = 2.6;
+    snd.lineWidth = 2.3;
     snd.strokeColor = col(C.icon);
-    snd.moveTo(173, this.Y(180));
-    snd.lineTo(176, this.Y(186));
-    snd.lineTo(173, this.Y(192));
+    snd.arc(168, this.Y(186), 6, -0.82, 0.82, false);
+    snd.stroke();
+    snd.arc(168, this.Y(186), 11, -0.72, 0.72, false);
     snd.stroke();
     this.sndGlyphOp = snd.node.addComponent(UIOpacity);
     const slash = this.gfx('sndSlash');
@@ -327,9 +459,7 @@ export class BettingBarWeb extends Component {
     slash.stroke();
     this.sndSlash = slash.node;
     this.sndSlash.active = false;
-    this.hitNode(140, 160, 44, 52, () => {
-      this.volPanel.active = !this.volPanel.active;
-    });
+    this.hitNode(140, 160, 44, 52, () => this.toggleVolPanel());
 
     // Stronger account divider — alpha 0.3 was washing out at scale 0.53.
     g.lineWidth = 2;
@@ -461,11 +591,15 @@ export class BettingBarWeb extends Component {
     sel.on(Node.EventType.TOUCH_CANCEL, end);
   }
 
-  private CELLW = 132;
-  /** Pill centre in TRACK space: selector centre (SW/2=400) minus the 12px mask
-   *  inset the track lives under — using 400 raw left every cell 12px right of
-   *  the active pill. */
-  private PCX = 388;
+  // Task 2.3 — carousel cellW/pillCenterX promoted to bar.web.carousel tunables.
+  // Read-once at access time so designers can hot-tune in view-config.ts.
+  private get CELLW(): number {
+    return VIEW_CONFIG.bar.web.carousel.cellW;
+  }
+  /** Pill centre in TRACK space: selector centre minus the 12px mask inset. */
+  private get PCX(): number {
+    return VIEW_CONFIG.bar.web.carousel.pillCenterX;
+  }
   private trackXFor(i: number): number {
     return this.PCX - (i * this.CELLW + this.CELLW / 2);
   }
@@ -475,18 +609,21 @@ export class BettingBarWeb extends Component {
     return Math.max(0, Math.min(this.levels.length - 1, i));
   }
   private restyleCells(): void {
-    // The mask window holds ~5 cells (active ±2). Cells at distance >=3 sit on
-    // the hard mask edge and would clip mid-glyph (the "5" the owner saw), so
-    // they FADE OUT entirely before the cut — the strip reads as a clean
-    // centred carousel at any selection instead of a lopsided clipped row.
+    // Task 2.3 — fadeScale/fadeOpacity drive the L→R falloff. Index by clamped
+    // distance from the active cell so distance>=3 always uses the last (=0
+    // alpha) bucket — kills the carousel half-clip past the mask edge.
+    const fcfg = VIEW_CONFIG.bar.web.carousel;
+    const scales = fcfg.fadeScale;
+    const ops = fcfg.fadeOpacity;
+    const last = Math.min(scales.length, ops.length) - 1;
     this.cells.forEach((c, i) => {
       const d = Math.abs(i - this.activeIdx);
+      const k = Math.min(d, last);
       const on = d === 0;
       c.color = col(on ? C.dark : C.value);
-      const s = on ? 1.0 : d === 1 ? 0.74 : d === 2 ? 0.56 : 0.5;
-      c.node.setScale(s, s, 1);
+      c.node.setScale(scales[k]!, scales[k]!, 1);
       const op = c.node.getComponent(UIOpacity) ?? c.node.addComponent(UIOpacity);
-      op.opacity = on ? 255 : d === 1 ? 185 : d === 2 ? 95 : 0;
+      op.opacity = ops[k]!;
     });
   }
   private snapNearest(emit: boolean): void {
@@ -523,6 +660,22 @@ export class BettingBarWeb extends Component {
     // glyph child, not the circle base.
     const circleBtn = (cx: number, cy: number, r: number): { node: Node; g: Graphics } => {
       const n = this.localNode(this.node, cx, this.Y(cy), r * 2, r * 2);
+      // Premium hover/press GLOW ring — candy-pink bloom drawn UNDER the face,
+      // hidden at rest. hitNode's state machine fades it via the __glowOp handle
+      // (hover dim / pressed hot / idle off), composing with the scale feedback.
+      const glowN = this.localNode(n, 0, 0, (r + 12) * 2, (r + 12) * 2);
+      const gg = glowN.addComponent(Graphics);
+      for (let k = 6; k >= 1; k--) {
+        gg.fillColor = col(C.active, 0.05);
+        gg.circle(0, 0, r + 1 + k * 1.8);
+        gg.fill();
+      }
+      gg.fillColor = col(C.activeHi, 0.18);
+      gg.circle(0, 0, r + 2);
+      gg.fill();
+      const glowOp = glowN.addComponent(UIOpacity);
+      glowOp.opacity = 0;
+      (n as unknown as { __glowOp: UIOpacity }).__glowOp = glowOp;
       const g = n.addComponent(Graphics);
       g.fillColor = col(C.panel);
       g.circle(0, 0, r);
@@ -537,36 +690,71 @@ export class BettingBarWeb extends Component {
       return { node: n, g };
     };
 
-    const coins = circleBtn(1980, 186, 38);
-    (
-      [
-        ['#9a4bd0', -11],
-        ['#c06fda', -3],
-        ['#e0a0ff', 5],
-      ] as [string, number][]
-    ).forEach(([hex, dy]) => {
-      coins.g.fillColor = col(hex);
-      coins.g.ellipse(0, dy, 19, 6.5);
+    // Task 2.2 — coins cluster + ×2 gamble button spacing driven by tunables.
+    // gambleGapPx is the horizontal gap between coins.cx and gamble.cx; default
+    // 110 matches the legacy layout exactly so no visual change at default.
+    const barCfg2 = VIEW_CONFIG.bar.web;
+    const coinsX = 1980 + barCfg2.clusterCoinsX;
+    const gambleX = coinsX + barCfg2.gambleGapPx;
+    const coins = circleBtn(coinsX, 186, 38);
+    // Quick-bet menu → a crisp GOLD coin stack (was 3 purple-on-purple ellipses
+    // that read as a blur). Each coin: dark edge band → gold face → amber rim →
+    // top sheen, stacked bottom-up so the top coin reads cleanest.
+    const drawCoin = (cy: number): void => {
+      const rx = 20,
+        ry = 7.5;
+      coins.g.fillColor = col('#7a4a06'); // edge / thickness band
+      coins.g.ellipse(0, cy - 3.4, rx, ry);
       coins.g.fill();
-    });
-    this.hitNode(1942, 148, 76, 76, () => this.events.emit('betmenu'), [coins.node]);
+      coins.g.fillColor = col('#ffce47'); // gold face
+      coins.g.ellipse(0, cy, rx, ry);
+      coins.g.fill();
+      coins.g.lineWidth = 1.3; // amber rim
+      coins.g.strokeColor = col('#b9760c');
+      coins.g.ellipse(0, cy, rx, ry);
+      coins.g.stroke();
+      coins.g.fillColor = col('#fff4c4', 0.85); // top sheen
+      coins.g.ellipse(-rx * 0.28, cy + ry * 0.34, rx * 0.4, ry * 0.32);
+      coins.g.fill();
+    };
+    drawCoin(-11);
+    drawCoin(-1);
+    drawCoin(9);
+    // tiny sparkle on the top coin — sells the "shiny money" read
+    coins.g.fillColor = col('#fffbe8');
+    coins.g.circle(11, 13, 1.7);
+    coins.g.fill();
+    this.hitNode(coinsX - 38, 148, 76, 76, () => this.events.emit('betmenu'), [coins.node]);
 
-    const gamble = circleBtn(2090, 186, 38);
-    this.lbl('×2', 0, 0, 25, C.value, true, gamble.node, 0.5);
-    this.hitNode(2052, 148, 76, 76, () => this.events.emit('bet:double'), [gamble.node]);
+    const gamble = circleBtn(gambleX, 186, 38);
+    // lbl() applies the Y() design-space crop; inside a LOCAL centred node that
+    // shoves the glyph CROP(=78)px up (the "×2 floats above its circle" bug). Pin
+    // it back to local origin so it sits centred in the button.
+    const x2lbl = this.lbl('×2', 0, 0, 25, C.value, true, gamble.node, 0.5);
+    x2lbl.node.setPosition(0, 0, 0);
+    this.hitNode(gambleX - 38, 148, 76, 76, () => this.events.emit('bet:double'), [gamble.node]);
 
     const turbo = circleBtn(2200, 150, 30);
     const tGlyph = this.localNode(turbo.node, 0, 0, 30, 30);
     const tg = tGlyph.addComponent(Graphics);
-    tg.fillColor = col(C.active);
-    tg.moveTo(4, 12);
-    tg.lineTo(-9, -3);
-    tg.lineTo(-1, -3);
-    tg.lineTo(-5, -14);
-    tg.lineTo(8, 2);
-    tg.lineTo(0, 2);
-    tg.close();
+    // Gold lightning bolt (was flat pink) → reads as "speed / electric". Filled
+    // gold face + amber edge for a crisp premium glyph.
+    const boltPath = (): void => {
+      tg.moveTo(4, 13);
+      tg.lineTo(-9, -2);
+      tg.lineTo(-1, -2);
+      tg.lineTo(-5, -14);
+      tg.lineTo(9, 3);
+      tg.lineTo(1, 3);
+      tg.close();
+    };
+    tg.fillColor = col('#ffd23f');
+    boltPath();
     tg.fill();
+    tg.lineWidth = 1.4;
+    tg.strokeColor = col('#8a5200');
+    boltPath();
+    tg.stroke();
     this.turboGlyphOp = tGlyph.addComponent(UIOpacity);
     const pip = this.localNode(turbo.node, 13, 13, 12, 12);
     const pg = pip.addComponent(Graphics);
@@ -580,18 +768,21 @@ export class BettingBarWeb extends Component {
     const auto = circleBtn(2200, 222, 30);
     const aGlyph = this.localNode(auto.node, 0, 0, 30, 30);
     const ag2 = aGlyph.addComponent(Graphics);
-    ag2.lineWidth = 3;
-    ag2.strokeColor = col('#e0a0ff');
+    // Brighter, crisper loop arrow (was a dim #e0a0ff). White-lilac reads clean
+    // on the dark circle and matches the premium gold turbo beside it.
+    ag2.lineWidth = 3.4;
+    ag2.strokeColor = col('#f4e6ff');
     ag2.arc(0, 0, 12, -1.23, -1.91 + Math.PI * 2, true);
     ag2.stroke();
-    ag2.fillColor = col('#e0a0ff');
-    ag2.moveTo(2, 13);
+    ag2.fillColor = col('#f4e6ff');
+    ag2.moveTo(3, 14);
     ag2.lineTo(-3, 7);
-    ag2.lineTo(-5, 15);
+    ag2.lineTo(-6, 16);
     ag2.close();
     ag2.fill();
     this.autoGlyph = aGlyph;
     this.autoCount = this.lbl('', 0, 0, 22, C.value, true, auto.node, 0.5);
+    this.autoCount.node.setPosition(0, 0, 0); // same local-origin pin as ×2
     this.autoCount.node.active = false;
     this.hitNode(2170, 192, 60, 60, () => this.events.emit('autoplay'), [auto.node]);
 
@@ -725,6 +916,7 @@ export class BettingBarWeb extends Component {
     vp.setPosition(70, this.Y(10), 0);
     vp.active = false;
     this.volPanel = vp;
+    this.volPanelOp = vp.addComponent(UIOpacity);
     const g = vp.addComponent(Graphics);
     g.fillColor = col(C.panel, 0.97);
     g.roundRect(0, -98, 240, 98, 20);
@@ -745,7 +937,7 @@ export class BettingBarWeb extends Component {
     vp.addChild(closeHit);
     closeHit.addComponent(UITransform).setContentSize(36, 36);
     closeHit.setPosition(216, -22, 0);
-    closeHit.on(Node.EventType.TOUCH_END, () => (vp.active = false));
+    closeHit.on(Node.EventType.TOUCH_END, () => this.toggleVolPanel());
 
     const fillNode = new Node('vfill');
     fillNode.layer = this.node.layer;
@@ -791,6 +983,38 @@ export class BettingBarWeb extends Component {
     this.redrawVolume();
   }
 
+  /** Smooth open/close for the sound popup — pop-scale + fade in (backOut), fade
+   *  + settle out, then deactivate. Replaces the old hard active toggle so the
+   *  panel feels like a real menu transition. */
+  private toggleVolPanel(): void {
+    const vp = this.volPanel;
+    const op = this.volPanelOp;
+    const opening = !vp.active;
+    Tween.stopAllByTarget(vp);
+    Tween.stopAllByTarget(op);
+    if (opening) {
+      vp.active = true;
+      vp.setScale(0.84, 0.84, 1);
+      op.opacity = 0;
+      tween(vp)
+        .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .start();
+      tween(op).to(0.16, { opacity: 255 }).start();
+    } else {
+      tween(vp)
+        .to(0.14, { scale: new Vec3(0.9, 0.9, 1) }, { easing: 'quadIn' })
+        .start();
+      tween(op)
+        .to(0.14, { opacity: 0 })
+        .call(() => {
+          vp.active = false;
+          vp.setScale(1, 1, 1);
+          op.opacity = 255;
+        })
+        .start();
+    }
+  }
+
   private redrawVolume(): void {
     this.volKnob.setPosition(60 + 154 * this.volume, -66, 0);
     this.volFill.clear();
@@ -833,7 +1057,9 @@ export class BettingBarWeb extends Component {
   }
 
   private fmt(n: number): string {
-    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Non-finite guard: a bad value renders as a clean 0.00, never "NaN"/"∞".
+    const v = Number.isFinite(n) ? n : 0;
+    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   /** HU2 odometer driven by the COMPONENT SCHEDULER (Cocos tween on a plain
    *  object does not tick in this runtime — only Node tweens do — so the value

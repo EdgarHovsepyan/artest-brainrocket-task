@@ -6,6 +6,7 @@ import {
   _decorator,
   Component,
   Mask,
+  Material,
   Node,
   SpriteFrame,
   tween,
@@ -80,14 +81,14 @@ export class ReelView extends Component {
   update(dt: number): void {
     if (!this.strip || dt <= 0) return;
     const y = this.strip.position.y;
-    // Skip the stretch during the wind-up: the up→down launch reversal spikes the
-    // per-frame velocity and popped the whole column's size (the owner's "reels
-    // change size at spin start"). Hold scale at 1 until the reel is truly cruising.
-    if (this.blurActive && !this.launching) {
+    // 2026-06-11 — motion-blur strip-stretch DISABLED via spin.blur.enabled.
+    // ANY vertical stretch on the symbols during a spin reads as "vertical
+    // arrows / lines" (user-rejected). The reel reads fast from the scroll
+    // alone. Guard keeps the strip at scale 1 throughout. The block below
+    // only runs if a future design re-enables a (non-stretch) blur treatment.
+    if (VIEW_CONFIG.spin.blur.enabled && this.blurActive && !this.launching) {
       const { triggerSpd, span, strengthYFrac, rampInDecay, rampOutDecay } = VIEW_CONFIG.spin.blur;
       const cellsPerFrame = Math.abs(y - this.lastStripY) / (this.pitch || 1) / (dt * 60);
-      // Subtle smear only — capped at ~1.18x so the reel reads as fast, never as
-      // a distorted/rescaled container (owner note: don't change reel scaling).
       const target =
         1 + Math.max(0, Math.min(1, (cellsPerFrame - triggerSpd) / span)) * (strengthYFrac * 2.2);
       const decay = target > this.blurStretch ? rampInDecay : rampOutDecay;
@@ -149,16 +150,42 @@ export class ReelView extends Component {
     const strip = this.strip;
     if (!strip) return Promise.resolve();
     const rows = GRID.rows;
+    const len = this.stripCells.length;
 
     // Idle breathing OFF for the spin (the strip scrolls + motion-blurs instead).
     this.cells.forEach((c) => c.setIdle(false));
-    // DON'T re-paint the visible window (cells 0..2) here — leaving the current
-    // symbols means nothing changes before the strip lifts (kills the "symbols
-    // change before spinning" flash). Only the off-screen buffer (k>=rows) gets
-    // random fillers; the real result is dropped into the window AT settle.
-    this.pendingFinal = final;
-    for (let k = rows; k < this.stripCells.length; k++) {
+    // Hardened mask (Task 6.1 hardening): paint the 3 cells that will be inside
+    // the window AT THE INSTANT OF LAUNCH with the SAME symbols currently shown,
+    // so the strip-jump from y=0 to y=startY produces a window with *identical*
+    // visible content. Without this the user sees an instant glitch as cells
+    // 0..2 (idle) jump out and cells len-3..len-1 (random fillers) jump in.
+    //
+    // Strip layout: cell_k.localY = pitch − k·pitch. At launch strip.y = startY
+    // = spinBuffer × pitch. The cells whose worldY land in the window-band
+    // [−pitch, +pitch] are k = spinBuffer..spinBuffer+2 = len-3..len-1.
+    const launchTop = len - rows; // top window row at launch
+    const currentSymbols = [
+      this.cells[0].currentId,
+      this.cells[1].currentId,
+      this.cells[2].currentId,
+    ];
+    for (let k = rows; k < launchTop; k++) {
+      // Mid-strip buffer: still random — these are what the user sees during
+      // the high-speed cruise + decel.
       this.stripCells[k].setSymbol(Math.floor(Math.random() * SYMBOL_COUNT));
+    }
+    // Cells immediately at the launch position: clone the current window
+    // content so the jump-from-y=0-to-y=startY is visually a no-op.
+    for (let r = 0; r < rows; r++) {
+      this.stripCells[launchTop + r].setSymbol(currentSymbols[r]);
+    }
+    // Cells 0..2 (the ones that will arrive at the window AT SETTLE) get the
+    // FINAL result painted NOW — while they're far above the visible band. By
+    // the time the strip decelerates and they enter the window, they already
+    // show the result. settle() no longer has to swap them visibly.
+    this.pendingFinal = final;
+    for (let r = 0; r < rows; r++) {
+      this.cells[r].setSymbol(final[r]);
     }
 
     return new Promise<void>((resolve) => {
@@ -166,8 +193,10 @@ export class ReelView extends Component {
         if (!this.settle) return;
         this.settle = null;
         Tween.stopAllByTarget(strip);
-        // Drop the result into the window exactly at the stop — the land squash
-        // masks the swap, so the result never shows before or during the spin.
+        // Cells 0..2 were painted with `final` at launch (Task 6.1 hardening);
+        // they already show the result by the time the strip arrives at 0.
+        // This call is now idempotent — kept as a defensive backstop if some
+        // future caller bypasses the launch-time paint (e.g. a direct settle).
         const fin = this.pendingFinal;
         if (fin) this.cells.forEach((c, row) => c.setSymbol(fin[row]));
         this.pendingFinal = null;
@@ -177,7 +206,11 @@ export class ReelView extends Component {
         this.blurStretch = 1;
         this.lastStripY = 0; // fresh velocity baseline for the next spin
         strip.setScale(1, 1, 1); // clear any residual motion-blur stretch
-        this.cells.forEach((c) => c.playLand(VIEW_CONFIG.spin.landSquash));
+        // 2026-06-11 polish — the per-cell playLand was making each symbol bounce
+        // independently AFTER the strip's elasticOut already bounced. Reads as
+        // a fragmented post-stop wobble instead of a unified reel impact. The
+        // strip's elasticOut tween (Task 6.2) IS the AAA-canonical land bounce
+        // — keep it as the ONE source of impact feel. Per-cell squash dropped.
         // Resume idle breathing once the reel has settled.
         if (!this.reducedMotion) this.cells.forEach((c) => c.setIdle(true));
         resolve();
@@ -189,26 +222,63 @@ export class ReelView extends Component {
       // Gate the blur through the wind-up so the up→down launch reversal can't
       // pop the column's size; clear once the reel is cruising.
       this.launching = true;
+      // 6.1: pre-spin mask formalize — promote the implicit 50ms lock from a
+      // literal to VIEW_CONFIG.spin.preSpinMaskMs so QA can tune the snap-guard.
       const windDur =
-        (speedMul === 1 && VIEW_CONFIG.spin.windupMs > 0 ? VIEW_CONFIG.spin.windupMs : 50) / 1000;
+        (speedMul === 1 && VIEW_CONFIG.spin.windupMs > 0
+          ? VIEW_CONFIG.spin.windupMs
+          : VIEW_CONFIG.spin.preSpinMaskMs) / 1000;
       this.scheduleOnce(() => {
         this.launching = false;
       }, windDur);
       const t = tween(strip);
-      // Anticipatory wind-up "slingshot": base spins only pull UP a touch, then
-      // launch down — reads as loading the reel (a Signature game-feel touch).
-      const { windupMs, windupAmpFrac } = VIEW_CONFIG.spin;
+      // Anticipatory wind-up "slingshot": base spins pull UP + Y-squash the
+      // strip briefly, reading as a coiled spring loading energy before the
+      // launch. Composes with the launch teleport (already invisible thanks
+      // to the 6.1 hardening that clones the visible window to the launch
+      // buffer cells).
+      const { windupMs, windupAmpFrac, windupSquash } = VIEW_CONFIG.spin;
       if (speedMul === 1 && windupMs > 0) {
         const kick = VIEW_CONFIG.layout.cell * windupAmpFrac * 0.15;
+        // Optional Y-squash — only if windupSquash < 1 (disabled by default so
+        // NO vertical scaling touches the symbols). The position kick below is
+        // the wind-up cue on its own.
+        if (windupSquash < 1) {
+          tween(strip)
+            .to(windupMs / 2000, { scale: new Vec3(1.0, windupSquash, 1) }, { easing: 'sineIn' })
+            .to(windupMs / 2000, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
+            .start();
+        }
         t.to(
           windupMs / 1000,
           { position: new Vec3(0, this.startY + kick, 0) },
           { easing: 'quadOut' },
         );
       }
-      t.to(spinSeconds * speedMul, { position: new Vec3(0, 0, 0) }, { easing: reelEase })
-        .call(() => this.settle?.())
-        .start();
+      // 6.2: split-stop elastic over-travel bounce. The trapezoidal reelEase
+      // brings the strip to REST at y = -overshoot (a small negative dip); the
+      // second segment then springs back to 0 with elasticOut. settle() (drops
+      // the result + playLand squash) fires on the SECOND segment's complete so
+      // the squash coincides with REST, not with the dip nadir. Reduced-motion
+      // skips the bounce (the dead-stop at 0 reads cleanly without overshoot).
+      const b = VIEW_CONFIG.spin.bounce;
+      const bounceEnabled = !this.reducedMotion && b.overtravelFrac > 0;
+      if (bounceEnabled) {
+        const overshoot = VIEW_CONFIG.layout.cell * b.overtravelFrac * b.elasticity;
+        const bounceDur = (b.bounceMs / 1000) * b.weight;
+        t.to(
+          (spinSeconds * speedMul) / b.speed,
+          { position: new Vec3(0, -overshoot, 0) },
+          { easing: reelEase },
+        )
+          .to(bounceDur, { position: new Vec3(0, 0, 0) }, { easing: b.easing })
+          .call(() => this.settle?.())
+          .start();
+      } else {
+        t.to(spinSeconds * speedMul, { position: new Vec3(0, 0, 0) }, { easing: reelEase })
+          .call(() => this.settle?.())
+          .start();
+      }
     });
   }
 
@@ -224,8 +294,8 @@ export class ReelView extends Component {
   /** Pulse the given window rows (cells in a winning line), offset by `delay`
    *  seconds so the controller can stagger reels into an L->R wave blink. `rich`
    *  enables the in-cell sheen/sparkle (focused wins only — off for dense wins). */
-  highlight(rows: number[], delay = 0, rich = true): void {
-    rows.forEach((row, i) => this.cells[row]?.playWin(delay + i * 0.04, rich));
+  highlight(rows: number[], delay = 0, rich = true, winMat: Material | null = null): void {
+    rows.forEach((row, i) => this.cells[row]?.playWin(delay + i * 0.04, rich, winMat));
   }
 
   /** Bounce the given window rows — sticky wilds/crowns celebrating each free
@@ -242,5 +312,11 @@ export class ReelView extends Component {
 
   clearHighlight(): void {
     this.cells.forEach((c) => c.clear());
+  }
+
+  /** Task 6.3 — short Svarka jitter on a single window row when the win-line
+   *  head crosses the cell. amp/durMs from VIEW_CONFIG.win.svarka. */
+  shakeRow(row: number, amp: number, durMs: number): void {
+    this.cells[row]?.playShake(amp, durMs);
   }
 }

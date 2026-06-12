@@ -241,7 +241,7 @@ export class BettingBarMobile extends PIXI.Container {
     return { scale: s, barTopY: this.y + BAND_TOP * s, barH: band * s };
   }
 
-  _fmt(n) { return Number(n).toLocaleString('en-US'); }
+  _fmt(n) { const v = Number(n); return (Number.isFinite(v) ? v : 0).toLocaleString('en-US'); }
   setBalance(n) { const b = this.elements.balanceBar; b.balanceValue.text = this._fmt(n); b.relayout(); }
   setCurrency(c) { const b = this.elements.balanceBar; b.balanceCurrency.text = c; b.relayout(); }
   setLastWin(n) { const p = this.elements.lastWinPanel; p.value.text = this._fmt(n); p.relayout(); }

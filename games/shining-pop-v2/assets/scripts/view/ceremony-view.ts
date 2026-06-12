@@ -29,7 +29,8 @@ const RIM = new Color().fromHEX(PAL.accent); // magenta accent
 const CRYSTAL = new Color().fromHEX(PAL.valueText); // crystal white-pink amount
 const WARM = new Color(255, 196, 92, 255); // hot-gold the amount rolls THROUGH
 const TITLE = new Color().fromHEX(PAL.title); // soft-magenta header default
-const fmt = (cents: number) => (cents / 100).toFixed(2);
+// Non-finite guard: a bad count-up value renders 0.00, never "NaN"/"∞".
+const fmt = (cents: number) => ((Number.isFinite(cents) ? cents : 0) / 100).toFixed(2);
 
 @ccclass('CeremonyView')
 export class CeremonyView extends Component {
@@ -38,6 +39,7 @@ export class CeremonyView extends Component {
   private raysG!: Graphics;
   private shockNode!: Node;
   private shockG!: Graphics;
+  private panelLightOp!: UIOpacity; // Task 5.MATRIX — SUPER/EPIC amount-backing glow
   private headerLabel!: Label;
   private amountLabel!: Label;
   private badgeLabel!: Label;
@@ -63,19 +65,42 @@ export class CeremonyView extends Component {
    *  stays AV-synced (audio lives in the controller). */
   onDetonate: ((tierName: string) => void) | null = null;
   onCountPip: (() => void) | null = null;
+  /** Task 5.MATRIX — Epic-tier ceremony asks the slot-view to spray its
+   *  particle-pool coin geyser (audio + particles still live there). */
+  onCoinGeyser: (() => void) | null = null;
   private pipAccum = 0;
+  // Task 5.1 — heartbeat ticker state. heartbeatScale is set instantly to
+  // currentTextPop on each 10ⁿ crossing of the rolling count, then decays
+  // toward 1.0 per frame within the same scheduled stepper (no plain-object
+  // tweens — `tween({v:0})` would never tick in this 3.8.8 web runtime).
+  private heartbeatScale = 1;
+  private heartbeatThresholds: number[] = [];
+  private currentTextPop = 1.18;
   private readonly _tintTmp = new Color();
 
   /** Build the (hidden) overlay + a fullscreen dim used for the micro-silence beat. */
   build(shakeNode: Node): void {
     this.shakeNode = shakeNode;
 
-    // fullscreen dim behind the light show (held-breath beat + ray contrast)
+    // 2026-06-11 BUG FIX (cocos-aaa-visual-gate WC5/WC7 + anti-pattern "effects
+    // that hide the win"): the old fullscreen SOLID black rect at alpha ~153
+    // blacked out the whole game on a big win ("closing all gameplay"). Replaced
+    // with a RADIAL VIGNETTE — concentric wide-stroked frames, dark at the screen
+    // EDGE fading to FULLY CLEAR in the centre. The reels, symbols and win number
+    // (all centred) stay bright + visible; only the perimeter darkens to funnel
+    // the eye. This is the premium "scene reacts" look, never a black box.
     const dimNode = this.mk('dim', 4000, 4000, this.node);
     const dg = dimNode.addComponent(Graphics);
-    dg.fillColor = new Color(0, 0, 0, 255);
-    dg.rect(-2000, -2000, 4000, 4000);
-    dg.fill();
+    const RINGS = 16;
+    for (let i = 0; i < RINGS; i++) {
+      const t = i / (RINGS - 1); // 0 = outer screen edge, 1 = centre
+      const half = 2000 - t * 1640; // 2000 (edge) → 360 (near centre, stays clear)
+      const a = Math.round((1 - t) * (1 - t) * 46); // soft quadratic edge falloff
+      dg.lineWidth = 150; // wide bands overlap → smooth gradient, no banding
+      dg.strokeColor = new Color(5, 2, 11, a);
+      dg.rect(-half, -half, half * 2, half * 2);
+      dg.stroke();
+    }
     this.dim = dimNode.addComponent(UIOpacity);
     this.dim.opacity = 0;
 
@@ -101,6 +126,22 @@ export class CeremonyView extends Component {
     ground.close();
     ground.fill();
 
+    // Task 5.MATRIX — brighter panel-light layer (SUPER/EPIC only). Same
+    // diamond shape, hotter alpha; opacity tweened up per tier.panelLight in
+    // show(). Stays a stacked-alpha wash so the brightness reads as light, not
+    // a solid plate (slot-vfx restraint rule).
+    const panelLightNode = this.mk('panelLight', 10, 10, ov);
+    const panelLight = panelLightNode.addComponent(Graphics);
+    panelLight.fillColor = new Color(255, 90, 176, 110);
+    panelLight.moveTo(0, -120);
+    panelLight.lineTo(330, -10);
+    panelLight.lineTo(0, 100);
+    panelLight.lineTo(-330, -10);
+    panelLight.close();
+    panelLight.fill();
+    this.panelLightOp = panelLightNode.addComponent(UIOpacity);
+    this.panelLightOp.opacity = 0;
+
     this.headerLabel = this.mkLabel(ov, 0, 96, 56, TITLE);
     this.amountLabel = this.mkLabel(ov, 0, -16, 66, CRYSTAL);
     this.badgeLabel = this.mkLabel(ov, 0, -86, 30, Color.WHITE);
@@ -119,12 +160,12 @@ export class CeremonyView extends Component {
     const tier = resolveBigWinTier(multiple);
     if (!tier) return false;
 
-    // continuous 0..1 intensity across the main band (8x .. 100x). Past 100x the
-    // ceremony USED to clamp here — so a 500x or a max-win looked identical to a
-    // 100x, the escalation dying exactly where the biggest wins begin. `boost`
-    // keeps rays/shake/duration growing (log-scaled, saturates ~1000x+) while the
+    // Task 5.MATRIX — re-mapped intensity normaliser. Old span was (multiple-8)/92
+    // when BIG was 8x; new BIG floor is 15x and the band extends to 100x so the
+    // span is (multiple-15)/85. The `boost` keeps growing past 100x (log-scaled,
+    // saturates ~1000x+) so a max-win still escalates beyond an EPIC. The
     // saturating `t` still governs colour/fontSize so text never blows up.
-    const t = Math.max(0, Math.min(1, (multiple - 8) / 92));
+    const t = Math.max(0, Math.min(1, (multiple - 10) / 90));
     const over = Math.max(0, multiple - 100);
     const boost = over > 0 ? Math.min(1, Math.log10(1 + over / 60)) : 0;
     const tx = Math.min(1.6, t + boost * 0.6); // extended intensity for >100x
@@ -157,6 +198,16 @@ export class CeremonyView extends Component {
       // AV-sync hook: the controller fires the braam/win sting on this exact
       // frame so the detonation never plays in silence (audio lives there).
       this.onDetonate?.(tier.name);
+      // Task 5.MATRIX — EPIC coin geyser. The hook wakes particle-layer.coinGeyser
+      // on the slot-view; null-safe so other tiers stay clean.
+      if (!reduced && tier.coinParticles > 0) this.onCoinGeyser?.();
+      // Task 5.MATRIX — panel-light brighten (SUPER/EPIC only). 0..1 → 0..255.
+      // Tween up here, decayed by hide()/abort() back to 0.
+      if (this.panelLightOp) {
+        Tween.stopAllByTarget(this.panelLightOp);
+        const lightAlpha = reduced ? 0 : Math.round(tier.panelLight * 255);
+        tween(this.panelLightOp).to(0.3, { opacity: lightAlpha }).start();
+      }
       // header overshoot pop on top of the panel scale-in
       this.headerLabel.node.setScale(0.3, 0.3, 1);
       tween(this.headerLabel.node)
@@ -164,15 +215,22 @@ export class CeremonyView extends Component {
         .to(0.12, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
         .start();
       // bigger wins savour longer — duration tracks the extended intensity.
-      this.countUp(winCents, 0.8 + 1.0 * tx);
+      // Task 5.1 — pass tier.textPopScale so the heartbeat scales per tier.
+      this.countUp(winCents, 0.8 + 1.0 * tx, tier.textPopScale);
     };
 
-    // beat 1 — micro-silence: dim, hold, then detonate.
+    // beat 1 — micro-silence: dim, hold, then detonate. 2026-06-11 — the `dim`
+    // is now a VIGNETTE (clear centre), so its opacity controls only how dark
+    // the SCREEN EDGES get; the reels/symbols/number stay fully visible. Tier
+    // scales the edge darkness via boardDimAlpha (BIG/MEGA subtle, SUPER/EPIC
+    // a touch deeper) but NEVER blacks the centre. Peak opacity capped at 200
+    // (vignette stroke alphas are already low, so this reads as a soft frame).
     const msec = VIEW_CONFIG.ceremony.microSilenceMs / 1000;
+    const savourAlpha = reduced ? 80 : Math.round(150 + 105 * tier.boardDimAlpha);
     tween(this.dim)
-      .to(msec, { opacity: reduced ? 90 : 165 })
+      .to(msec, { opacity: reduced ? 120 : 200 })
       .call(reveal)
-      .to(0.5, { opacity: reduced ? 60 : 110 })
+      .to(0.5, { opacity: savourAlpha })
       .start();
 
     this.scheduleOnce(() => this.hide(), (VIEW_CONFIG.ceremony.holdMs + 1100 * tx) / 1000);
@@ -201,7 +259,10 @@ export class CeremonyView extends Component {
     this.scheduleOnce(() => this.hide(), 1.6);
   }
 
-  /** Radial god-rays as elongated faceted diamonds (no circles, additive feel). */
+  /** Radial god-rays as elongated faceted diamonds (no circles, additive feel).
+   *  VISUAL BUST — warmed from magenta to GOLD/AMBER so the ceremony light
+   *  matches the fire aesthetic (WC7 diegetic warm light). Alternating gold +
+   *  hot-orange shafts read as radiant heat, not neon. */
   private drawRays(count: number, len: number, alpha: number): void {
     const g = this.raysG;
     g.clear();
@@ -210,7 +271,10 @@ export class CeremonyView extends Component {
       const cos = Math.cos(a);
       const sin = Math.sin(a);
       const w = 14 + (i % 3) * 6;
-      g.fillColor = new Color(255, i % 2 ? 60 : 120, 156, Math.round(26 * alpha + (i % 3) * 6));
+      // Gold (even) ↔ hot-orange (odd) warm shafts.
+      const gch = i % 2 ? 150 : 205;
+      const bch = i % 2 ? 40 : 90;
+      g.fillColor = new Color(255, gch, bch, Math.round(30 * alpha + (i % 3) * 7));
       g.moveTo(cos * 70, sin * 70);
       g.lineTo(cos * len * 0.5 - sin * w, sin * len * 0.5 + cos * w);
       g.lineTo(cos * len, sin * len);
@@ -220,31 +284,52 @@ export class CeremonyView extends Component {
     }
   }
 
-  /** One-shot expanding shock diamond that fades as it grows. */
+  /** One-shot detonation FLASH (2026-06-11 redesign). The old version was a
+   *  STROKED diamond outline expanding to size/60× — it read as a "rotated box"
+   *  growing out of the win (user-rejected, same complaint as the tap ping).
+   *  This replacement is a FILLED soft radial light bloom: a bright pinpoint
+   *  core feathering out through 4 stacked-alpha diamonds, scaling up + fading.
+   *  It reads as a burst of LIGHT (a detonation), never a shape outline. Pairs
+   *  with the god-rays (drawRays) which are already filled diamonds. */
   private fireShock(size: number): void {
     const g = this.shockG;
     g.clear();
-    g.lineWidth = 5;
-    g.strokeColor = new Color(255, 224, 255, 220);
-    g.moveTo(0, 60);
-    g.lineTo(60, 0);
-    g.lineTo(0, -60);
-    g.lineTo(-60, 0);
-    g.close();
-    g.stroke();
-    this.shockNode.setScale(0.4, 0.4, 1);
+    // Stacked filled diamonds — hot-white core → magenta-pink feathered halo.
+    const layers: Array<[number, number, number, number, number]> = [
+      // [radius, r, g, b, alpha]
+      [78, 255, 90, 176, 26],
+      [54, 255, 140, 200, 50],
+      [32, 255, 210, 240, 110],
+      [16, 255, 255, 255, 220],
+    ];
+    for (const [rad, cr, cg, cb, ca] of layers) {
+      g.fillColor = new Color(cr, cg, cb, ca);
+      g.moveTo(0, rad);
+      g.lineTo(rad, 0);
+      g.lineTo(0, -rad);
+      g.lineTo(-rad, 0);
+      g.close();
+      g.fill();
+    }
+    this.shockNode.setScale(0.35, 0.35, 1);
     const op = this.shockNode.getComponent(UIOpacity) ?? this.shockNode.addComponent(UIOpacity);
     op.opacity = 255;
+    // Fast bright punch then a slightly slower fade — a flash, not a slow ring.
     tween(this.shockNode)
-      .to(0.55, { scale: new Vec3(size / 60, size / 60, 1) }, { easing: 'quadOut' })
+      .to(0.42, { scale: new Vec3(size / 78, size / 78, 1) }, { easing: 'expoOut' })
       .start();
-    tween(op).to(0.55, { opacity: 0 }, { easing: 'quadOut' }).start();
+    tween(op).to(0.12, { opacity: 255 }).to(0.42, { opacity: 0 }, { easing: 'quadOut' }).start();
   }
 
   private hide(): void {
     if (!this.overlay) return;
     Tween.stopAllByTarget(this.raysNode);
     tween(this.dim).to(0.3, { opacity: 0 }).start();
+    // Task 5.MATRIX — fade the panel-light back to 0 in lockstep with the panel.
+    if (this.panelLightOp) {
+      Tween.stopAllByTarget(this.panelLightOp);
+      tween(this.panelLightOp).to(0.18, { opacity: 0 }).start();
+    }
     tween(this.overlay)
       .to(0.18, { scale: new Vec3(0.6, 0.6, 1) }, { easing: 'quadIn' })
       .call(() => (this.overlay.active = false))
@@ -265,7 +350,7 @@ export class CeremonyView extends Component {
     this.scheduleOnce(() => this.hide(), 0.35);
   }
 
-  private countUp(toCents: number, dur: number): void {
+  private countUp(toCents: number, dur: number, textPopScale = 1.18): void {
     this.counting = true;
     this.countTarget = toCents;
     this.countFrom = 0;
@@ -273,14 +358,28 @@ export class CeremonyView extends Component {
     this.countElapsed = 0;
     this.pipAccum = 0;
     this.amountLabel.string = '0.00';
+    // Task 5.1 — pre-compute heartbeat milestones (log scale — dense early,
+    // sparse late). 10ⁿ crossings the count will pass through give the natural
+    // "log feel" beats described in the blueprint. milestoneCount caps how many
+    // we'll fire (defensive — a max-win count might cross 7+ decades).
+    this.heartbeatScale = 1;
+    this.currentTextPop = textPopScale;
+    const { milestoneCount } = VIEW_CONFIG.counter.heartbeat;
+    this.heartbeatThresholds.length = 0;
+    for (let n = 1; this.heartbeatThresholds.length < milestoneCount; n++) {
+      const v = Math.pow(10, n);
+      if (v >= toCents) break;
+      this.heartbeatThresholds.push(v);
+    }
+    this.amountLabel.node.setScale(1, 1, 1);
     this.unschedule(this.tickCount);
     this.schedule(this.tickCount, 0); // every frame — guaranteed to tick (not a plain-object tween)
   }
 
   /** Frame-stepped count-up (arrow fn so `this` binds + unschedule matches the
-   *  same ref). Samples quartOut by hand, fires a throttled audio pip, and
-   *  lerps the amount colour warm-gold -> crystal as it lands (the "living tint"
-   *  WC6 beat — the hero number is no longer static-coloured). */
+   *  same ref). Samples quartOut by hand, fires a throttled audio pip, lerps the
+   *  amount colour warm-gold -> crystal as it lands, AND (Task 5.1) drives a
+   *  heartbeat scale-pop on each 10ⁿ crossing — beats dense early, sparse late. */
   private tickCount = (dt: number): void => {
     this.countElapsed += dt;
     const p = Math.min(1, this.countElapsed / this.countDur);
@@ -289,6 +388,17 @@ export class CeremonyView extends Component {
     this.amountLabel.string = fmt(Math.round(v));
     Color.lerp(this._tintTmp, WARM, CRYSTAL, e);
     this.amountLabel.color = this._tintTmp; // reassign so the Label marks dirty
+    // Task 5.1 — heartbeat: consume any 10ⁿ thresholds the rolling count passed
+    // this frame, snap heartbeatScale to currentTextPop on each, then decay
+    // toward 1 per-frame at decayPerSec (within this scheduled stepper — never
+    // a plain-object tween).
+    while (this.heartbeatThresholds.length && v >= this.heartbeatThresholds[0]) {
+      this.heartbeatThresholds.shift();
+      this.heartbeatScale = this.currentTextPop;
+    }
+    const { decayPerSec } = VIEW_CONFIG.counter.heartbeat;
+    this.heartbeatScale += (1 - this.heartbeatScale) * Math.min(1, decayPerSec * dt);
+    this.amountLabel.node.setScale(this.heartbeatScale, this.heartbeatScale, 1);
     // per-pip tick ~ every 70ms while rolling (skips the final settle)
     this.pipAccum += dt;
     if (p < 0.98 && this.pipAccum >= 0.07) {
@@ -300,6 +410,8 @@ export class CeremonyView extends Component {
       this.amountLabel.string = fmt(this.countTarget);
       this.amountLabel.color = CRYSTAL;
       this.counting = false;
+      this.heartbeatScale = 1;
+      this.amountLabel.node.setScale(1, 1, 1); // reset before landingPop tweens
       this.landingPop();
     }
   };
@@ -309,9 +421,46 @@ export class CeremonyView extends Component {
     const n = this.amountLabel.node;
     n.setScale(1, 1, 1);
     tween(n)
-      .to(0.14, { scale: new Vec3(1.3, 1.3, 1) }, { easing: 'quadOut' })
-      .to(0.24, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .to(0.14, { scale: new Vec3(1.36, 1.36, 1) }, { easing: 'quadOut' })
+      .to(0.26, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .start();
+    // VISUAL BUST (WC9) — a bright specular streak sweeps across the number on
+    // landing, like light catching polished gold. A tilted white parallelogram
+    // masked to the label width, swept L→R once, then destroyed.
+    this.fireNumberSheen();
+  }
+
+  /** WC9 — one-shot specular sweep across the win number (gold-object feel). */
+  private numberSheen: Node | null = null;
+  private fireNumberSheen(): void {
+    const parent = this.amountLabel.node;
+    if (this.numberSheen && this.numberSheen.isValid) this.numberSheen.destroy();
+    const w = 360;
+    const h = 90;
+    const n = new Node('numSheen');
+    n.addComponent(UITransform).setContentSize(40, h);
+    n.layer = parent.layer;
+    parent.addChild(n);
+    const g = n.addComponent(Graphics);
+    g.fillColor = new Color(255, 255, 255, 150);
+    g.moveTo(-14, h / 2);
+    g.lineTo(14, h / 2);
+    g.lineTo(26, -h / 2);
+    g.lineTo(-2, -h / 2);
+    g.close();
+    g.fill();
+    n.angle = -16;
+    n.setPosition(-w / 2, 0, 0);
+    const op = n.addComponent(UIOpacity);
+    op.opacity = 0;
+    tween(op).to(0.06, { opacity: 220 }).to(0.34, { opacity: 0 }).start();
+    tween(n)
+      .to(0.4, { position: new Vec3(w / 2, 0, 0) }, { easing: 'sineInOut' })
+      .call(() => {
+        if (n.isValid) n.destroy();
+      })
+      .start();
+    this.numberSheen = n;
   }
 
   private shake(amp: number): void {
@@ -343,7 +492,17 @@ export class CeremonyView extends Component {
     if (this.overlay) Tween.stopAllByTarget(this.overlay);
     if (this.raysNode) Tween.stopAllByTarget(this.raysNode);
     if (this.shockNode) Tween.stopAllByTarget(this.shockNode);
-    if (this.amountLabel) Tween.stopAllByTarget(this.amountLabel);
+    if (this.amountLabel) {
+      Tween.stopAllByTarget(this.amountLabel);
+      // Task 5.1 — wipe heartbeat state so a new ceremony starts clean.
+      this.amountLabel.node.setScale(1, 1, 1);
+    }
+    if (this.panelLightOp) {
+      Tween.stopAllByTarget(this.panelLightOp);
+      this.panelLightOp.opacity = 0; // Task 5.MATRIX — wipe panel-light
+    }
+    this.heartbeatScale = 1;
+    this.heartbeatThresholds.length = 0;
     if (this.shakeNode) {
       Tween.stopAllByTarget(this.shakeNode);
       // Reset ONLY an in-flight shake back to its live rest (pos+angle). Never

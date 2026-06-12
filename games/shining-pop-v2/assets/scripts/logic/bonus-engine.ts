@@ -89,7 +89,14 @@ export function runFreeSpins(rng: Rng, mode: BonusMode, spins: number): BonusRes
       payout: result.totalPayout,
       // Only real [reel,row] cell keys reach the view; the 'reel:N' WILD-REELS
       // state key is internal and must not be parsed as a cell position.
-      sticky: [...sticky]
+      //
+      // NB: `Array.from(sticky)` not `[...sticky]`. Cocos 3.8.8's Babel emit
+      // compiles `[...iterable]` down to `[].concat(iterable)`, which DOES NOT
+      // iterate Sets — it pushes the Set as a single array element. Downstream
+      // `.filter(k => k.indexOf(...))` then sees `k = Set` and crashes with
+      // "k.indexOf is not a function". `Array.from()` is the iterable-safe form
+      // that compiles cleanly. (Reproduced 2026-06-11 on the WILD-REELS buy.)
+      sticky: Array.from(sticky)
         .filter((k) => k.indexOf('reel:') !== 0)
         .map((k) => k.split(',').map(Number) as [number, number]),
     });

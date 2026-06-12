@@ -71,7 +71,11 @@
   // NEVER a wrong "$" (currency-confusion is a Stake reject — KB §9 / HC #10).
   const CUR = CURRENCIES[STAKE.currency] || { s:(STAKE.currency ? STAKE.currency+' ' : '$'), d:2, l:'en-US' };
   function fmtMoney(x6){
-    const v = x6 / API_AMOUNT_MULTIPLIER;
+    // Non-finite guard: a malformed/out-of-contract amount (Infinity from a
+    // "1e999"-style wire value, or NaN from a non-numeric one) must render as a
+    // clean zero, NEVER "$∞" / "$NaN" on an approval-sensitive money surface.
+    const _n = Number(x6);
+    const v = (Number.isFinite(_n) ? _n : 0) / API_AMOUNT_MULTIPLIER;
     // Social mode hides fiat/crypto symbols, but social COINS keep their GC/SC
     // label (the correct sweepstakes term, not a restricted gambling one).
     const prefix = STAKE.social ? (CUR.social ? CUR.s : '') : CUR.s;
@@ -10696,17 +10700,24 @@
     // Sits in the topRes band so it doesn't overlap reels.
     bonusHudText.alpha = 1;
     let hudLabel = '';
+    // Hard-coerce the live spin counter + multiplier to clean integers so the FS
+    // HUD can NEVER render a stray decimal / non-finite (always "2 / 10  ×3",
+    // never "2 / 10.0  ×3.00001" or "×NaN"), independent of the upstream source.
+    const _fsInt = (v) => (Number.isFinite(+v) ? Math.trunc(+v) : 0);
+    const _sN = _fsInt(_bonusState.spinNum);
+    const _tS = _fsInt(_bonusState.totalSpins);
+    const _sM = _fsInt(_bonusState.spinMult);
     // 2-color HUD text — PINK shades distinguish modes, all on smoke-white
     // base. Behavioural differences (wild reel / sticky / multiplier) carry
     // the rest of the mode identity.
     if(mode === 'bonus_hot'){
-      hudLabel = `🔥 HOT  ${_bonusState.spinNum} / ${_bonusState.totalSpins}   ×${_bonusState.spinMult}`;
+      hudLabel = `🔥 HOT  ${_sN} / ${_tS}   ×${_sM}`;
       bonusHudText.style.fill = 0xc8326f;        // PINK_DEEP — warm/aggressive
     } else if(mode === 'bonus_mega'){
-      hudLabel = `✨ MEGA  ${_bonusState.spinNum} / ${_bonusState.totalSpins}   ×${_bonusState.spinMult}`;
+      hudLabel = `✨ MEGA  ${_sN} / ${_tS}   ×${_sM}`;
       bonusHudText.style.fill = 0xff8ab8;        // PINK_SOFT — premium/elite
     } else {
-      hudLabel = `FREE SPINS  ${_bonusState.spinNum} / ${_bonusState.totalSpins}   ×${_bonusState.spinMult}`;
+      hudLabel = `FREE SPINS  ${_sN} / ${_tS}   ×${_sM}`;
       bonusHudText.style.fill = 0xff5a9c;        // PINK — standard accent
     }
     bonusHudText.text = hudLabel;
@@ -10849,7 +10860,7 @@
       // the text atlas every frame (8-12ms hit on mobile). Tint is
       // GPU-side, instant, and behaves identically for whole-glyph color.
       bonusMultBig.visible = true;
-      bonusMultBig.text = '×' + _bonusState.spinMult;
+      bonusMultBig.text = '×' + (Number.isFinite(+_bonusState.spinMult) ? Math.trunc(+_bonusState.spinMult) : 0);
       bonusMultBig.position.set(cx, cy);
       bonusMultBig.scale.set(scale);
       bonusMultBig.alpha = eAlpha;
