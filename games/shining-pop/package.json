@@ -1,0 +1,25 @@
+{
+  "name": "@artest/shining-pop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ARTEST | BrainRocket — PixiJS v8 flagship slot. Single-file casino-RGS output via vite-plugin-singlefile.",
+  "author": "Edgar Hovsepyan",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:stake": "vite build && node scripts/inline-assets.mjs",
+    "package:stake": "npm run build:stake && node scripts/package-stake.mjs",
+    "preview": "vite preview --port 5174"
+  },
+  "dependencies": {
+    "@esotericsoftware/spine-pixi-v8": "^4.2.0",
+    "gsap": "^3.12.5",
+    "pixi.js": "8.18.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vite-plugin-singlefile": "^2.0.3"
+  }
+}

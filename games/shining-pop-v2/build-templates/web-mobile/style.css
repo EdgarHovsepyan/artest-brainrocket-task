@@ -1,0 +1,81 @@
+html {
+  -ms-touch-action: none;
+  width: 100%;
+  height: 100%;
+}
+
+body, canvas, div {
+  display: block;
+  outline: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  -khtml-user-select: none;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+/* Remove spin of input type number */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    /* display: none; <- Crashes Chrome on hover */
+    -webkit-appearance: none;
+    margin: 0; /* <-- Apparently some margin are still there even though it's hidden */
+}
+
+body {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  margin: 0;
+
+  cursor: default;
+  color: #888;
+  background-color: #0a0610;
+
+  text-align: center;
+  font-family: Helvetica, Verdana, Arial, sans-serif;
+
+  display: flex;
+  flex-direction: column;
+}
+
+canvas {
+  background-color: rgba(0, 0, 0, 0);
+}
+
+/* Viewport units — the container never depends on a parent layout pass having
+   completed, which de-flakes engine boot in embedded/headless browsers (the
+   stock 100% chain can read 0x0 at init -> the engine stalls pre-scene).
+   `svh`/`dvh` honour the iOS dynamic toolbar so the bar isn't clipped under
+   the Safari URL strip; falls back to `vh` on older browsers. */
+#GameDiv, #Cocos3dGameContainer, #GameCanvas {
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  /* Respect the iPhone notch + dynamic island + home-bar safe areas. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  box-sizing: border-box;
+}
+
+/* Lock the document so an iOS soft keyboard can't shove the canvas off-screen
+   (Cocos has no native inputs; if a custom field gets added later this keeps
+   the layout stable while the keyboard is up). */
+html, body { overscroll-behavior: none; touch-action: manipulation; }
+
+:root {
+  --safe-top: env(safe-area-inset-top);
+  --safe-right: env(safe-area-inset-right);
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-left: env(safe-area-inset-left);
+}

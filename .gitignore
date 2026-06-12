@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# Cocos Creator editor-generated (recreated when the project is opened)
+games/*/library/
+games/*/temp/
+games/*/profiles/
+games/*/local/
+
+# NOTE: games/shining-pop/dist and games/shining-pop-v2/build/web-mobile are
+# committed on purpose — they are the playable review builds (see README).
+
+# misc
+*.log
+.DS_Store

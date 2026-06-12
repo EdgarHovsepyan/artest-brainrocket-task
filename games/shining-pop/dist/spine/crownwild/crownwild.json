@@ -1,0 +1,634 @@
+{
+  "skeleton": {
+    "hash": "sp-crownwild-0001",
+    "spine": "4.2.00",
+    "x": -274,
+    "y": -176.5,
+    "width": 548,
+    "height": 353,
+    "images": "./",
+    "audio": ""
+  },
+  "bones": [
+    {
+      "name": "crown"
+    },
+    {
+      "name": "glow",
+      "parent": "crown"
+    },
+    {
+      "name": "sweep",
+      "parent": "crown"
+    },
+    {
+      "name": "spark1",
+      "parent": "crown",
+      "x": -170,
+      "y": 80,
+      "scaleX": 0,
+      "scaleY": 0
+    },
+    {
+      "name": "spark2",
+      "parent": "crown",
+      "x": 170,
+      "y": 80,
+      "scaleX": 0,
+      "scaleY": 0
+    },
+    {
+      "name": "spark3",
+      "parent": "crown",
+      "x": 0,
+      "y": 158,
+      "scaleX": 0,
+      "scaleY": 0
+    },
+    {
+      "name": "spark4",
+      "parent": "crown",
+      "x": -120,
+      "y": -70,
+      "scaleX": 0,
+      "scaleY": 0
+    },
+    {
+      "name": "spark5",
+      "parent": "crown",
+      "x": 120,
+      "y": -70,
+      "scaleX": 0,
+      "scaleY": 0
+    }
+  ],
+  "slots": [
+    {
+      "name": "glow",
+      "bone": "glow",
+      "attachment": "sp_crownwild_glow",
+      "blend": "additive"
+    },
+    {
+      "name": "base",
+      "bone": "crown",
+      "attachment": "sp_crownwild_base"
+    },
+    {
+      "name": "sweep",
+      "bone": "sweep",
+      "blend": "additive"
+    },
+    {
+      "name": "spark1",
+      "bone": "spark1",
+      "blend": "additive"
+    },
+    {
+      "name": "spark2",
+      "bone": "spark2",
+      "blend": "additive"
+    },
+    {
+      "name": "spark3",
+      "bone": "spark3",
+      "blend": "additive"
+    },
+    {
+      "name": "spark4",
+      "bone": "spark4",
+      "blend": "additive"
+    },
+    {
+      "name": "spark5",
+      "bone": "spark5",
+      "blend": "additive"
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "glow": {
+          "sp_crownwild_glow": {
+            "width": 256,
+            "height": 256,
+            "scaleX": 2.9,
+            "scaleY": 2
+          }
+        },
+        "base": {
+          "sp_crownwild_base": {
+            "width": 548,
+            "height": 353
+          }
+        },
+        "sweep": {
+          "sp_crownwild_sweep": {
+            "width": 48,
+            "height": 256,
+            "scaleY": 1.6
+          }
+        },
+        "spark1": {
+          "sp_crownwild_spark": {
+            "width": 80,
+            "height": 80
+          }
+        },
+        "spark2": {
+          "sp_crownwild_spark": {
+            "width": 80,
+            "height": 80
+          }
+        },
+        "spark3": {
+          "sp_crownwild_spark": {
+            "width": 80,
+            "height": 80
+          }
+        },
+        "spark4": {
+          "sp_crownwild_spark": {
+            "width": 80,
+            "height": 80
+          }
+        },
+        "spark5": {
+          "sp_crownwild_spark": {
+            "width": 80,
+            "height": 80
+          }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "idle": {
+      "bones": {
+        "crown": {
+          "scale": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "time": 1.2,
+              "x": 1.03,
+              "y": 1.03
+            },
+            {
+              "time": 2.4,
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        "glow": {
+          "scale": [
+            {
+              "x": 0.92,
+              "y": 0.92
+            },
+            {
+              "time": 1.2,
+              "x": 1.1,
+              "y": 1.1
+            },
+            {
+              "time": 2.4,
+              "x": 0.92,
+              "y": 0.92
+            }
+          ]
+        }
+      }
+    },
+    "land": {
+      "bones": {
+        "crown": {
+          "translate": [
+            {
+              "x": 0,
+              "y": 280
+            },
+            {
+              "time": 0.26,
+              "x": 0,
+              "y": -14
+            },
+            {
+              "time": 0.4,
+              "x": 0,
+              "y": 4
+            },
+            {
+              "time": 0.52,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "scale": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "time": 0.26,
+              "x": 1.14,
+              "y": 0.84
+            },
+            {
+              "time": 0.4,
+              "x": 0.96,
+              "y": 1.05
+            },
+            {
+              "time": 0.52,
+              "x": 1.01,
+              "y": 0.99
+            },
+            {
+              "time": 0.62,
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        "glow": {
+          "scale": [
+            {
+              "x": 0.7,
+              "y": 0.7
+            },
+            {
+              "time": 0.3,
+              "x": 1.15,
+              "y": 1.15
+            },
+            {
+              "time": 0.62,
+              "x": 0.92,
+              "y": 0.92
+            }
+          ]
+        }
+      }
+    },
+    "win": {
+      "slots": {
+        "sweep": {
+          "attachment": [
+            {
+              "name": null
+            },
+            {
+              "time": 0.07,
+              "name": "sp_crownwild_sweep"
+            },
+            {
+              "time": 0.58,
+              "name": null
+            }
+          ]
+        }
+      },
+      "bones": {
+        "crown": {
+          "scale": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "time": 0.12,
+              "x": 1.14,
+              "y": 1.14
+            },
+            {
+              "time": 0.4,
+              "x": 1,
+              "y": 1
+            }
+          ]
+        },
+        "glow": {
+          "scale": [
+            {
+              "x": 0.92,
+              "y": 0.92
+            },
+            {
+              "time": 0.12,
+              "x": 1.5,
+              "y": 1.5
+            },
+            {
+              "time": 0.55,
+              "x": 0.92,
+              "y": 0.92
+            }
+          ]
+        },
+        "sweep": {
+          "translate": [
+            {
+              "x": -260,
+              "y": 0
+            },
+            {
+              "time": 0.58,
+              "x": 260,
+              "y": 0
+            }
+          ]
+        }
+      }
+    },
+    "bigwin": {
+      "slots": {
+        "sweep": {
+          "attachment": [
+            {
+              "name": null
+            },
+            {
+              "time": 0.06,
+              "name": "sp_crownwild_sweep"
+            },
+            {
+              "time": 0.5,
+              "name": null
+            },
+            {
+              "time": 0.62,
+              "name": "sp_crownwild_sweep"
+            },
+            {
+              "time": 1.1,
+              "name": null
+            }
+          ]
+        },
+        "spark1": {
+          "attachment": [
+            {
+              "name": null
+            },
+            {
+              "time": 0.14,
+              "name": "sp_crownwild_spark"
+            },
+            {
+              "time": 0.95,
+              "name": null
+            }
+          ]
+        },
+        "spark2": {
+          "attachment": [
+            {
+              "name": null
+            },
+            {
+              "time": 0.2,
+              "name": "sp_crownwild_spark"
+            },
+            {
+              "time": 1,
+              "name": null
+            }
+          ]
+        },
+        "spark3": {
+          "attachment": [
+            {
+              "name": null
+            },
+            {
+              "time": 0.26,
+              "name": "sp_crownwild_spark"
+            },
+            {
+              "time": 1.05,
+              "name": null
+            }
+          ]
+        },
+        "spark4": {
+          "attachment": [
+            {
+              "name": null
+            },
+            {
+              "time": 0.32,
+              "name": "sp_crownwild_spark"
+            },
+            {
+              "time": 1.1,
+              "name": null
+            }
+          ]
+        },
+        "spark5": {
+          "attachment": [
+            {
+              "name": null
+            },
+            {
+              "time": 0.38,
+              "name": "sp_crownwild_spark"
+            },
+            {
+              "time": 1.15,
+              "name": null
+            }
+          ]
+        }
+      },
+      "bones": {
+        "crown": {
+          "scale": [
+            {
+              "x": 1,
+              "y": 1
+            },
+            {
+              "time": 0.12,
+              "x": 1.18,
+              "y": 1.18
+            },
+            {
+              "time": 0.5,
+              "x": 1.04,
+              "y": 1.04
+            },
+            {
+              "time": 1,
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "rotate": [
+            {
+              "value": 0
+            },
+            {
+              "time": 0.2,
+              "value": 4
+            },
+            {
+              "time": 0.5,
+              "value": -4
+            },
+            {
+              "time": 0.9,
+              "value": 0
+            }
+          ]
+        },
+        "glow": {
+          "scale": [
+            {
+              "x": 0.9,
+              "y": 0.9
+            },
+            {
+              "time": 0.1,
+              "x": 1.9,
+              "y": 1.9
+            },
+            {
+              "time": 0.6,
+              "x": 1.1,
+              "y": 1.1
+            },
+            {
+              "time": 1.2,
+              "x": 0.9,
+              "y": 0.9
+            }
+          ]
+        },
+        "sweep": {
+          "translate": [
+            {
+              "x": -260,
+              "y": 0
+            },
+            {
+              "time": 0.5,
+              "x": 260,
+              "y": 0
+            },
+            {
+              "time": 0.62,
+              "x": -260,
+              "y": 0
+            },
+            {
+              "time": 1.1,
+              "x": 260,
+              "y": 0
+            }
+          ]
+        },
+        "spark1": {
+          "scale": [
+            {
+              "time": 0.14,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "time": 0.4,
+              "x": 1.6,
+              "y": 1.6
+            },
+            {
+              "time": 0.95,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        "spark2": {
+          "scale": [
+            {
+              "time": 0.2,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "time": 0.46,
+              "x": 1.6,
+              "y": 1.6
+            },
+            {
+              "time": 1,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        "spark3": {
+          "scale": [
+            {
+              "time": 0.26,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "time": 0.52,
+              "x": 1.7,
+              "y": 1.7
+            },
+            {
+              "time": 1.05,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        "spark4": {
+          "scale": [
+            {
+              "time": 0.32,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "time": 0.58,
+              "x": 1.5,
+              "y": 1.5
+            },
+            {
+              "time": 1.1,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        },
+        "spark5": {
+          "scale": [
+            {
+              "time": 0.38,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "time": 0.64,
+              "x": 1.5,
+              "y": 1.5
+            },
+            {
+              "time": 1.15,
+              "x": 0,
+              "y": 0
+            }
+          ]
+        }
+      }
+    }
+  }
+}

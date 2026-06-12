@@ -1,0 +1,150 @@
+// CINEMA WAVE — winning-symbol "ON FIRE" highlight. An additive overlay sprite
+// that samples the symbol's OWN texture and paints, ALL clipped to the symbol's
+// alpha silhouette (never a background box / border quad):
+//   1. rising FIRE — scrolling fbm noise through a warm fire ramp, hottest at the
+//      symbol's base, licking up its shape (the symbol itself burns);
+//   2. a silhouette RIM-LIGHT (alpha-band, atlas-pack safe);
+//   3. a diagonal SPECULAR SWEEP across the glossy candy face.
+// Branchless toolkit (step/smoothstep/mix, no per-fragment branches) adapted from
+// pixi-v8-shader-fx to a Cocos CCEffect (WebGL2 GLSL, dual ES300/ES100 variants;
+// never WebGPU). Honors vfx.materialsEnabled (null -> Graphics sheen fallback) and
+// reducedFx (consumer skips the overlay). This REPLACES the old rectangular
+// win-fire background quads — fire is now strictly per-symbol, on the symbol.
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: one
+          blendDstAlpha: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_time:        { value: 0.0 }
+        u_intensity:   { value: 1.0 }
+        u_rimWidth:    { value: 0.035 }
+        u_sweepSpeed:  { value: 0.55 }
+        u_fireAmt:     { value: 1.0 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec4 color;
+
+  // uv0 is ALWAYS declared (vertex stage always writes it). Declaring it only
+  // `#if USE_TEXTURE` breaks the no-texture variant (Cocos Error 16323/16324).
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+
+  uniform Constants {
+    float u_time;
+    float u_intensity;
+    float u_rimWidth;
+    float u_sweepSpeed;
+    float u_fireAmt;
+  };
+
+  // Cheap value-noise (hash + bilerp) → 3-octave fbm → warm fire ramp.
+  float hash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise (vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+  float fbm (vec2 p) {
+    float v = 0.0, amp = 0.5;
+    for (int i = 0; i < 3; i++) { v += amp * vnoise(p); p *= 2.0; amp *= 0.5; }
+    return v;
+  }
+  vec3 fireRamp (float t) {
+    vec3 c = vec3(0.0);
+    c = mix(c, vec3(0.6, 0.05, 0.0), smoothstep(0.0, 0.3, t));
+    c = mix(c, vec3(1.0, 0.35, 0.0), smoothstep(0.3, 0.55, t));
+    c = mix(c, vec3(1.0, 0.8, 0.2),  smoothstep(0.55, 0.8, t));
+    c = mix(c, vec3(1.0, 1.0, 0.85), smoothstep(0.8, 1.0, t));
+    return c;
+  }
+
+  vec4 frag () {
+    // Sample the symbol alpha DIRECTLY (not via a macro) — Cocos's chunk scanner
+    // only inlines CCSampleWithAlphaSeparated when it sees the literal call.
+    float a = 1.0;
+    #if USE_TEXTURE
+      a = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
+    #endif
+
+    // === FIRE clipped to the symbol silhouette (the symbol burns, no box) ===
+    // Concentrated at the BASE and licking UP, so the candy face stays readable —
+    // the symbol looks lit/edged with flame, not painted solid orange.
+    float t = u_time * 1.6;
+    vec2 np = vec2(uv0.x * 3.0 + sin(uv0.y * 6.0 + t) * 0.16, uv0.y * 3.2 - t * 1.25);
+    float n = fbm(np);
+    float vfall = pow(smoothstep(0.72, 0.0, uv0.y), 1.5); // hot only low → rises, fades up
+    float flame = pow(n * vfall, 1.5) * (0.55 + 0.4 * u_intensity);
+    flame *= a;                                           // CLIP to the symbol shape
+    vec3 fireCol = fireRamp(clamp(flame, 0.0, 1.0));
+    float fireA = clamp(flame, 0.0, 1.0) * 0.68 * u_fireAmt;
+
+    // === silhouette rim-light (alpha band — no neighbour taps, atlas-safe) ===
+    float lo = 0.5 - u_rimWidth * 8.0;
+    float rim = smoothstep(lo, 0.5, a) * (1.0 - smoothstep(0.5, 0.94, a));
+    rim = pow(clamp(rim, 0.0, 1.0), 0.7);
+    float flow = 0.5 + 0.5 * sin(u_time * 3.0 + (uv0.x + uv0.y) * 6.2831);
+    vec3 rimCol = mix(vec3(1.0, 0.45, 0.10), vec3(1.0, 0.93, 0.66), flow);
+
+    // === diagonal specular sweep across the glossy face, masked to the body ===
+    float diag = (uv0.x + (1.0 - uv0.y)) * 0.5;
+    float sweep = (1.0 - smoothstep(0.0, 0.11, abs(diag - fract(u_time * u_sweepSpeed)))) * a;
+    vec3 sweepCol = vec3(1.0, 0.98, 0.92);
+
+    vec3 rgb = fireCol * fireA + rimCol * rim + sweepCol * sweep * 0.55;
+    float outA = clamp(fireA + rim + sweep * 0.55, 0.0, 1.0) * u_intensity * color.a;
+
+    vec4 col = vec4(rgb, outA);
+    ALPHA_TEST(col);
+    return col;
+  }
+}%

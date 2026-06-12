@@ -1,0 +1,138 @@
+// VISUAL BUST — animated FLAME shader for winning symbols. fbm-ish layered
+// noise scrolling UPWARD with a horizontal wobble, mapped through a warm fire
+// gradient (deep-red → orange → gold → white-hot), masked by a vertical
+// hot-bottom falloff so it reads as flames licking up behind the symbol.
+// Additive blend. u_time animates the scroll; u_intensity scales the heat.
+// Graphics radial-glow is the always-on fallback (this is the additive overlay).
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: one
+          blendDstAlpha: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_time:        { value: 0.0 }
+        u_intensity:   { value: 1.0 }
+        u_speed:       { value: 1.6 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+  out vec4 color;
+  out vec2 uv0;
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec4 color;
+  // uv0 is ALWAYS declared (the vertex stage always writes it). Declaring it
+  // only `#if USE_TEXTURE` made the no-texture shader variant reference an
+  // undefined varying → runtime GLSL compile failure (Cocos Error 16323/16324).
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+
+  uniform Constants {
+    float u_time;
+    float u_intensity;
+    float u_speed;
+  };
+
+  // Cheap value-noise (no texture) — hash + bilerp.
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+  // 3-octave fbm.
+  float fbm(vec2 p) {
+    float v = 0.0, amp = 0.5;
+    for (int i = 0; i < 3; i++) {
+      v += amp * vnoise(p);
+      p *= 2.0;
+      amp *= 0.5;
+    }
+    return v;
+  }
+
+  // Warm fire gradient: t 0=cool/transparent → 1=white-hot.
+  vec3 fireRamp(float t) {
+    vec3 c = vec3(0.0);
+    c = mix(c, vec3(0.6, 0.05, 0.0), smoothstep(0.0, 0.3, t));  // deep red
+    c = mix(c, vec3(1.0, 0.35, 0.0), smoothstep(0.3, 0.55, t)); // orange
+    c = mix(c, vec3(1.0, 0.8, 0.2), smoothstep(0.55, 0.8, t));  // gold
+    c = mix(c, vec3(1.0, 1.0, 0.85), smoothstep(0.8, 1.0, t));  // white-hot
+    return c;
+  }
+
+  vec4 frag () {
+    vec2 uv = uv0;
+    float t = u_time * u_speed;
+    // Scroll the noise UP; add a horizontal wobble that grows toward the top.
+    vec2 np = vec2(uv.x * 3.0 + sin(uv.y * 6.0 + t) * 0.15, uv.y * 3.0 - t * 1.2);
+    float n = fbm(np);
+    // Vertical falloff: hottest at the bottom, fading to nothing at the top.
+    float vfall = smoothstep(1.0, 0.15, uv.y);
+    // Horizontal falloff: fade at the side edges so flames don't read as a box.
+    float hfall = smoothstep(0.0, 0.25, uv.x) * smoothstep(1.0, 0.75, uv.x);
+    // Flame body = noise shaped by the falloffs.
+    float flame = n * vfall * hfall;
+    flame = pow(flame, 1.4) * (1.2 + 0.6 * u_intensity);
+
+    vec3 col = fireRamp(clamp(flame, 0.0, 1.0));
+    float a = clamp(flame * 1.3, 0.0, 1.0);
+
+    vec4 o = vec4(col, a) * color;
+    #if USE_TEXTURE
+      // Multiply by the sprite alpha so the flame is clipped to the sprite shape
+      // (e.g. a soft mask quad behind the symbol).
+      float texA = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
+      o.a *= texA;
+    #endif
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

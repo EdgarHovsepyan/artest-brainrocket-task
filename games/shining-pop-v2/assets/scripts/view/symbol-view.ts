@@ -1,0 +1,502 @@
+// MVC — VIEW. One symbol cell: render + win pulse only. No game rules.
+// Built from code by ReelView; falls back to a text label if a sprite frame
+// for an id is missing, so the board still reads even without art.
+
+import {
+  _decorator,
+  Color,
+  Component,
+  Graphics,
+  Label,
+  Material,
+  Node,
+  Sprite,
+  SpriteFrame,
+  tween,
+  Tween,
+  UIOpacity,
+  UITransform,
+  Vec3,
+} from 'cc';
+import { SYMBOL_NAMES } from '../logic/game-config';
+import { VIEW_CONFIG } from './view-config';
+import { applyFont } from './fonts';
+
+const { ccclass } = _decorator;
+
+@ccclass('SymbolView')
+export class SymbolView extends Component {
+  private sprite: Sprite | null = null;
+  private label: Label | null = null;
+  private frames: SpriteFrame[] = [];
+  private glow: Node | null = null;
+  private glowOp: UIOpacity | null = null;
+  private size = 90;
+  /** Current symbol id — set by setSymbol, read by ReelView's spin-mask logic
+   *  so it can paint off-screen buffer cells with the SAME symbols currently in
+   *  the window. Prevents the launch-frame visible-content swap that the user
+   *  perceived as "symbols changing at spin start". */
+  private _currentId = 0;
+  get currentId(): number {
+    return this._currentId;
+  }
+  // Win-VFX layers (slot-vfx artist): built lazily on first win, killed in clear.
+  private sheen: Node | null = null;
+  private sparkles: Node[] = [];
+  // CINEMA WAVE — shader rim-light/sweep overlay (symbol-win.effect). Built lazily
+  // on the first shader-backed win; samples THIS symbol's own alpha. The shared
+  // material's u_time is advanced globally by SlotView; this node only owns its
+  // per-symbol opacity envelope. Null material -> the Graphics sheen above carries.
+  private winOverlay: Node | null = null;
+  private winOverlaySp: Sprite | null = null;
+  private winOverlayOp: UIOpacity | null = null;
+  // CINEMA WAVE — soft-burst.effect under-glow. SlotView injects the shared
+  // material + white frame after the effect kit loads; each cell lazily swaps its
+  // banded Graphics radial (the rejected "many circles") for the shader burst on
+  // first win. Statics so no per-cell plumbing through ReelView.
+  static fxBurstMat: Material | null = null;
+  static fxWhiteFrame: SpriteFrame | null = null;
+  private burstUpgraded = false;
+  // SY1 idle breathing — the sprite lives on `art` (a child) so the per-frame
+  // breathe composes with the win/land tweens that scale the CELL node, with no
+  // tween conflict. Phase-offset per cell so the grid never breathes in unison.
+  private art: Node | null = null;
+  private idleT = 0;
+  private idlePhase = 0;
+  private idleAmp = 0;
+  private idleOn = false;
+
+  /** Build the cell's sprite + text fallback at `size` px square. `phase` desyncs
+   *  this cell's idle breathing from its neighbours. */
+  build(size: number, frames: SpriteFrame[], phase = 0): void {
+    this.frames = frames;
+    this.size = size;
+    this.idlePhase = phase;
+
+    const art = size * VIEW_CONFIG.layout.symbolFill;
+    (this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform)).setContentSize(
+      art,
+      art,
+    );
+    // Sprite on a centred child so idle breathing (scales `art`) never fights the
+    // win/land tweens (which scale this.node).
+    const artNode = new Node('art');
+    artNode.addComponent(UITransform).setContentSize(art, art);
+    this.node.addChild(artNode);
+    this.art = artNode;
+    const sp = artNode.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = Sprite.Type.SIMPLE;
+    this.sprite = sp;
+
+    const lblNode = new Node('fallback');
+    lblNode.addComponent(UITransform).setContentSize(size, size);
+    artNode.addChild(lblNode);
+    const lbl = lblNode.addComponent(Label);
+    lbl.fontSize = Math.round(size * 0.34);
+    lbl.lineHeight = lbl.fontSize + 2;
+    lbl.isBold = true;
+    lbl.color = new Color(245, 247, 250, 255); // white-smoke (brand: no acid yellow)
+    applyFont(lbl, 'display');
+    this.label = lbl;
+
+    // Win light-up (2026-06-11 RADIANT redesign): a smooth FEATHERED radial
+    // bloom BEHIND the symbol. The earlier version used 3 hard rounded-rects
+    // which read as a "golden box shadow" (user-rejected). This stacks LAYERS
+    // soft blobs (roundRect with radius = full → circular) with a QUADRATIC
+    // alpha falloff so the edge feathers into nothing — reads as emitted LIGHT,
+    // not a box or a ring. Warm gradient: gold-white core → deep-orange edge.
+    const glowNode = new Node('winGlow');
+    glowNode.addComponent(UITransform).setContentSize(size, size);
+    this.node.addChild(glowNode);
+    glowNode.setSiblingIndex(0); // behind the art
+    const gg = glowNode.addComponent(Graphics);
+    const LAYERS = 10;
+    for (let i = LAYERS - 1; i >= 0; i--) {
+      const t = i / (LAYERS - 1); // 0 = hot core, 1 = soft outer
+      const rad = size * (0.22 + t * 0.56); // core tighter → outer wider
+      const r = 255;
+      // HOTTER ramp (2026-06-11): the old (255, 232→122, 180→30) read as a flat
+      // BEIGE circle — too much blue in the outer band. Now: white-gold core
+      // (255,238,200) → hot orange (255,120,20) → deep ember-red (255,40,0). The
+      // low blue makes it read as FIRE, not tan. Higher peak alpha = more punch.
+      const gch = Math.round(238 - t * 198); // 238 → 40
+      const bch = Math.round(200 - t * 200); // 200 → 0
+      const a = Math.round((1 - t) * (1 - t) * 120); // brighter, feathered edge
+      gg.fillColor = new Color(r, gch, bch, a);
+      gg.roundRect(-rad, -rad, rad * 2, rad * 2, rad);
+      gg.fill();
+    }
+    glowNode.setScale(0.8, 0.8, 1);
+    this.glow = glowNode;
+    this.glowOp = glowNode.addComponent(UIOpacity);
+    this.glowOp.opacity = 0;
+  }
+
+  /** Show symbol `id` — sprite if its frame loaded, else the id's name. */
+  setSymbol(id: number): void {
+    this._currentId = id;
+    const frame = this.frames[id] ?? null;
+    if (this.sprite) this.sprite.spriteFrame = frame;
+    if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
+    // High-value symbols (wild + H1..H4 = ids 0..4) carry more visual "weight" —
+    // they breathe a touch deeper, the textbook AAA cue that they matter more.
+    this.idleAmp = id <= 4 ? 0.03 : 0.018;
+  }
+
+  /** SY1 idle breathing: a desynced sine scale on the art child while the reel is
+   *  at rest, so the grid is alive, never a static template. Composes with the
+   *  win/land tweens (those scale the cell node, not `art`). Gated off during
+   *  spin + under reduced-motion. */
+  update(dt: number): void {
+    if (!this.idleOn || !this.art) return;
+    this.idleT += dt;
+    const sc = 1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp;
+    this.art.setScale(sc, sc, 1);
+  }
+
+  /** Toggle idle breathing (ReelView: on when settled, off while spinning). */
+  setIdle(on: boolean): void {
+    this.idleOn = on;
+    if (!on && this.art) this.art.setScale(1, 1, 1);
+  }
+
+  /** Win pulse + light-up — driven by Cocos Tween. `delay` enables an L→R ripple.
+   *  `rich` adds the in-cell sheen + edge sparkle (focused wins only — the caller
+   *  disables it on dense wins like a full wild reel where 20+ cells would stack
+   *  their white sheens into a wash). */
+  /** Swap the banded Graphics radial for the soft-burst shader sprite ONCE, when
+   *  the shared material is available. Re-points this.glow/this.glowOp so every
+   *  existing envelope (playWin / playLock / flashWildLand / clear) drives the
+   *  new visual with zero further changes. Graphics stays as the fallback. */
+  private ensureBurst(): void {
+    if (this.burstUpgraded || !VIEW_CONFIG.win.burst.enabled) return;
+    const mat = SymbolView.fxBurstMat;
+    const sf = SymbolView.fxWhiteFrame;
+    if (!mat || !sf) return; // material kit off/failed → keep the Graphics glow
+    const s = this.size * VIEW_CONFIG.win.burst.scale;
+    const n = new Node('winBurst');
+    n.layer = this.node.layer;
+    n.addComponent(UITransform).setContentSize(s, s);
+    this.node.addChild(n);
+    n.setSiblingIndex(0); // behind the art, same slot as the old glow
+    const sp = n.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = Sprite.Type.SIMPLE;
+    sp.spriteFrame = sf;
+    sp.customMaterial = mat;
+    const op = n.addComponent(UIOpacity);
+    op.opacity = 0;
+    n.setScale(0.8, 0.8, 1); // match the old glow's rest scale (tweens go 0.8→1.35)
+    if (this.glow) this.glow.active = false; // retire the banded Graphics version
+    this.glow = n;
+    this.glowOp = op;
+    this.burstUpgraded = true;
+  }
+
+  playWin(delay = 0, rich = true, winMat: Material | null = null): void {
+    this.ensureBurst();
+    const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
+    const half = symbolPulseMs / 2 / 1000; // ms → s, two halves
+    Tween.stopAllByTarget(this.node);
+    this.node.setScale(1, 1, 1);
+    const pop = symbolPulseScale + 0.12; // first beat overshoots → the win has an attack
+    const bnc = VIEW_CONFIG.win.winBounceLoop;
+    const hi = new Vec3(bnc.scaleHi, bnc.scaleHi, 1);
+    const lo = new Vec3(bnc.scaleLo, bnc.scaleLo, 1);
+    const bhalf = bnc.ms / 2 / 1000;
+    // ATTACK (once): overshoot pop → settle. Then a CONTINUOUS bounce loop so the
+    // winning symbol stays alive/celebrating until clear (user: "bouncing looping").
+    tween(this.node)
+      .delay(delay)
+      .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
+      .to(half, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
+      .start();
+    if (bnc.enabled) {
+      tween(this.node)
+        .delay(delay + half * 2) // begin after the attack lands
+        .to(bhalf, { scale: hi }, { easing: 'sineOut' })
+        .to(bhalf, { scale: lo }, { easing: 'sineIn' })
+        .union()
+        .repeatForever()
+        .start();
+    }
+    if (this.glow && this.glowOp) {
+      Tween.stopAllByTarget(this.glow);
+      Tween.stopAllByTarget(this.glowOp);
+      this.glow.setScale(0.8, 0.8, 1);
+      this.glowOp.opacity = 0;
+      // SHINING loop: the warm radial glow breathes behind the symbol FOREVER
+      // (was repeat(3)) — pairs with the shader rim/sweep for a sustained shine.
+      tween(this.glowOp)
+        .delay(delay)
+        .to(half, { opacity: 200 })
+        .to(half, { opacity: 70 })
+        .union()
+        .repeatForever()
+        .start();
+      tween(this.glow)
+        .delay(delay)
+        .to(half, { scale: new Vec3(1.35, 1.35, 1) }, { easing: 'quadOut' })
+        .to(half, { scale: new Vec3(0.95, 0.95, 1) }, { easing: 'quadIn' })
+        .union()
+        .repeatForever()
+        .start();
+    }
+    if (rich) {
+      // CINEMA WAVE — prefer the shader rim-light/sweep overlay; the Graphics
+      // sheen + corner sparkles are the fallback when the material is unavailable
+      // (vfx.materialsEnabled off / load failed) or under reducedFx (caller passes
+      // winMat = null in those cases).
+      if (winMat && VIEW_CONFIG.win.symbolFx.enabled) {
+        this.playWinShader(delay, winMat);
+      } else {
+        this.playSheen(delay);
+        this.playSparkles(delay);
+      }
+    }
+  }
+
+  /** CINEMA WAVE — additive shader overlay that reads this symbol's own alpha and
+   *  paints the animated rim-light + specular sweep. Built lazily; re-pointed at
+   *  the current spriteFrame each win so it always traces the right silhouette. */
+  private playWinShader(delay: number, mat: Material): void {
+    const cfg = VIEW_CONFIG.win.symbolFx;
+    if (!this.winOverlay) {
+      const s = this.size * cfg.scale;
+      const n = new Node('winSheenFx');
+      n.layer = this.node.layer;
+      n.addComponent(UITransform).setContentSize(s, s);
+      // Parent to `art` so the overlay tracks the symbol's position + idle breathe;
+      // added last → renders ON TOP of the symbol sprite.
+      this.art?.addChild(n);
+      const sp = n.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.type = Sprite.Type.SIMPLE;
+      this.winOverlay = n;
+      this.winOverlaySp = sp;
+      this.winOverlayOp = n.addComponent(UIOpacity);
+    }
+    const sp = this.winOverlaySp!;
+    sp.spriteFrame = this.sprite?.spriteFrame ?? null; // sample the CURRENT symbol
+    sp.customMaterial = mat;
+    const op = this.winOverlayOp!;
+    this.winOverlay.active = true;
+    Tween.stopAllByTarget(op);
+    op.opacity = 0;
+    tween(op)
+      .delay(delay)
+      .to(cfg.envInMs / 1000, { opacity: cfg.envHoldOpacity }, { easing: 'sineOut' })
+      .start();
+  }
+
+  /** SHEEN SWEEP (slot-vfx Layer 7): a bright diagonal specular streak rakes
+   *  top->bottom across the symbol face, looping — reads as light catching a
+   *  glossy candy surface. Built lazily on first win. */
+  private playSheen(delay: number): void {
+    if (!this.sheen) {
+      const s = this.size;
+      const n = new Node('sheen');
+      n.addComponent(UITransform).setContentSize(s, s);
+      this.node.addChild(n);
+      const g = n.addComponent(Graphics);
+      // thin bright parallelogram (diagonal streak), no circles
+      g.fillColor = new Color(255, 236, 248, 40); // candy-white, low alpha (stack-safe)
+      g.moveTo(-s * 0.12, s * 0.6);
+      g.lineTo(s * 0.06, s * 0.6);
+      g.lineTo(-s * 0.06, -s * 0.6);
+      g.lineTo(-s * 0.24, -s * 0.6);
+      g.close();
+      g.fill();
+      n.addComponent(UIOpacity).opacity = 0;
+      this.sheen = n;
+    }
+    const sheen = this.sheen;
+    const s = this.size;
+    const op = sheen.getComponent(UIOpacity)!;
+    Tween.stopAllByTarget(sheen);
+    Tween.stopAllByTarget(op);
+    sheen.setPosition(-s * 0.55, s * 0.5, 0);
+    op.opacity = 0;
+    // sweep position L->R, fade in/out at the ends; loop until cleared.
+    tween(sheen)
+      .delay(delay)
+      .to(0.55, { position: new Vec3(s * 0.55, -s * 0.5, 0) }, { easing: 'sineInOut' })
+      .delay(0.7)
+      .union()
+      .repeatForever()
+      .start();
+    tween(op)
+      .delay(delay)
+      .to(0.18, { opacity: 95 })
+      .to(0.37, { opacity: 0 })
+      .delay(0.7)
+      .union()
+      .repeatForever()
+      .start();
+  }
+
+  /** EDGE SPARKLE (slot-vfx Layer 8): four tiny diamonds twinkle at the cell
+   *  corners on a staggered loop. Pure opacity + scale, no circles. */
+  private playSparkles(delay: number): void {
+    if (this.sparkles.length === 0) {
+      const s = this.size;
+      const corners = [
+        [-s * 0.4, s * 0.4],
+        [s * 0.4, s * 0.4],
+        [s * 0.4, -s * 0.4],
+        [-s * 0.4, -s * 0.4],
+      ];
+      for (const [x, y] of corners) {
+        const n = new Node('spark');
+        n.addComponent(UITransform).setContentSize(12, 12);
+        n.setPosition(x, y, 0);
+        const g = n.addComponent(Graphics);
+        g.fillColor = new Color(255, 224, 255, 200);
+        g.moveTo(0, 6);
+        g.lineTo(5, 0);
+        g.lineTo(0, -6);
+        g.lineTo(-5, 0);
+        g.close();
+        g.fill();
+        n.addComponent(UIOpacity).opacity = 0;
+        this.node.addChild(n);
+        this.sparkles.push(n);
+      }
+    }
+    this.sparkles.forEach((n, i) => {
+      const op = n.getComponent(UIOpacity)!;
+      Tween.stopAllByTarget(op);
+      Tween.stopAllByTarget(n);
+      op.opacity = 0;
+      n.setScale(0.4, 0.4, 1);
+      tween(op)
+        .delay(delay + i * 0.18)
+        .to(0.16, { opacity: 230 })
+        .to(0.3, { opacity: 0 })
+        .delay(0.7)
+        .union()
+        .repeatForever()
+        .start();
+      tween(n)
+        .delay(delay + i * 0.18)
+        .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .to(0.3, { scale: new Vec3(0.4, 0.4, 1) })
+        .delay(0.7)
+        .union()
+        .repeatForever()
+        .start();
+    });
+  }
+
+  /** Kill the looping win layers (called from clear on the next spin). */
+  private stopWinFx(): void {
+    if (this.winOverlay && this.winOverlayOp) {
+      Tween.stopAllByTarget(this.winOverlayOp);
+      this.winOverlayOp.opacity = 0;
+      this.winOverlay.active = false;
+    }
+    if (this.sheen) {
+      Tween.stopAllByTarget(this.sheen);
+      const op = this.sheen.getComponent(UIOpacity);
+      if (op) {
+        Tween.stopAllByTarget(op);
+        op.opacity = 0;
+      }
+    }
+    this.sparkles.forEach((n) => {
+      Tween.stopAllByTarget(n);
+      const op = n.getComponent(UIOpacity);
+      if (op) {
+        Tween.stopAllByTarget(op);
+        op.opacity = 0;
+      }
+    });
+  }
+
+  /** Sharp one-shot WILD-landing flash: scale punch + single hot glow strike.
+   *  Distinct from playWin (sustained pulse) — this is the "it just hit" beat. */
+  flashWildLand(delay = 0): void {
+    Tween.stopAllByTarget(this.node);
+    this.node.setScale(1, 1, 1);
+    tween(this.node)
+      .delay(delay)
+      .to(0.09, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'quadOut' })
+      .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .start();
+    if (this.glow && this.glowOp) {
+      Tween.stopAllByTarget(this.glow);
+      Tween.stopAllByTarget(this.glowOp);
+      this.glow.setScale(0.7, 0.7, 1);
+      this.glowOp.opacity = 0;
+      tween(this.glowOp).delay(delay).to(0.07, { opacity: 235 }).to(0.3, { opacity: 0 }).start();
+      tween(this.glow)
+        .delay(delay)
+        .to(0.34, { scale: new Vec3(1.5, 1.5, 1) }, { easing: 'quadOut' })
+        .start();
+    }
+  }
+
+  /** Sticky-lock confirmation: small settle pop + a HELD glow rim (reads as
+   *  "locked in", not a respin win). */
+  playLock(delay = 0): void {
+    Tween.stopAllByTarget(this.node);
+    this.node.setScale(1, 1, 1);
+    tween(this.node)
+      .delay(delay)
+      .to(0.08, { scale: new Vec3(1.14, 1.14, 1) }, { easing: 'quadOut' })
+      .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
+      .start();
+    if (this.glow && this.glowOp) {
+      Tween.stopAllByTarget(this.glow);
+      Tween.stopAllByTarget(this.glowOp);
+      this.glow.setScale(1, 1, 1);
+      tween(this.glowOp)
+        .delay(delay)
+        .to(0.1, { opacity: 150 })
+        .delay(0.45)
+        .to(0.35, { opacity: 0 })
+        .start();
+    }
+  }
+
+  /** Tactile landing squash-and-stretch (the reel "thunk"). */
+  playLand(squashY: number): void {
+    Tween.stopAllByTarget(this.node);
+    this.node.setScale(1, 1, 1);
+    tween(this.node)
+      .to(0.06, { scale: new Vec3(1 + (1 - squashY), squashY, 1) }, { easing: 'quadOut' })
+      .to(0.13, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .start();
+  }
+
+  /** Task 6.3 — short position jitter when the Svarka head crosses this cell.
+   *  Captures the rest position locally so chained calls re-rest cleanly.
+   *  Drives the NODE position only — scale/opacity tweens (playWin) run in
+   *  parallel without conflict. */
+  playShake(amp: number, durMs: number): void {
+    const rest = this.node.position.clone();
+    const d = durMs / 1000;
+    const kick = (dx: number, dy: number) => new Vec3(rest.x + dx, rest.y + dy, rest.z);
+    tween(this.node)
+      .to(d * 0.25, { position: kick(amp, amp * 0.5) }, { easing: 'quadOut' })
+      .to(d * 0.25, { position: kick(-amp * 0.8, -amp * 0.4) }, { easing: 'quadOut' })
+      .to(d * 0.25, { position: kick(amp * 0.5, amp * 0.25) }, { easing: 'quadOut' })
+      .to(d * 0.25, { position: rest }, { easing: 'quadOut' })
+      .start();
+  }
+
+  clear(): void {
+    Tween.stopAllByTarget(this.node);
+    this.node.setScale(1, 1, 1);
+    if (this.glow) {
+      Tween.stopAllByTarget(this.glow);
+      this.glow.setScale(0.8, 0.8, 1);
+    }
+    if (this.glowOp) {
+      Tween.stopAllByTarget(this.glowOp);
+      this.glowOp.opacity = 0;
+    }
+    this.stopWinFx();
+  }
+}
