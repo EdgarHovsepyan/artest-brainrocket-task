@@ -21,6 +21,7 @@ import {
   Label,
   Mask,
   Node,
+  resources,
   Sprite,
   SpriteFrame,
   tween,
@@ -423,13 +424,19 @@ export class BettingBarWeb extends Component {
   private buildAccount(): void {
     const g = this.gfx('account');
     this.panel(g, 40, 148, 440, 76, 38);
+    // Menu hamburger — authored icon with the drawn lines as fallback (own node
+    // so the icon can retire it; the account panel Graphics stays untouched).
+    const menuGlyph = this.gfx('menuGlyph');
     [27, 38, 49].forEach((dy) => {
-      g.moveTo(80, this.Y(148 + dy));
-      g.lineTo(110, this.Y(148 + dy));
+      menuGlyph.moveTo(80, this.Y(148 + dy));
+      menuGlyph.lineTo(110, this.Y(148 + dy));
     });
-    g.lineWidth = 3.2;
-    g.strokeColor = col(C.icon);
-    g.stroke();
+    menuGlyph.lineWidth = 3.2;
+    menuGlyph.strokeColor = col(C.icon);
+    menuGlyph.stroke();
+    this.icon(this.node, 95, this.Y(186), 40, 'ic_menu', C.icon, () => {
+      menuGlyph.node.active = false;
+    });
     this.hitNode(60, 148, 70, 76, () => this.events.emit('menu'));
 
     const snd = this.gfx('snd');
@@ -451,6 +458,9 @@ export class BettingBarWeb extends Component {
     snd.arc(168, this.Y(186), 11, -0.72, 0.72, false);
     snd.stroke();
     this.sndGlyphOp = snd.node.addComponent(UIOpacity);
+    // Authored speaker icon — child of the snd node so setSoundOn's opacity dim
+    // cascades; the drawn cone clears once the frame lands.
+    this.icon(snd.node, 163, this.Y(186), 38, 'ic_sound', C.icon, () => snd.clear());
     const slash = this.gfx('sndSlash');
     slash.lineWidth = 3;
     slash.strokeColor = col(C.icon);
@@ -654,6 +664,37 @@ export class BettingBarWeb extends Component {
     return n;
   }
 
+  /** ICON SET — replaces the hand-drawn vector glyphs with the authored
+   *  `resources/icons/ic_*.png` sprites (white art, tinted per control). Loads
+   *  async; the node stays hidden until the frame lands and `onReady` then
+   *  retires the Graphics fallback — a missing/failed icon keeps the vector
+   *  glyph, so the bar can never render glyph-less. */
+  private icon(
+    parent: Node,
+    x: number,
+    y: number,
+    size: number,
+    name: string,
+    tint: string,
+    onReady?: () => void,
+  ): Node {
+    const n = this.localNode(parent, x, y, size, size);
+    n.name = name;
+    const sp = n.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = Sprite.Type.SIMPLE;
+    sp.color = col(tint);
+    n.active = false;
+    resources.load(`icons/${name}/spriteFrame`, SpriteFrame, (err, sf) => {
+      if (!err && sf && n.isValid) {
+        sp.spriteFrame = sf;
+        n.active = true;
+        onReady?.();
+      }
+    });
+    return n;
+  }
+
   private buildRightCluster(): void {
     // Every control is its OWN centred node (master container-per-button): press
     // feedback scales the button, not the shared canvas; state dimming hits the
@@ -697,33 +738,36 @@ export class BettingBarWeb extends Component {
     const coinsX = 1980 + barCfg2.clusterCoinsX;
     const gambleX = coinsX + barCfg2.gambleGapPx;
     const coins = circleBtn(coinsX, 186, 38);
-    // Quick-bet menu → a crisp GOLD coin stack (was 3 purple-on-purple ellipses
-    // that read as a blur). Each coin: dark edge band → gold face → amber rim →
-    // top sheen, stacked bottom-up so the top coin reads cleanest.
+    // Quick-bet menu → authored gold coin-stack icon; the drawn stack lives on
+    // its own child glyph as the fallback (retired when the icon frame lands).
+    const coinGlyph = this.localNode(coins.node, 0, 0, 60, 60);
+    const cg = coinGlyph.addComponent(Graphics);
     const drawCoin = (cy: number): void => {
       const rx = 20,
         ry = 7.5;
-      coins.g.fillColor = col('#7a4a06'); // edge / thickness band
-      coins.g.ellipse(0, cy - 3.4, rx, ry);
-      coins.g.fill();
-      coins.g.fillColor = col('#ffce47'); // gold face
-      coins.g.ellipse(0, cy, rx, ry);
-      coins.g.fill();
-      coins.g.lineWidth = 1.3; // amber rim
-      coins.g.strokeColor = col('#b9760c');
-      coins.g.ellipse(0, cy, rx, ry);
-      coins.g.stroke();
-      coins.g.fillColor = col('#fff4c4', 0.85); // top sheen
-      coins.g.ellipse(-rx * 0.28, cy + ry * 0.34, rx * 0.4, ry * 0.32);
-      coins.g.fill();
+      cg.fillColor = col('#7a4a06'); // edge / thickness band
+      cg.ellipse(0, cy - 3.4, rx, ry);
+      cg.fill();
+      cg.fillColor = col('#ffce47'); // gold face
+      cg.ellipse(0, cy, rx, ry);
+      cg.fill();
+      cg.lineWidth = 1.3; // amber rim
+      cg.strokeColor = col('#b9760c');
+      cg.ellipse(0, cy, rx, ry);
+      cg.stroke();
+      cg.fillColor = col('#fff4c4', 0.85); // top sheen
+      cg.ellipse(-rx * 0.28, cy + ry * 0.34, rx * 0.4, ry * 0.32);
+      cg.fill();
     };
     drawCoin(-11);
     drawCoin(-1);
     drawCoin(9);
-    // tiny sparkle on the top coin — sells the "shiny money" read
-    coins.g.fillColor = col('#fffbe8');
-    coins.g.circle(11, 13, 1.7);
-    coins.g.fill();
+    cg.fillColor = col('#fffbe8');
+    cg.circle(11, 13, 1.7);
+    cg.fill();
+    this.icon(coins.node, 0, 0, 46, 'ic_coins', '#ffce47', () => {
+      coinGlyph.active = false;
+    });
     this.hitNode(coinsX - 38, 148, 76, 76, () => this.events.emit('betmenu'), [coins.node]);
 
     const gamble = circleBtn(gambleX, 186, 38);
@@ -756,6 +800,8 @@ export class BettingBarWeb extends Component {
     boltPath();
     tg.stroke();
     this.turboGlyphOp = tGlyph.addComponent(UIOpacity);
+    // Authored bolt icon — child of tGlyph so setTurbo's opacity dim cascades.
+    this.icon(tGlyph, 0, 0, 36, 'ic_bolt', '#ffd23f', () => tg.clear());
     const pip = this.localNode(turbo.node, 13, 13, 12, 12);
     const pg = pip.addComponent(Graphics);
     pg.fillColor = col('#e9bf5a');
@@ -780,6 +826,8 @@ export class BettingBarWeb extends Component {
     ag2.lineTo(-6, 16);
     ag2.close();
     ag2.fill();
+    // Authored loop-arrow icon — child of aGlyph so setAutoplay's toggle cascades.
+    this.icon(aGlyph, 0, 0, 40, 'ic_autoplay', '#f4e6ff', () => ag2.clear());
     this.autoGlyph = aGlyph;
     this.autoCount = this.lbl('', 0, 0, 22, C.value, true, auto.node, 0.5);
     this.autoCount.node.setPosition(0, 0, 0); // same local-origin pin as ×2
@@ -872,6 +920,9 @@ export class BettingBarWeb extends Component {
     ag.lineTo(-R * 0.2, ar + R * 0.1);
     ag.close();
     ag.fill();
+    // Authored double-arrow spin icon — child of arrowNode so the press-spin
+    // rotation tween carries it; the drawn arc clears when the frame lands.
+    this.icon(arrowNode, 0, 0, R * 1.05, 'ic_spin', C.value, () => ag.clear());
     this.spinArrow = arrowNode;
 
     const stopNode = this.localNode(ring, 0, 0, R, R);
@@ -932,6 +983,9 @@ export class BettingBarWeb extends Component {
     cap.node.setPosition(20, -14, 0);
     const close = this.lbl('✕', 218, 24, 18, C.icon, true, vp);
     close.node.setPosition(214, -22, 0);
+    this.icon(vp, 214, -22, 18, 'ic_close', C.icon, () => {
+      close.node.active = false;
+    });
     const closeHit = new Node('vx');
     closeHit.layer = this.node.layer;
     vp.addChild(closeHit);
@@ -977,6 +1031,7 @@ export class BettingBarWeb extends Component {
     mg.lineTo(-10, -5);
     mg.close();
     mg.fill();
+    this.icon(mute, 0, 0, 26, 'ic_sound', C.icon, () => mg.clear());
     mute.on(Node.EventType.TOUCH_END, () =>
       this.applyVolume(this.volume > 0.001 ? 0 : this.lastNonZero, true),
     );
