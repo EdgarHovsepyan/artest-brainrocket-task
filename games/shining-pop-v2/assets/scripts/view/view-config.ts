@@ -171,11 +171,16 @@ export const VIEW_CONFIG = {
     /** Pulse scale applied to winning symbols. */
     symbolPulseScale: 1.18,
     symbolPulseMs: 420,
-    /** CINEMA WAVE — after the initial attack pop, winning symbols settle into a
-     *  CONTINUOUS bounce loop (alive/celebrating) until the next spin clears them.
-     *  scaleHi/scaleLo = the bounce extremes; ms = one full hi→lo→hi cycle. The
-     *  shader rim/sweep shine loops alongside (driven by SlotView's u_time). */
-    winBounceLoop: { enabled: true, scaleHi: 1.12, scaleLo: 0.98, ms: 520 },
+    /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
+     *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
+     *  until the next spin clears them — the modern candy-slot "yummy" feel, not
+     *  a uniform scale pulse. jelly = axis amplitude; ms = one full wobble cycle.
+     *  The shader rim/sweep shine loops alongside (SlotView's u_time). */
+    winBounceLoop: { enabled: true, jelly: 0.085, ms: 520 },
+    /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
+     *  presented, so winners read instantly (standard top-provider treatment).
+     *  255 disables the dim. */
+    loserDimOpacity: 115,
     /** Seconds each winning line stays highlighted before cycling to the next. */
     lineCycleSeconds: 0.85,
     /** 2026-06-11 FIRE redesign — `showLines:false` removes the drawn payline
