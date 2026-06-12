@@ -13,13 +13,81 @@ const ACID = new Color(234, 255, 0, 255);
 const WHITE = new Color(255, 255, 255, 255);
 const COIN = new Color(255, 196, 64, 255);
 
+interface PhysParticle {
+  slot: PoolShard;
+  vx: number;
+  vy: number;
+  /** Vertical acceleration (px/s²) — negative pulls a rising ember back. */
+  g: number;
+  /** Per-frame velocity retention at 60fps (drag); <1 = damping. */
+  damp: number;
+  life: number;
+  age: number;
+  /** Twinkle phase offset so the field never flickers in unison. */
+  ph: number;
+  s0: number;
+}
+
 @ccclass('ParticleLayer')
 export class ParticleLayer extends Component {
   private pool!: ParticlePool;
+  // CGI particles — a real integrator (velocity, gravity, drag, twinkle) instead
+  // of point-to-point tweens. One stepper runs only while particles are alive.
+  private phys: PhysParticle[] = [];
+  private physOn = false;
 
   onLoad(): void {
     this.pool = this.node.getComponent(ParticlePool) ?? this.node.addComponent(ParticlePool);
   }
+
+  private spawnPhys(
+    x: number,
+    y: number,
+    color: Color,
+    s0: number,
+    vx: number,
+    vy: number,
+    g: number,
+    damp: number,
+    life: number,
+  ): void {
+    const slot = this.pool.get(x, y, color, s0);
+    if (!slot) return; // pool full — silent drop
+    this.phys.push({ slot, vx, vy, g, damp, life, age: 0, ph: Math.random() * 6.283, s0 });
+    if (!this.physOn) {
+      this.physOn = true;
+      this.schedule(this.tickPhys, 0);
+    }
+  }
+
+  private tickPhys = (dt: number): void => {
+    for (let i = this.phys.length - 1; i >= 0; i--) {
+      const p = this.phys[i];
+      p.age += dt;
+      if (p.age >= p.life || !p.slot.node.isValid) {
+        this.pool.put(p.slot);
+        this.phys.splice(i, 1);
+        continue;
+      }
+      const k = Math.pow(p.damp, dt * 60);
+      p.vx *= k;
+      p.vy = p.vy * k + p.g * dt;
+      const n = p.slot.node;
+      const pos = n.position;
+      n.setPosition(pos.x + p.vx * dt, pos.y + p.vy * dt, 0);
+      const t = p.age / p.life;
+      // Envelope: quick ignite → sustained → fade; candle-twinkle on top.
+      const fade = t < 0.12 ? t / 0.12 : t > 0.55 ? 1 - (t - 0.55) / 0.45 : 1;
+      const tw = 0.75 + 0.25 * Math.sin(p.age * 14 + p.ph);
+      p.slot.opacity.opacity = Math.round(255 * Math.max(0, fade) * tw);
+      const sc = p.s0 * (1 - 0.35 * t);
+      n.setScale(sc, sc, 1);
+    }
+    if (this.phys.length === 0) {
+      this.unschedule(this.tickPhys);
+      this.physOn = false;
+    }
+  };
 
   /** Burst shards from each centre; volume scales with `multiple` (win/total bet). */
   burst(centers: Vec3[], multiple: number): void {
@@ -40,9 +108,6 @@ export class ParticleLayer extends Component {
   fireEmbers(centers: Vec3[]): void {
     const cfg = VIEW_CONFIG.win.fireEmbers;
     const life = cfg.lifeMs / 1000;
-    // Premium mix: warm body motes + WHITE-HOT pinprick sparks. The wide
-    // scale/life variance is what separates "living fire" from a uniform
-    // dot-field; small-bright-fast layered against large-soft-slow.
     const warm = [
       new Color(255, 170, 60, 255), // amber
       new Color(255, 120, 30, 255), // orange
@@ -50,16 +115,38 @@ export class ParticleLayer extends Component {
       new Color(255, 248, 222, 255), // white-hot spark
     ];
     for (const c of centers) {
+      // Phase 1 — IGNITE RING: a radial pop of fast, hard-damped light points
+      // (the energy leaving the symbol), settling within ~half a second.
+      for (let i = 0; i < 8; i++) {
+        const ang = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
+        const v = 240 + Math.random() * 120;
+        this.spawnPhys(
+          c.x,
+          c.y,
+          warm[i % 3]!,
+          0.4 + Math.random() * 0.25,
+          Math.cos(ang) * v,
+          Math.sin(ang) * v,
+          -40,
+          0.86,
+          0.4 + Math.random() * 0.2,
+        );
+      }
+      // Phase 2 — EMBER RISE: buoyant motes that decelerate as they climb,
+      // drifting + twinkling; the white-hot quarter is faster and shorter.
       for (let i = 0; i < cfg.perCell; i++) {
         const hot = i % 4 === 3;
-        const color = warm[i % warm.length]!;
-        const scale = hot ? 0.22 + Math.random() * 0.22 : 0.45 + Math.random() * 0.75;
-        const slot = this.pool.get(c.x, c.y + (Math.random() - 0.5) * 24, color, scale);
-        if (!slot) return; // pool full
-        const drift = (Math.random() - 0.5) * cfg.spreadPx * (hot ? 2.6 : 1.8);
-        const rise = cfg.riseSpeed * life * (hot ? 1.1 + Math.random() : 0.5 + Math.random() * 0.6);
-        const dur = life * (hot ? 0.45 + Math.random() * 0.3 : 0.8 + Math.random() * 0.6);
-        this.ballistic(slot, c.x + drift, c.y + rise, dur, 'quadOut');
+        this.spawnPhys(
+          c.x + (Math.random() - 0.5) * cfg.spreadPx,
+          c.y + (Math.random() - 0.5) * 24,
+          warm[i % warm.length]!,
+          hot ? 0.2 + Math.random() * 0.2 : 0.45 + Math.random() * 0.7,
+          (Math.random() - 0.5) * 90,
+          cfg.riseSpeed * (hot ? 1.6 + Math.random() : 0.7 + Math.random() * 0.7),
+          -130,
+          0.985,
+          life * (hot ? 0.5 + Math.random() * 0.3 : 0.9 + Math.random() * 0.6),
+        );
       }
     }
   }

@@ -43,6 +43,7 @@ import { SymbolView } from './symbol-view';
 import { CeremonyView } from './ceremony-view';
 import { AnticipationLayer } from './anticipation-layer';
 import { ParticleLayer } from './particle-layer';
+import { ParticlePool } from './particle-pool';
 import { AudioManager } from './audio-manager';
 import { applyFont, loadFonts } from './fonts';
 import { PAL } from './palette';
@@ -306,6 +307,7 @@ export class SlotView extends Component {
       'symbol-win',
       'win-beam',
       'soft-burst',
+      'particle-glow',
     ].forEach((key) => {
       this.effectMaterials[key] = null;
       jobs.push(
@@ -751,6 +753,19 @@ export class SlotView extends Component {
     this.buildWinBeams();
     SymbolView.fxBurstMat = this.getEffectMaterial('soft-burst');
     SymbolView.fxWhiteFrame = this.getWhiteFrame();
+    // CGI particles — every pooled shard upgrades to an additive light point.
+    ParticlePool.glowMat = this.getEffectMaterial('particle-glow');
+    ParticlePool.glowFrame = this.getWhiteFrame();
+    // Apply the tuned intensities (the effects otherwise run at their defaults).
+    const fx = VIEW_CONFIG.win.symbolFx;
+    this.getEffectMaterial('symbol-win')?.setProperty('u_intensity', fx.intensity);
+    this.getEffectMaterial('symbol-win')?.setProperty('u_rimWidth', fx.rimWidth);
+    this.getEffectMaterial('symbol-win')?.setProperty('u_sweepSpeed', fx.sweepSpeed);
+    this.getEffectMaterial('soft-burst')?.setProperty(
+      'u_intensity',
+      VIEW_CONFIG.win.burst.intensity,
+    );
+    this.getEffectMaterial('win-beam')?.setProperty('u_intensity', 1.15);
 
     // VFX layers above the reels/win-lines
     this.anticipation = this.mkNode('anticipation', 10, 10, this.node).addComponent(
