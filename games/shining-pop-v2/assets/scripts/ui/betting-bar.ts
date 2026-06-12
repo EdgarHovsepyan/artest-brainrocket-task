@@ -230,17 +230,11 @@ export class BettingBarMobile extends Component {
   }
 
   private rr(g: Graphics, x: number, y: number, w: number, h: number, r: number): void {
-    const Y = this.Y.bind(this);
-    g.moveTo(x + r, Y(y));
-    g.lineTo(x + w - r, Y(y));
-    g.arc(x + w - r, Y(y + r), r, Math.PI / 2, 0, true);
-    g.lineTo(x + w, Y(y + h - r));
-    g.arc(x + w - r, Y(y + h - r), r, 0, -Math.PI / 2, true);
-    g.lineTo(x + r, Y(y + h));
-    g.arc(x + r, Y(y + h - r), r, -Math.PI / 2, Math.PI, true);
-    g.lineTo(x, Y(y + r));
-    g.arc(x + r, Y(y + r), r, Math.PI, Math.PI / 2, true);
-    g.close();
+    // Built-in roundRect (the web bar's clean path). The previous hand-rolled
+    // arc path swept the LONG way around each corner, which rendered a full
+    // protruding circle at every capsule end + a stray chord line — the "dark
+    // circles" on the banners / stepper / footer and the crushed stop corners.
+    g.roundRect(x, this.Y(y + h), w, h, r);
   }
   private panelInto(
     g: Graphics,
@@ -311,10 +305,8 @@ export class BettingBarMobile extends Component {
     g.rect(0, Y(301), W, 1.4);
     g.fillColor = col(C.divider, 0.5);
     g.fill();
-    // soft hero glow behind SPIN
-    g.circle(270, Y(392), 116);
-    g.fillColor = col(C.glow, 0.1);
-    g.fill();
+    // (spin hero glow removed — the soft disc read as a "circle shadow" under
+    // the spin button on small screens; the ring art carries the hero weight.)
 
     // LAST WIN / TOTAL BET banners
     this.panelInto(g, 60, 210, 200, 46, 23, C.banner, 1.8);
@@ -511,29 +503,29 @@ export class BettingBarMobile extends Component {
     menu.strokeColor = col(C.icon);
     menu.stroke();
     this.icon(menu.node, 489, 582, 28, 'ic_menu', C.icon, () => menu.clear());
-    // Sound icon relocated to design-x ~362 (left of the menu glyph) so its
-    // enlarged ≥44px hit area no longer overlaps the menu's.
+    // Sound icon at design-x ~425 — paired NEXT TO the menu glyph (user request)
+    // with adjacent, non-overlapping ≥44px hit areas.
     const snd = this.gfx('sound');
-    snd.moveTo(360, Y(577));
-    snd.lineTo(365, Y(577));
-    snd.lineTo(371, Y(572));
-    snd.lineTo(371, Y(592));
-    snd.lineTo(365, Y(587));
-    snd.lineTo(360, Y(587));
+    snd.moveTo(416, Y(577));
+    snd.lineTo(421, Y(577));
+    snd.lineTo(427, Y(572));
+    snd.lineTo(427, Y(592));
+    snd.lineTo(421, Y(587));
+    snd.lineTo(416, Y(587));
     snd.close();
     snd.fillColor = col(C.icon);
     snd.fill();
-    snd.arc(370.39, Y(582), 7, -1.0297, 1.0297, false);
+    snd.arc(426.39, Y(582), 7, -1.0297, 1.0297, false);
     snd.lineWidth = 2;
     snd.strokeColor = col(C.icon);
     snd.stroke();
-    this.icon(snd.node, 369, 582, 28, 'ic_sound', C.icon, () => snd.clear());
+    this.icon(snd.node, 425, 582, 28, 'ic_sound', C.icon, () => snd.clear());
     this.soundOp = snd.node.addComponent(UIOpacity);
 
     // muted slash (shown when sound is OFF) — its own node so setSoundOn toggles it.
     const mute = this.gfx('soundMuted');
-    mute.moveTo(358, Y(570));
-    mute.lineTo(384, Y(596));
+    mute.moveTo(414, Y(570));
+    mute.lineTo(440, Y(596));
     mute.lineWidth = 3;
     mute.strokeColor = col(C.value);
     mute.stroke();
@@ -733,7 +725,7 @@ export class BettingBarMobile extends Component {
     add('hitMinus', 170, 474, 67, 64, emit('bet:dec'));
     add('hitPlus', 303, 474, 67, 64, emit('bet:inc'));
     add('hitTurbo', 404, 474, 64, 64, emit('turbo'));
-    add('hitSound', 340, 550, 64, 64, () => this.toggleSoundPanel()); // opens the volume slider
+    add('hitSound', 393, 550, 64, 64, () => this.toggleSoundPanel()); // opens the volume slider
     add('hitMenu', 457, 550, 64, 64, emit('menu'));
   }
 
