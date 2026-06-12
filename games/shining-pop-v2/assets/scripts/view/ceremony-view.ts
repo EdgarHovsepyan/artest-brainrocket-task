@@ -132,7 +132,7 @@ export class CeremonyView extends Component {
     // a solid plate (slot-vfx restraint rule).
     const panelLightNode = this.mk('panelLight', 10, 10, ov);
     const panelLight = panelLightNode.addComponent(Graphics);
-    panelLight.fillColor = new Color(255, 90, 176, 110);
+    panelLight.fillColor = new Color(255, 186, 92, 110); // warm gold (was magenta)
     panelLight.moveTo(0, -120);
     panelLight.lineTo(330, -10);
     panelLight.lineTo(0, 100);
@@ -145,6 +145,13 @@ export class CeremonyView extends Component {
     this.headerLabel = this.mkLabel(ov, 0, 96, 56, TITLE);
     this.amountLabel = this.mkLabel(ov, 0, -16, 66, CRYSTAL);
     this.badgeLabel = this.mkLabel(ov, 0, -86, 30, Color.WHITE);
+    // Slot-title text treatment: a deep amber outline lifts the headline and
+    // the rolling amount off the busy board (white-on-glow alone read flat).
+    for (const l of [this.headerLabel, this.amountLabel]) {
+      l.enableOutline = true;
+      l.outlineColor = new Color(82, 34, 4, 255);
+      l.outlineWidth = 3;
+    }
 
     // tap anywhere on the ceremony fast-forwards it (master rule: interruptible)
     ov.on(Node.EventType.TOUCH_END, () => this.fastForward());

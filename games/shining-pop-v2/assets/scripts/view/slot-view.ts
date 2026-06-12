@@ -174,6 +174,7 @@ export class SlotView extends Component {
   // radial symbol glow is the fallback.
   private winFlames: Node[] = [];
   private winBeams: Node[] = [];
+  private winCoreG: Graphics | null = null;
   private whiteFrame: SpriteFrame | null = null;
   // CC-1 — shared u_time for all CCEffect materials advanced by a single schedule.
   private uTime = 0;
@@ -1175,29 +1176,55 @@ export class SlotView extends Component {
    *  cell centres. Null material → pool stays empty (embers + symbol fire carry
    *  the win read; no Graphics line fallback — drawn strokes were rejected). */
   private buildWinBeams(): void {
-    if (!VIEW_CONFIG.vfx.materialsEnabled || !VIEW_CONFIG.win.beams.enabled) return;
-    const mat = this.getEffectMaterial('win-beam');
-    if (!mat) return;
+    if (!VIEW_CONFIG.win.beams.enabled) return;
     const cfg = VIEW_CONFIG.win.beams;
     const root = this.mkNode('winBeams', 10, 10, this.node);
-    for (let i = 0; i < cfg.maxSegments; i++) {
-      const n = this.mkNode(`beam${i}`, 100, cfg.heightPx, root);
-      const sp = n.addComponent(Sprite);
-      sp.sizeMode = Sprite.SizeMode.CUSTOM;
-      sp.type = Sprite.Type.SIMPLE;
-      sp.spriteFrame = this.getWhiteFrame();
-      sp.customMaterial = mat;
-      n.addComponent(UIOpacity).opacity = 0;
-      n.active = false;
-      this.winBeams.push(n);
+    const mat = VIEW_CONFIG.vfx.materialsEnabled ? this.getEffectMaterial('win-beam') : null;
+    if (mat) {
+      for (let i = 0; i < cfg.maxSegments; i++) {
+        const n = this.mkNode(`beam${i}`, 100, cfg.heightPx, root);
+        const sp = n.addComponent(Sprite);
+        sp.sizeMode = Sprite.SizeMode.CUSTOM;
+        sp.type = Sprite.Type.SIMPLE;
+        sp.spriteFrame = this.getWhiteFrame();
+        sp.customMaterial = mat;
+        n.addComponent(UIOpacity).opacity = 0;
+        n.active = false;
+        this.winBeams.push(n);
+      }
     }
+    // Crisp CORE LINE above the plasma bloom: a 3px gold stroke + 1.2px white
+    // hairline tracing the full payline — the elegant "the line itself" read
+    // (and the always-on fallback when materials are off).
+    const core = this.mkNode('winCore', 10, 10, root);
+    this.winCoreG = core.addComponent(Graphics);
   }
 
   /** Lay the pooled beams along each winning line's cell-centre polyline. The
    *  segments overlap their feathered ends so the line reads as ONE continuous
    *  flowing energy ribbon, not jointed sticks. */
   private showWinBeams(lineWins: { lineIndex: number; count: number }[]): void {
-    if (this.reducedFx || !this.winBeams.length) return;
+    if (this.reducedFx) return;
+    // Core line — full payline, both strokes, regardless of shader support.
+    const cg = this.winCoreG;
+    if (cg) {
+      cg.clear();
+      for (const w of lineWins) {
+        const pts = this.linePts(w);
+        if (pts.length < 2) continue;
+        for (const [width, color] of [
+          [3, new Color(255, 214, 140, 235)],
+          [1.2, new Color(255, 248, 230, 255)],
+        ] as [number, Color][]) {
+          cg.lineWidth = width;
+          cg.strokeColor = color;
+          cg.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) cg.lineTo(pts[i].x, pts[i].y);
+          cg.stroke();
+        }
+      }
+    }
+    if (!this.winBeams.length) return;
     const cfg = VIEW_CONFIG.win.beams;
     let b = 0;
     for (const w of lineWins) {
@@ -1226,6 +1253,7 @@ export class SlotView extends Component {
   }
 
   private hideWinBeams(): void {
+    this.winCoreG?.clear();
     this.winBeams.forEach((n) => {
       const op = n.getComponent(UIOpacity);
       if (op) Tween.stopAllByTarget(op);
@@ -1642,37 +1670,8 @@ export class SlotView extends Component {
       g.rect(-w / 2 + 4, -h / 2 + 4 + (i - 1) * 2, w - 8, bevH * 0.65);
       g.fill();
     }
-    // Corner gems — bigger faceted crystals (2026-06-11, user: "corner need
-    // big"). 3 stacked facets: dark outer → magenta mid → bright white core,
-    // for a real cut-gem read instead of a flat diamond.
-    const gem = (cx: number, cy: number) => {
-      const R = 17; // half-height (was 10)
-      g.fillColor = new Color(154, 59, 214, 180); // violet outer facet
-      g.moveTo(cx, cy + R);
-      g.lineTo(cx + R * 0.8, cy);
-      g.lineTo(cx, cy - R);
-      g.lineTo(cx - R * 0.8, cy);
-      g.close();
-      g.fill();
-      g.fillColor = new Color(255, 90, 156, 245); // magenta mid facet
-      g.moveTo(cx, cy + R * 0.66);
-      g.lineTo(cx + R * 0.5, cy);
-      g.lineTo(cx, cy - R * 0.66);
-      g.lineTo(cx - R * 0.5, cy);
-      g.close();
-      g.fill();
-      g.fillColor = new Color(255, 245, 250, 220); // bright core glint
-      g.moveTo(cx, cy + R * 0.28);
-      g.lineTo(cx + R * 0.2, cy);
-      g.lineTo(cx, cy - R * 0.28);
-      g.lineTo(cx - R * 0.2, cy);
-      g.close();
-      g.fill();
-    };
-    gem(-w / 2 - 8, h / 2 + 8);
-    gem(w / 2 + 8, h / 2 + 8);
-    gem(-w / 2 - 8, -h / 2 - 8);
-    gem(w / 2 + 8, -h / 2 - 8);
+    // (corner crystals removed 2026-06-12 — the magenta facets fought the candy
+    // identity; the frame's bevel + clean rim carry the corners.)
 
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
@@ -1825,7 +1824,9 @@ export class SlotView extends Component {
   private fabDockX(sign: 1 | -1, scale: number, screenW: number): number | null {
     const fab = VIEW_CONFIG.layout.fab;
     const frameHalfW = this.gw / 2 + 24; // halo on the frame
-    const fabHalfW = fab.sizePx / 2;
+    // Clearance uses the SHRUNKEN landscape badge — checking the full-size
+    // width made the dock report "no room" on wide boards and hide the badge.
+    const fabHalfW = (fab.sizePx * fab.landscapeScale) / 2;
     const ideal = sign * (frameHalfW + fab.gapPx + fabHalfW);
     const screenHalfWLocal = screenW / 2 / scale;
     const outerLimit = screenHalfWLocal - fab.edgePadPx - fabHalfW;
@@ -1846,13 +1847,18 @@ export class SlotView extends Component {
     // live content is just logo-top -> reels-bottom; fitting that band makes the
     // reels fill the screen and removes the dead space the empty deck reserved.
     // Logo top + reels bottom from Task 1.1 tunables.
-    const contentTop = L.contentTopPx;
+    const isLandscape = vis.width > vis.height * 1.05;
+    // LANDSCAPE: the logo is screen-relative (not part of this band), so the
+    // full contentTopPx headroom was dead space that shrank the reels — fit just
+    // the frame crown instead. PORTRAIT keeps the logo band.
+    const contentTop = isLandscape
+      ? reelCenterY + this.gh / 2 + L.landscapeTopPadPx
+      : L.contentTopPx;
     const contentBottom = this.externalControls
       ? reelCenterY - this.gh / 2 - L.boardBottomGapPx // reels bottom + clean gap to the bar
       : -designHeight / 2; // own-HUD build keeps the full design envelope
     const contentH = contentTop - contentBottom;
     const contentCenter = (contentTop + contentBottom) / 2;
-    const isLandscape = vis.width > vis.height * 1.05;
     // Task 7.1 — portrait reels fill ≥90% of visible width. The 760 design
     // envelope is irrelevant in portrait (it wins on height-clamp already);
     // instead, scale to portraitWidthFill * vis.width / gw so the reels are
@@ -1925,7 +1931,8 @@ export class SlotView extends Component {
       if (isLandscape) {
         // Board-local shoulder dock converted to canvas space (scale tracks the
         // board so the badge keeps its size relative to the reels).
-        this.buyFab.setScale(base * s, base * s, 1);
+        const lsc = base * s * fab.landscapeScale;
+        this.buyFab.setScale(lsc, lsc, 1);
         const x = this.fabDockX(fab.landscapeDockSign as 1 | -1, s, vis.width);
         if (x === null) {
           this.buyFab.active = false; // viewport too narrow for both frame + FAB
