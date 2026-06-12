@@ -69,7 +69,13 @@ export const VIEW_CONFIG = {
       /** 0.12 clipped the badge's left edge on narrow phones — 0.16 clears it. */
       portraitScreenX: 0.16,
       portraitScreenY: 0.2,
-      portraitScale: 0.6,
+      /** Portrait badge width in CANVAS px — explicit because the FAB lives on
+       *  the canvas root (above the bar), where board-relative scales don't
+       *  apply. ~140 balances the spin ring; half the old oversized badge. */
+      portraitWidthPx: 140,
+      /** Portrait dock: fraction of the control band's height (bottomInset) the
+       *  badge centre sits at — 0.6 ≈ level with the spin button, left side. */
+      portraitBandFrac: 0.6,
     },
     /** Logo placement. 2026-06-11 — landscape logo is now SCREEN-RELATIVE
      *  (responsive): its centre lands at screen-fraction (landscapeScreenX,

@@ -1910,38 +1910,50 @@ export class SlotView extends Component {
       // board scale doesn't blow it up.
       const fab = L.fab;
       const base = this.buyFabBaseScale;
+      // The FAB lives on the CANVAS ROOT, above the betting bar — docked inside
+      // the control band it would otherwise render BEHIND the bar's opaque slab
+      // (the bar is a later sibling). Reparent once; both branches then position
+      // in canvas space.
+      const fabRoot = this.node.parent;
+      if (fabRoot && this.buyFab.parent !== fabRoot) {
+        this.buyFab.setParent(fabRoot);
+      }
+      // Re-assert TOP order every fit — the bar joins the root AFTER the first
+      // fit and would otherwise paint over the badge (modals hide the FAB on
+      // open, so sitting top-most never covers a dialog).
+      if (fabRoot) this.buyFab.setSiblingIndex(fabRoot.children.length - 1);
       if (isLandscape) {
-        this.buyFab.setScale(base, base, 1); // build-time size on the reel shoulder
+        // Board-local shoulder dock converted to canvas space (scale tracks the
+        // board so the badge keeps its size relative to the reels).
+        this.buyFab.setScale(base * s, base * s, 1);
         const x = this.fabDockX(fab.landscapeDockSign as 1 | -1, s, vis.width);
         if (x === null) {
           this.buyFab.active = false; // viewport too narrow for both frame + FAB
         } else {
           this.buyFab.active = true;
-          this.buyFab.setPosition(x, reelCenterY, 0);
+          this.buyFab.setPosition(
+            x * s + this.node.position.x,
+            reelCenterY * s + this.node.position.y,
+            0,
+          );
         }
       } else {
         this.buyFab.active = true;
-        // Counter-scale by the board scale so the badge stays a consistent
-        // on-screen size in portrait (where the board scale is large).
-        const cs = Math.max(0.3, (base * fab.portraitScale) / Math.max(0.001, s));
-        this.buyFab.setScale(cs, cs, 1);
+        // Fixed on-screen size: scale the art node to an explicit canvas width
+        // (board-relative scales don't apply on the canvas root).
+        const ut = this.buyFab.getComponent(UITransform);
+        const sc = fab.portraitWidthPx / Math.max(1, ut?.width ?? 96);
+        this.buyFab.setScale(sc, sc, 1);
         const canvasX = (fab.portraitScreenX - 0.5) * vis.width;
-        // CLAMP above the control band: portraitScreenY is a screen fraction, but
-        // the bar band's height varies per viewport — on tall phones the fixed
-        // fraction lands INSIDE the band and the FAB covers the balance strip
-        // (user-reported overlap). Force the FAB's bottom edge to clear the
-        // board's bottom inset (bar band + safe area) by 12 screen px.
-        const fabScreenH = (this.buyFab.getComponent(UITransform)?.height ?? 96) * cs * s;
-        const fromBottom = Math.max(
-          fab.portraitScreenY * vis.height,
-          this.bottomInset + fabScreenH / 2 + 12,
-        );
-        const canvasY = fromBottom - vis.height / 2;
-        this.buyFab.setPosition(
-          (canvasX - this.node.position.x) / s,
-          (canvasY - this.node.position.y) / s,
-          0,
-        );
+        // Dock INSIDE the control band, level with the spin button (left side):
+        // the band height (bottomInset) is the one stable reference across
+        // viewports — screen fractions overlapped the reels on short phones.
+        const fabScreenH = (ut?.height ?? 96) * sc;
+        const fromBottom =
+          this.bottomInset > 0
+            ? this.bottomInset * fab.portraitBandFrac
+            : Math.max(fab.portraitScreenY * vis.height, fabScreenH / 2 + 12);
+        this.buyFab.setPosition(canvasX, fromBottom - vis.height / 2, 0);
       }
     }
     // Task 1.2 — keep the feather nodes pinned to the reel window edges.
