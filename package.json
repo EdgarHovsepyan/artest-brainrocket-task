@@ -12,7 +12,8 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm run build && pnpm -r test",
+    "preview": "node scripts/preview.mjs",
     "sim": "pnpm --filter @artest/math-core sim",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

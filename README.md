@@ -9,11 +9,11 @@
 [![PixiJS](https://img.shields.io/badge/PixiJS-v8-e91e63?logo=javascript&logoColor=white)](games/shining-pop)
 [![Cocos Creator](https://img.shields.io/badge/Cocos%20Creator-3.8.8-55c2e1?logo=cocos&logoColor=white)](games/shining-pop-v2)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](#engineering-standards)
-[![Tests](https://img.shields.io/badge/tests-45%2F45%20passing-2ea043)](#quality-gates)
+[![Tests](https://img.shields.io/badge/tests-73%2F73%20passing-2ea043)](#quality-gates)
 [![RTP](https://img.shields.io/badge/RTP-~97%25%20sim--anchored-f5a623)](#developer-quick-start)
 
-*Two production slot games on one deterministic, sim-anchored math core —
-designed, built and verified end-to-end by a single developer.*
+_Two production slot games on one deterministic, sim-anchored math core —
+designed, built and verified end-to-end by a single developer._
 
 </div>
 
@@ -21,19 +21,23 @@ designed, built and verified end-to-end by a single developer.*
 
 ## The games
 
-| Game | Engine | Stack | RTP | Status |
-| --- | --- | --- | --- | --- |
-| **[shining-pop](games/shining-pop)** | PixiJS v8 | Vite · GSAP · Spine · Web Audio | ~97 % | flagship — submission-ready |
+| Game                                       | Engine              | Stack                                | RTP     | Status                         |
+| ------------------------------------------ | ------------------- | ------------------------------------ | ------- | ------------------------------ |
+| **[shining-pop](games/shining-pop)**       | PixiJS v8           | Vite · GSAP · Spine · Web Audio      | ~97 %   | flagship — submission-ready    |
 | **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC · 9 CCEffect shaders | ~97.5 % | parity port + shader VFX suite |
 
 ## Instant run — no toolchain needed
 
-Both playable builds ship in the repo:
+Both playable builds ship in the repo. With Node ≥ 20 installed, run from the repo root:
 
 ```bash
-npx serve games/shining-pop/dist -l 5180                  # PixiJS  → http://localhost:5180
-npx serve games/shining-pop-v2/build/web-mobile -l 8200   # Cocos   → http://localhost:8200
+node scripts/preview.mjs
+#  ▶ PixiJS  — shining-pop     http://localhost:5180
+#  ▶ Cocos   — shining-pop-v2  http://localhost:8200
 ```
+
+No install step, no dependencies — open either URL and play.
+(`npx serve games/shining-pop/dist -l 5180` works too if you prefer.)
 
 ## Screens
 
@@ -41,15 +45,15 @@ npx serve games/shining-pop-v2/build/web-mobile -l 8200   # Cocos   → http://l
 
 <img width="860" alt="Cocos Creator — base game" src="docs/media/cocos-desktop.png" />
 
-*Cocos Creator 3.8.8 — candy reskin, authored icon set, full-bleed reels*
+_Cocos Creator 3.8.8 — candy reskin, authored icon set, full-bleed reels_
 
 <img width="860" alt="Cocos Creator — win presentation" src="docs/media/cocos-win.png" />
 
-*Win presentation: gold payline core + flowing plasma beam · per-symbol shader fire · jelly squash-and-stretch · win-focus dim*
+_Win presentation: gold payline core + flowing plasma beam · per-symbol shader fire · jelly squash-and-stretch · win-focus dim_
 
 <img width="860" alt="Cocos Creator — EPIC WIN ceremony" src="docs/media/cocos-ceremony.png" />
 
-*Tiered ceremony: outlined headline, rolling count-up, rotating god-rays, warm gold light*
+_Tiered ceremony: outlined headline, rolling count-up, rotating god-rays, warm gold light_
 
 <table>
   <tr>
@@ -134,13 +138,13 @@ sequenceDiagram
 ## Developer quick start
 
 ```bash
+corepack enable                                # one-time: gets the pinned pnpm
 pnpm install
-pnpm -r build                                  # shared packages
-pnpm test                                      # node:test suites (45 green)
-pnpm sim                                       # Monte-Carlo RTP of the math core
+pnpm test                                      # builds packages + runs all suites (73 green)
+pnpm sim                                       # Monte-Carlo RTP of the math core (2M spins)
+pnpm preview                                   # serve both shipped game builds
 
 pnpm --filter @artest/shining-pop dev          # PixiJS dev server :5173
-pnpm --filter @artest/shining-pop-v2 test      # Cocos pure-logic tests
 pnpm --filter @artest/shining-pop-v2 sim       # Cocos RTP sim (2M spins)
 ```
 
