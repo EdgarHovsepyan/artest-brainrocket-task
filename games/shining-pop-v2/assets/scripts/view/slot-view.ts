@@ -27,6 +27,7 @@ import {
 import { BONUS_MODES, BonusMode, GRID, PAYLINES, SYMBOLS } from '../logic/game-config';
 import {
   CONTROLS_LINES,
+  FEATURES_LINES,
   maxWinMultiple,
   paytableRows,
   RTP_DISPLAY,
@@ -2005,6 +2006,9 @@ export class SlotView extends Component {
       this.buyModal.on('bet:inc', () => this.buyBetStepCb?.(1));
       this.buyModal.on('bet:dec', () => this.buyBetStepCb?.(-1));
       this.buyModal.on('ui:click', () => this.audio.click());
+      // Unaffordable BUY press: the modal shakes its own button; the host adds
+      // the audio cue. The intent never reaches the controller.
+      this.buyModal.on('buy:blocked', () => this.audio.click());
     }
     const tiers: BuyTier[] = options.map((o, i) => {
       const present = SlotView.BUY_PRESENT[o.mode] ?? { accent: '#ff7ad0', special: '' };
@@ -2030,6 +2034,10 @@ export class SlotView extends Component {
   /** Refresh each tier's live cost after a bet change (controller supplies texts). */
   refreshBuyCosts(costTexts: string[]): void {
     this.buyModal?.setCosts(costTexts);
+  }
+  /** Per-tier affordability (controller recomputes on balance/bet changes). */
+  setBuyAffordable(flags: boolean[]): void {
+    this.buyModal?.setAffordable(flags);
   }
   /** Wire the modal's inline bet stepper back to the controller's bet ladder. */
   onBuyBetStep(cb: (dir: number) => void): void {
@@ -2317,7 +2325,14 @@ export class SlotView extends Component {
       stat('VOLATILITY', VOLATILITY_DISPLAY);
       stat('LINES', String(PAYLINES.length));
       stat('GRID', `${GRID.reels}×${GRID.rows}`);
-      y -= 10;
+      y -= 6;
+      // Buy-feature documentation (approval gate B4/I4): every mode named, its
+      // mechanic described and its cost basis stated — sourced from BONUS_MODES.
+      y -= wrapLine('FEATURES', y, info.headerSize, ACID) + info.lineGap;
+      for (const line of FEATURES_LINES) {
+        y -= wrapLine(line, y, info.captionSize) + 3;
+      }
+      y -= 8;
       y -= wrapLine('RTP is calculated over many plays.', y, info.captionSize) + info.lineGap;
       wrapLine('Individual sessions may vary.', y, info.captionSize);
     }
