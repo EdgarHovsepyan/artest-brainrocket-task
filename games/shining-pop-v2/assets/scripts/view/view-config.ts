@@ -66,7 +66,8 @@ export const VIEW_CONFIG = {
        *  left deck in portrait (screen-relative fraction + a portrait scale so
        *  it isn't blown up by the big portrait board scale). */
       landscapeDockSign: -1,
-      portraitScreenX: 0.12,
+      /** 0.12 clipped the badge's left edge on narrow phones — 0.16 clears it. */
+      portraitScreenX: 0.16,
       portraitScreenY: 0.2,
       portraitScale: 0.6,
     },
