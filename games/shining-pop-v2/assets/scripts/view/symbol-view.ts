@@ -422,6 +422,7 @@ export class SymbolView extends Component {
   /** Sharp one-shot WILD-landing flash: scale punch + single hot glow strike.
    *  Distinct from playWin (sustained pulse) — this is the "it just hit" beat. */
   flashWildLand(delay = 0): void {
+    this.ensureBurst(); // shader burst, never the banded Graphics circles
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
     tween(this.node)
@@ -445,6 +446,7 @@ export class SymbolView extends Component {
   /** Sticky-lock confirmation: small settle pop + a HELD glow rim (reads as
    *  "locked in", not a respin win). */
   playLock(delay = 0): void {
+    this.ensureBurst(); // shader burst, never the banded Graphics circles
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
     tween(this.node)

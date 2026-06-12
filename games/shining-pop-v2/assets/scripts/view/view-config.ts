@@ -34,6 +34,9 @@ export const VIEW_CONFIG = {
      *  need bigger"). The logo moves to the top-left shoulder in landscape so
      *  it no longer needs the tall centre headroom. */
     contentTopPx: 372,
+    /** Landscape frame crown above the reels (the logo lives screen-relative
+     *  there, outside this band) — tight so the reels fill the height. */
+    landscapeTopPadPx: 44,
     boardBottomGapPx: 30,
     /** bg base-fill + bg_art scaled by this factor so the painted bg always
      *  bleeds past 16:9, 21:9, 9:16, 9:21 — kills the #0a0610 letterbox band
@@ -59,8 +62,8 @@ export const VIEW_CONFIG = {
     fab: {
       sizePx: 100,
       gapPx: 14,
-      minClearancePx: 18,
-      edgePadPx: 24,
+      minClearancePx: 14,
+      edgePadPx: 12,
       /** 2026-06-11 — match the PixiJS reference: the BUY BONUS badge sits on
        *  the LEFT of the reels in landscape (dockSign -1), and in the bottom-
        *  left deck in portrait (screen-relative fraction + a portrait scale so
@@ -76,6 +79,8 @@ export const VIEW_CONFIG = {
       /** Portrait dock: fraction of the control band's height (bottomInset) the
        *  badge centre sits at — 0.6 ≈ level with the spin button, left side. */
       portraitBandFrac: 0.6,
+      /** Landscape shrink — the badge dominated the web layout at full size. */
+      landscapeScale: 0.78,
     },
     /** Logo placement. 2026-06-11 — landscape logo is now SCREEN-RELATIVE
      *  (responsive): its centre lands at screen-fraction (landscapeScreenX,
@@ -86,7 +91,8 @@ export const VIEW_CONFIG = {
      *  through the board scale so they hold at any viewport. */
     logo: {
       topY: 322,
-      landscapeScale: 0.66,
+      /** 0.66 dominated the web layout — 0.52 reads brand-present, not loud. */
+      landscapeScale: 0.52,
       landscapeScreenX: 0.18,
       landscapeScreenY: 0.88,
       bonusScreenX: 0.12,
@@ -199,7 +205,7 @@ export const VIEW_CONFIG = {
      *  per winning cell; warm orange→gold, rise + fade. Bumped 6→9 so even a
      *  small win reads clearly (the embers + symbol glow are the only win cue
      *  now that lines are gone). */
-    fireEmbers: { perCell: 9, riseSpeed: 180, lifeMs: 760, spreadPx: 34 },
+    fireEmbers: { perCell: 12, riseSpeed: 180, lifeMs: 820, spreadPx: 46 },
 
     /** The OLD rectangular win-fire flame QUADS behind winning cells read as a
      *  "fire background box" (user-rejected). Fire is now painted PER-SYMBOL,

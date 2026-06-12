@@ -59,20 +59,15 @@ shining-pop-studio/
 │  └─ spine/                      # drop master.skel/.atlas/.png here to activate Spine (see its README)
 ├─ scripts/
 │  └─ port-from-singlefile.mjs    # re-sync from the approved single-file game
-├─ docs/                          # knowledge base (copied from the approved repo)
-│  ├─ ARCHITECTURE.md
-│  ├─ STAKE_CONSTRAINTS_CLAUDE.md # the hard Stake rules — READ before shipping
-│  ├─ MATH_SUMMARY.txt            # RTP / max-win / mode costs (math is LOCKED)
-│  └─ blueprints/                 # incl. 10_…_SPINE_SYMBOL_BLUEPRINT.md
 ├─ vite.config.ts                 # vite-plugin-singlefile for the Stake build
 └─ tsconfig.json
 ```
 
-## Stake compliance — non-negotiables (see `docs/STAKE_CONSTRAINTS_CLAUDE.md`)
+## Stake compliance — non-negotiables
 
 - **No external resources.** Everything bundles locally (PixiJS via npm → inlined by the singlefile build; assets under `/public`). No CDNs.
 - **Console must be silent** in production — gate every `console.*` behind `?debug=true`.
-- **Math is locked.** RTP 96.0%, max win 5,000×, the 4 modes + costs in `docs/MATH_SUMMARY.txt`. Do not recompute payouts on the frontend.
+- **Math is locked.** RTP 96.0%, max win 5,000×; mode costs come from the shared math core. Do not recompute payouts on the frontend.
 - The single-file build output is what gets uploaded to ACP → Import Files → Front End.
 
 ## Roadmap

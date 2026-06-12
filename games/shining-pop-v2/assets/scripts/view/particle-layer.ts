@@ -40,19 +40,26 @@ export class ParticleLayer extends Component {
   fireEmbers(centers: Vec3[]): void {
     const cfg = VIEW_CONFIG.win.fireEmbers;
     const life = cfg.lifeMs / 1000;
+    // Premium mix: warm body motes + WHITE-HOT pinprick sparks. The wide
+    // scale/life variance is what separates "living fire" from a uniform
+    // dot-field; small-bright-fast layered against large-soft-slow.
     const warm = [
       new Color(255, 170, 60, 255), // amber
       new Color(255, 120, 30, 255), // orange
       new Color(255, 220, 130, 255), // gold
+      new Color(255, 248, 222, 255), // white-hot spark
     ];
     for (const c of centers) {
       for (let i = 0; i < cfg.perCell; i++) {
+        const hot = i % 4 === 3;
         const color = warm[i % warm.length]!;
-        const slot = this.pool.get(c.x, c.y, color, 0.4 + Math.random() * 0.5);
+        const scale = hot ? 0.22 + Math.random() * 0.22 : 0.45 + Math.random() * 0.75;
+        const slot = this.pool.get(c.x, c.y + (Math.random() - 0.5) * 24, color, scale);
         if (!slot) return; // pool full
-        const endX = c.x + (Math.random() - 0.5) * cfg.spreadPx * 2;
-        const endY = c.y + cfg.riseSpeed * life * (0.6 + Math.random() * 0.6);
-        this.ballistic(slot, endX, endY, life * (0.7 + Math.random() * 0.5), 'quadOut');
+        const drift = (Math.random() - 0.5) * cfg.spreadPx * (hot ? 2.6 : 1.8);
+        const rise = cfg.riseSpeed * life * (hot ? 1.1 + Math.random() : 0.5 + Math.random() * 0.6);
+        const dur = life * (hot ? 0.45 + Math.random() * 0.3 : 0.8 + Math.random() * 0.6);
+        this.ballistic(slot, c.x + drift, c.y + rise, dur, 'quadOut');
       }
     }
   }

@@ -10,11 +10,10 @@
 [![Cocos Creator](https://img.shields.io/badge/Cocos%20Creator-3.8.8-55c2e1?logo=cocos&logoColor=white)](games/shining-pop-v2)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](#engineering-standards)
 [![Tests](https://img.shields.io/badge/tests-45%2F45%20passing-2ea043)](#quality-gates)
-[![RTP](https://img.shields.io/badge/RTP-~97%25%20sim--anchored-f5a623)](#the-math-is-owned-end-to-end)
+[![RTP](https://img.shields.io/badge/RTP-~97%25%20sim--anchored-f5a623)](#developer-quick-start)
 
-*Two production slot games sharing one deterministic math core — each shippable
-as a self-contained casino-RGS build, designed, built and verified end-to-end
-by a single developer.*
+*Two production slot games on one deterministic, sim-anchored math core —
+designed, built and verified end-to-end by a single developer.*
 
 </div>
 
@@ -25,44 +24,48 @@ by a single developer.*
 | Game | Engine | Stack | RTP | Status |
 | --- | --- | --- | --- | --- |
 | **[shining-pop](games/shining-pop)** | PixiJS v8 | Vite · GSAP · Spine · Web Audio | ~97 % | flagship — submission-ready |
-| **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC scene · CCEffect shaders | ~97.5 % | parity port + shader VFX suite |
-
-## Screens
-
-<div align="center">
-
-### Cocos Creator 3.8.8 — `shining-pop-v2`
-
-<img width="840" alt="Cocos desktop" src="docs/media/cocos-desktop.png" />
-
-*Candy reskin · per-symbol shader fire on wins · soft-burst god-ray glow · win-line energy beams*
-
-<img width="840" alt="Cocos win presentation" src="docs/media/cocos-win.png" />
-
-<table>
-  <tr>
-    <td align="center" valign="top">
-      <img width="240" alt="Cocos mobile portrait" src="docs/media/cocos-mobile.png" /><br/>
-      <em>Portrait: safe-area deck, clamped BUY&nbsp;BONUS, 44&nbsp;px targets</em>
-    </td>
-    <td align="center" valign="top">
-      <img width="560" alt="PixiJS intro" src="docs/media/pixi-desktop.png" /><br/>
-      <img width="560" alt="PixiJS board" src="docs/media/pixi-board.png" /><br/>
-      <em>PixiJS v8 flagship: branded intro gate &amp; full control surface</em>
-    </td>
-  </tr>
-</table>
-
-</div>
+| **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC · 9 CCEffect shaders | ~97.5 % | parity port + shader VFX suite |
 
 ## Instant run — no toolchain needed
 
 Both playable builds ship in the repo:
 
 ```bash
-npx serve games/shining-pop/dist -l 5180            # PixiJS  → http://localhost:5180
-npx serve games/shining-pop-v2/build/web-mobile -l 8200   # Cocos → http://localhost:8200
+npx serve games/shining-pop/dist -l 5180                  # PixiJS  → http://localhost:5180
+npx serve games/shining-pop-v2/build/web-mobile -l 8200   # Cocos   → http://localhost:8200
 ```
+
+## Screens
+
+<div align="center">
+
+<img width="860" alt="Cocos Creator — base game" src="docs/media/cocos-desktop.png" />
+
+*Cocos Creator 3.8.8 — candy reskin, authored icon set, full-bleed reels*
+
+<img width="860" alt="Cocos Creator — win presentation" src="docs/media/cocos-win.png" />
+
+*Win presentation: gold payline core + flowing plasma beam · per-symbol shader fire · jelly squash-and-stretch · win-focus dim*
+
+<img width="860" alt="Cocos Creator — EPIC WIN ceremony" src="docs/media/cocos-ceremony.png" />
+
+*Tiered ceremony: outlined headline, rolling count-up, rotating god-rays, warm gold light*
+
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <img width="230" alt="Cocos mobile portrait" src="docs/media/cocos-mobile.png" /><br/>
+      <em>Portrait: safe-area deck, docked BUY BONUS,<br/>44 px targets</em>
+    </td>
+    <td align="center" valign="top">
+      <img width="540" alt="PixiJS intro" src="docs/media/pixi-desktop.png" /><br/>
+      <img width="540" alt="PixiJS board" src="docs/media/pixi-board.png" /><br/>
+      <em>PixiJS v8 flagship — branded intro gate &amp; full control surface</em>
+    </td>
+  </tr>
+</table>
+
+</div>
 
 ## Architecture
 
@@ -85,12 +88,10 @@ flowchart LR
     SPV2 -->|"headless CLI build"| OUT2["build/web-mobile"]
 ```
 
-**One math core, two render targets** — a payout rule or RTP tune happens once
-and both games inherit it; a cross-engine drift test enforces it. The rule that
-keeps every game correct: **math decides, the game renders.** Money is never
-recomputed in a view.
-
-Every spin follows the same contract in both engines:
+**One math core, two render targets** — a payout rule or RTP tune happens once and
+both games inherit it; a cross-engine drift test enforces it. The rule that keeps
+every game correct: **math decides, the game renders.** Money is never recomputed
+in a view.
 
 ```mermaid
 sequenceDiagram
@@ -104,44 +105,31 @@ sequenceDiagram
     C->>V: spinTo(grid)
     V-->>C: reels settled
     C->>V: showWins(result)
-    Note over V: symbol fire · soft-burst glow<br/>energy beams · tiered ceremony
+    Note over V: payline core + plasma beam<br/>symbol fire · soft-burst · jelly wobble
     C->>V: setBalance / setLastWin (render-only)
 ```
 
-## What is actually in these games
+## Feature highlights
 
-- **Math, owned end-to-end** — seeded mulberry32 RNG, reel-strip builder, line
-  evaluator, WILD STRIKE feature, three buy-bonus modes with sim-anchored
-  costs, a Monte-Carlo simulator (2M+ spins per run), outcome-book generator,
-  and a `node:test` suite that pins engine results against the shared core so
-  the two games can never drift.
-- **A real-time shader VFX suite (Cocos)** — nine custom CCEffect programs
-  written for WebGL2 with a graceful ES100 variant: per-symbol **fire clipped
-  to each symbol's own alpha silhouette**, rim-light + specular-sweep winner
-  highlight, **soft-burst** god-ray glow (continuous falloff — banding-free by
-  construction), **win-line energy beams** (flowing fbm plasma ribbons), reel
-  portal warp, buy-button plasma, payline bloom. Every shader honors a master
-  switch and reduced-motion, with vector-graphics fallbacks.
-- **Full control surface** — web bar (account panel, LAST WIN / TOTAL BET
-  banners, swipeable bet carousel, ×2 gamble, quick-bet chip stack, turbo,
-  autoplay, ringed spin with a 4-state hover/press glow machine) and a
-  portrait mobile bar with safe-area handling — picked per orientation,
-  rebuilt on rotation.
-- **Player systems** — autoplay with stop-on-feature / stop-on-big-win and a
-  jurisdiction-cap hook; tri-state turbo; quick-bet ladder; settings (sound,
-  speed, reduced effects); game info with rules / data-derived paytable / RTP;
-  animated menu hub.
-- **Presentation** — branded boot loader, tap-to-play intro with audio unlock,
-  win ceremonies whose intensity scales continuously with the win multiple,
-  kinetic count-ups, wild-landing strikes, sticky-lock confirmations,
-  anticipation reels, ember particles, screen-shake choreography.
-- **Audio as a system** — a 37-clip generated bank through a 4-bus dB mix,
-  base↔bonus music crossfades, looped reel-rush bed, first-gesture unlock, a
-  procedural synth fallback — plus the LDW rule (no triumphant feedback on
-  returns ≤ 1× bet).
-- **Compliance engineering** — labeled 2-decimal money everywhere, designed
-  bet ladder, controls locked during spins/autoplay, reduced-motion mode,
-  keyboard map, silent production console, responsive from desktop to 400×225.
+- **Math owned end-to-end** — seeded RNG, reel-strip builder, line evaluator,
+  WILD STRIKE, three buy-bonus modes with sim-anchored costs, a 2M-spin
+  Monte-Carlo simulator, outcome-book generator, and a cross-engine drift suite.
+- **A real shader VFX suite (Cocos)** — nine custom CCEffect programs (WebGL2 +
+  ES100 variants): per-symbol fire clipped to each symbol's alpha silhouette,
+  rim-light + specular sweep, banding-free soft-burst glow with rotating rays,
+  flowing payline plasma with a traveling pulse, reel portal warp, buy-button
+  plasma. Every shader honors a master switch, reduced-motion, and a vector
+  fallback.
+- **Modern win language** — winners jelly-wobble while non-winners dim back;
+  a crisp 3 px gold payline core rides a soft plasma bloom; tiered ceremonies
+  escalate continuously with the win multiple up to an EPIC max-win detonation.
+- **Full control surface** — authored icon set across both bars, swipeable bet
+  carousel, ×2 gamble, quick-bet stack, turbo, autoplay with stop conditions,
+  4-state buttons with hover/press glow, animated panel transitions, and a
+  buy-bonus modal with per-tier affordability (`NEED <cost>` refusal states).
+- **Compliance engineering** — labeled 2-decimal money everywhere, RGS-style
+  bet ladder, controls locked during spins, reduced-motion mode, keyboard map,
+  silent production console, responsive from desktop to 390×844 portrait.
 
 ## Developer quick start
 
@@ -156,7 +144,7 @@ pnpm --filter @artest/shining-pop-v2 test      # Cocos pure-logic tests
 pnpm --filter @artest/shining-pop-v2 sim       # Cocos RTP sim (2M spins)
 ```
 
-Cocos rebuilds headlessly (no editor session needed):
+Cocos rebuilds headlessly — no editor session needed:
 
 ```bash
 CocosCreator --project games/shining-pop-v2 --build "platform=web-mobile;debug=false"
@@ -171,10 +159,10 @@ CocosCreator --project games/shining-pop-v2 --build "platform=web-mobile;debug=f
 
 ## Engineering standards
 
-Conventional Commits enforced by commitlint + husky · shared ESLint flat
-config + Prettier · strict TypeScript (`no-explicit-any`) · zero allocation in
-per-frame loops · pure logic with no engine imports · data-driven view configs
-(designers tune data, never component code).
+Conventional Commits enforced by commitlint + husky · shared ESLint flat config +
+Prettier · strict TypeScript (`no-explicit-any`) · zero allocation in per-frame
+loops · pure logic with no engine imports · data-driven view configs (designers
+tune data, never component code).
 
 ---
 
