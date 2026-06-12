@@ -3,22 +3,24 @@
 // win derives from paytable + WILD STRIKE, so the panel can never drift from the
 // math. Master-parity texts adapted to this game's real feature set.
 
-import { PAYTABLE, SETTINGS, SYMBOLS, WILD_STRIKE } from './game-config';
+import { BONUS_MODES, BonusMode, PAYTABLE, SETTINGS, SYMBOLS, WILD_STRIKE } from './game-config';
 import { SymbolId } from './types';
 
-/** Display names matching the shipped symbol art (the master's candy set,
- *  black-keyed offline; resource filenames keep their original ids/UUIDs). */
+/** Display names matching the SHIPPED candy symbol art (2026-06-12 reskin).
+ *  Resource filenames keep their original ids/UUIDs; only the display names
+ *  track the art — a paytable naming symbols that aren't on the reels is a
+ *  reviewer flag. */
 export const SYMBOL_DISPLAY: Record<SymbolId, string> = {
   0: 'WILD',
-  1: 'CROWN',
-  2: 'SEVEN',
-  3: 'BELL',
-  4: 'MELON',
-  5: 'GRAPES',
-  6: 'PLUM',
-  7: 'LEMON',
-  8: 'CHERRY',
-  9: '10',
+  1: 'GOLD GEM',
+  2: 'BLUE GEM',
+  3: 'PURPLE GEM',
+  4: 'CANDY HEARTS',
+  5: 'TWIST CANDY',
+  6: 'CANDY CANES',
+  7: 'GUMMY BEARS',
+  8: 'LOLLIPOP',
+  9: 'WRAPPED CANDY',
 };
 
 export interface PaytableRow {
@@ -58,9 +60,28 @@ export const RULES_LINES: string[] = [
   'WILD substitutes for every symbol.',
   `WILD STRIKE: ${WILD_STRIKE.minWilds}+ Wilds anywhere multiply the spin's`,
   `line wins by the Wild count, up to x${WILD_STRIKE.maxMultiplier}.`,
-  'Buy Features play a fixed set of free spins.',
+  'Buy Features play a fixed set of free spins (see FEATURES).',
   'Every spin is separate and decided fairly at random.',
 ];
+
+/** What each mode does, in player language. */
+const FEATURE_DESC: Record<BonusMode, string> = {
+  wilds: 'every WILD that lands STICKS for the rest of the feature.',
+  crowns: 'every GOLD GEM that lands STICKS for the rest of the feature.',
+  reels: 'one full reel turns WILD and stays locked for every spin.',
+};
+
+/** Buy-feature documentation — derives from BONUS_MODES (the single source the
+ *  buy menu prices from), so the info panel can never drift from the live costs. */
+export const FEATURES_LINES: string[] = (Object.keys(BONUS_MODES) as BonusMode[]).flatMap(
+  (mode) => {
+    const m = BONUS_MODES[mode];
+    return [
+      `${m.name} — ${m.spins} free spins; ${FEATURE_DESC[mode]}`,
+      `  Cost: ${m.cost.toFixed(2)}x your total bet (shown live in the Buy menu).`,
+    ];
+  },
+);
 
 export const CONTROLS_LINES: string[] = [
   'SPIN / Space — start a round',

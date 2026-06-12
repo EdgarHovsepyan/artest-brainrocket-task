@@ -102,6 +102,7 @@ export class SlotController extends Component {
       })),
     );
     this.view.setBuyBet(this.fmt(this.model.bet));
+    this.refreshBuyAffordability();
     // The modal's inline bet stepper walks the same ladder as the bar.
     this.view.onBuyBetStep((dir) => this.changeBet(dir));
     this.refreshAutoplayPanel();
@@ -285,6 +286,17 @@ export class SlotController extends Component {
     );
     this.view.refreshBuyCosts(costs);
     this.view.setBuyBet(this.fmt(this.model.bet));
+    this.refreshBuyAffordability();
+  }
+
+  /** Per-tier affordability for the buy modal — recomputed whenever the balance
+   *  or the bet changes, so BUY dims to NEED before a doomed press can happen. */
+  private refreshBuyAffordability(): void {
+    this.view.setBuyAffordable(
+      (Object.keys(BONUS_MODES) as BonusMode[]).map(
+        (m) => this.model.balance >= this.model.bonusCost(m),
+      ),
+    );
   }
 
   /** Wall-clock for the session timer (Date.now is fine at game runtime). */
@@ -504,6 +516,7 @@ export class SlotController extends Component {
       this.bar.setAffordable(this.model.canSpin());
       this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
       this.view.setInteractable(true);
+      this.refreshBuyAffordability(); // balance moved — keep the buy modal honest
       // Responsible-gaming Reality Check interrupts before the next spin/autoplay.
       if (realityCheckDue(this.session, this.comply, this.nowMs())) {
         this.presentRealityCheck();
@@ -533,7 +546,17 @@ export class SlotController extends Component {
   /** Buy a feature: play each free spin back, then credit + celebrate. */
   private async onBuy(mode: BonusMode): Promise<void> {
     if (this.state !== 'idle' || this.autoplay.active) return;
-    if (this.model.balance < this.model.bonusCost(mode)) return;
+    if (this.model.balance < this.model.bonusCost(mode)) {
+      // Friendly dismissible notice, never a dead click (the modal's NEED state
+      // blocks this path for taps; this guard covers the B-key shortcut).
+      this.view.showError(
+        'Insufficient balance',
+        'This bonus costs more than your current balance.\nLower your bet or pick a smaller bonus.',
+        'OK',
+        () => this.view.dismissError(),
+      );
+      return;
+    }
     this.state = 'bonus';
     this.bar.setSpinning(true);
     this.view.setInteractable(false);
@@ -604,6 +627,7 @@ export class SlotController extends Component {
       this.bar.setSpinning(false);
       this.view.setInteractable(true);
       this.view.setBuyFabVisible(true); // feature over — buying allowed again
+      this.refreshBuyAffordability();
     }, 0.4);
   }
 

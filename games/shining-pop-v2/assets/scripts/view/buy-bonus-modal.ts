@@ -20,6 +20,7 @@ import {
   Sprite,
   SpriteFrame,
   tween,
+  Tween,
   UIOpacity,
   UITransform,
   Vec3,
@@ -80,6 +81,9 @@ export class BuyBonusModal extends Component {
   private selected = 0;
   private betValue!: Label;
   private buyLabel!: Label;
+  private buyBtn!: Node;
+  private buyOp!: UIOpacity;
+  private affordable: boolean[] = [];
   private built = false;
 
   on(ev: string, cb: (arg?: unknown) => void): this {
@@ -319,10 +323,27 @@ export class BuyBonusModal extends Component {
     });
 
     const buy = this.node2(card, 150, btnY, 220, 56);
+    this.buyBtn = buy;
+    this.buyOp = buy.addComponent(UIOpacity);
     const bg = buy.addComponent(Graphics);
     this.candyPanel(bg, 220, 56, 28, C.buy, C.buyHi, C.buyHi, 2);
     this.buyLabel = this.text(buy, 'BUY', 0, 2, 18, C.dark, true);
-    this.pressFx(buy, [buy], () => this.emit('buy', this.tiers[this.selected].mode));
+    this.pressFx(buy, [buy], () => {
+      // Unaffordable tier: refuse with a head-shake + 'buy:blocked' (host shows
+      // the friendly notice) instead of a dead click or a doomed buy intent.
+      if (this.affordable[this.selected] === false) {
+        this.emit('buy:blocked', this.tiers[this.selected].mode);
+        Tween.stopAllByTarget(buy);
+        buy.setPosition(150, btnY, 0);
+        tween(buy)
+          .by(0.05, { position: new Vec3(-9, 0, 0) })
+          .by(0.09, { position: new Vec3(18, 0, 0) })
+          .by(0.05, { position: new Vec3(-9, 0, 0) })
+          .start();
+        return;
+      }
+      this.emit('buy', this.tiers[this.selected].mode);
+    });
 
     // Close X — top-right.
     const close = this.node2(card, CARD_W / 2 - 38, CARD_H / 2 - 38, 52, 52);
@@ -370,25 +391,41 @@ export class BuyBonusModal extends Component {
       // Glow ring fades in under the chosen medallion.
       const ring = this.rings[idx];
       if (ring) {
-        ring.active = true;
         const rop = ring.getComponent(UIOpacity) ?? ring.addComponent(UIOpacity);
-        tween(rop).stop();
-        rop.opacity = on ? 0 : 0;
-        if (on) tween(rop).to(0.18, { opacity: 255 }).start();
-        else ring.active = false;
+        Tween.stopAllByTarget(rop);
+        if (on) {
+          ring.active = true;
+          rop.opacity = 0;
+          tween(rop).to(0.18, { opacity: 255 }).start();
+        } else {
+          ring.active = false;
+        }
       }
       // Medallion pops up on select, settles back otherwise.
       const med = this.medallions[idx];
       if (med) {
-        tween(med).stop();
+        Tween.stopAllByTarget(med);
         tween(med)
           .to(0.22, { scale: new Vec3(on ? 1.12 : 1, on ? 1.12 : 1, 1) }, { easing: 'backOut' })
           .start();
       }
     });
-    if (this.buyLabel) {
-      this.buyLabel.string = `BUY  ${this.tiers[i].costText}`;
-    }
+    this.applyBuyState();
+  }
+
+  /** BUY reflects the selected tier's affordability: full-strength `BUY <cost>`
+   *  when buyable, dimmed `NEED <cost>` when the balance can't cover it. */
+  private applyBuyState(): void {
+    if (!this.buyLabel) return;
+    const ok = this.affordable[this.selected] !== false;
+    this.buyLabel.string = `${ok ? 'BUY' : 'NEED'}  ${this.tiers[this.selected].costText}`;
+    if (this.buyOp) this.buyOp.opacity = ok ? 255 : 130;
+  }
+
+  /** Per-tier affordability flags (host recomputes on balance/bet changes). */
+  setAffordable(flags: boolean[]): void {
+    this.affordable = flags.slice();
+    this.applyBuyState();
   }
 
   setBet(betText: string): void {
@@ -406,7 +443,7 @@ export class BuyBonusModal extends Component {
         label.string = costTexts[i];
       }
     });
-    if (this.buyLabel) this.buyLabel.string = `BUY  ${this.tiers[this.selected].costText}`;
+    this.applyBuyState();
   }
 
   open(): void {
