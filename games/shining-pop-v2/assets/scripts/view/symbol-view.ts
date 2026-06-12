@@ -61,6 +61,7 @@ export class SymbolView extends Component {
   // breathe composes with the win/land tweens that scale the CELL node, with no
   // tween conflict. Phase-offset per cell so the grid never breathes in unison.
   private art: Node | null = null;
+  private artOp: UIOpacity | null = null;
   private idleT = 0;
   private idlePhase = 0;
   private idleAmp = 0;
@@ -84,6 +85,7 @@ export class SymbolView extends Component {
     artNode.addComponent(UITransform).setContentSize(art, art);
     this.node.addChild(artNode);
     this.art = artNode;
+    this.artOp = artNode.addComponent(UIOpacity); // win-focus dim targets the art only
     const sp = artNode.addComponent(Sprite);
     sp.sizeMode = Sprite.SizeMode.CUSTOM;
     sp.type = Sprite.Type.SIMPLE;
@@ -202,8 +204,11 @@ export class SymbolView extends Component {
     this.node.setScale(1, 1, 1);
     const pop = symbolPulseScale + 0.12; // first beat overshoots → the win has an attack
     const bnc = VIEW_CONFIG.win.winBounceLoop;
-    const hi = new Vec3(bnc.scaleHi, bnc.scaleHi, 1);
-    const lo = new Vec3(bnc.scaleLo, bnc.scaleLo, 1);
+    // JELLY wobble: wide-and-short ↔ narrow-and-tall (axes in opposition) — the
+    // candy "yummy" squash-and-stretch, not a uniform scale pulse.
+    const j = bnc.jelly;
+    const squash = new Vec3(1 + j * 0.9, 1 - j, 1);
+    const stretch = new Vec3(1 - j * 0.8, 1 + j, 1);
     const bhalf = bnc.ms / 2 / 1000;
     // ATTACK (once): overshoot pop → settle. Then a CONTINUOUS bounce loop so the
     // winning symbol stays alive/celebrating until clear (user: "bouncing looping").
@@ -215,8 +220,8 @@ export class SymbolView extends Component {
     if (bnc.enabled) {
       tween(this.node)
         .delay(delay + half * 2) // begin after the attack lands
-        .to(bhalf, { scale: hi }, { easing: 'sineOut' })
-        .to(bhalf, { scale: lo }, { easing: 'sineIn' })
+        .to(bhalf, { scale: squash }, { easing: 'sineInOut' })
+        .to(bhalf, { scale: stretch }, { easing: 'sineInOut' })
         .union()
         .repeatForever()
         .start();
@@ -486,9 +491,21 @@ export class SymbolView extends Component {
       .start();
   }
 
+  /** WIN FOCUS — dim this cell's art while OTHER cells win, restore on clear.
+   *  Opacity only (the cell's scale/tweens stay untouched), so it composes with
+   *  idle breathing and never fights the win envelopes. */
+  setDimmed(on: boolean): void {
+    if (!this.artOp) return;
+    Tween.stopAllByTarget(this.artOp);
+    tween(this.artOp)
+      .to(0.18, { opacity: on ? VIEW_CONFIG.win.loserDimOpacity : 255 })
+      .start();
+  }
+
   clear(): void {
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
+    this.setDimmed(false);
     if (this.glow) {
       Tween.stopAllByTarget(this.glow);
       this.glow.setScale(0.8, 0.8, 1);

@@ -106,8 +106,15 @@ CCProgram sprite-fs %{
     float xf = smoothstep(0.0, 0.14, uv0.x) * smoothstep(1.0, 0.86, uv0.x);
     float body = (0.4 + 0.6 * n) * yf * yf * xf * a;
 
-    // Ember -> gold ramp; the hottest filaments go white-gold.
+    // TRAVELING PULSE — a bright energy packet sweeps along the line (the
+    // modern-slot "power running down the payline" read).
+    float pk = fract(uv0.x * 0.8 - u_time * 0.55);
+    float pulse = exp(-pow((pk - 0.5) * 6.0, 2.0));
+    body *= 0.85 + 0.9 * pulse;
+
+    // Ember -> gold ramp; the hottest filaments and the pulse go white-gold.
     vec3 colr = mix(vec3(1.0, 0.42, 0.08), vec3(1.0, 0.94, 0.7), n * yf);
+    colr = mix(colr, vec3(1.0, 0.98, 0.88), pulse * 0.55);
     float outA = clamp(body * 1.35, 0.0, 1.0) * u_intensity * color.a;
 
     vec4 o = vec4(colr * (0.6 + 0.8 * body) , outA);

@@ -296,6 +296,11 @@ export class ReelView extends Component {
    *  enables the in-cell sheen/sparkle (focused wins only — off for dense wins). */
   highlight(rows: number[], delay = 0, rich = true, winMat: Material | null = null): void {
     rows.forEach((row, i) => this.cells[row]?.playWin(delay + i * 0.04, rich, winMat));
+    // WIN FOCUS — every cell that isn't part of the win dims back so the winners
+    // pop instantly (clearHighlight → cell.clear() restores full opacity).
+    this.cells.forEach((c, row) => {
+      if (rows.indexOf(row) < 0) c.setDimmed(true);
+    });
   }
 
   /** Bounce the given window rows — sticky wilds/crowns celebrating each free
