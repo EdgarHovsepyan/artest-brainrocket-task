@@ -36,8 +36,8 @@ export const VIEW_CONFIG = {
     contentTopPx: 372,
     /** Landscape frame crown above the reels (the logo lives screen-relative
      *  there, outside this band) — tight so the reels fill the height. */
-    landscapeTopPadPx: 44,
-    boardBottomGapPx: 30,
+    landscapeTopPadPx: 28,
+    boardBottomGapPx: 22,
     /** bg base-fill + bg_art scaled by this factor so the painted bg always
      *  bleeds past 16:9, 21:9, 9:16, 9:21 — kills the #0a0610 letterbox band
      *  without touching the engine cover. */
@@ -52,7 +52,7 @@ export const VIEW_CONFIG = {
     /** Portrait width fill ratio for fit(). Bumped 0.92→0.96 (2026-06-11) so the
      *  reels are bigger and sit closer to the bar — reduces the empty band the
      *  user saw between the reels and the betting controls in portrait. */
-    portraitWidthFill: 0.96,
+    portraitWidthFill: 0.99,
     landscapeWidthFill: 1.0,
 
     // ── Task 1.3: logo top-left + Buy-FAB collision guard ───────────────────
@@ -224,7 +224,7 @@ export const VIEW_CONFIG = {
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    burst: { enabled: true, intensity: 1.0, scale: 1.9 },
+    burst: { enabled: true, intensity: 1.15, scale: 1.9 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the
@@ -237,7 +237,7 @@ export const VIEW_CONFIG = {
      *  scale = overlay size vs the symbol (1.06 gives the rim a hair of room). */
     symbolFx: {
       enabled: true,
-      intensity: 1.05,
+      intensity: 1.2,
       rimWidth: 0.035,
       sweepSpeed: 0.55,
       envInMs: 220,

@@ -1,0 +1,91 @@
+// CGI-grade particle point: a soft ADDITIVE light glow (hot core + feathered
+// halo, both exponential — banding-free by construction). The CPU integrator in
+// particle-layer drives all motion/physics; this shader only makes each particle
+// read as EMITTED LIGHT instead of a filled polygon ("diagonal boxes" rejected).
+// Tint rides the sprite color. Vector-diamond fallback remains in particle-pool.
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: one
+          blendDstAlpha: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_intensity:   { value: 1.0 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec4 color;
+
+  // uv0 ALWAYS declared — the no-texture variant otherwise fails to compile
+  // (Cocos Error 16323/16324).
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+
+  uniform Constants {
+    float u_intensity;
+  };
+
+  vec4 frag () {
+    float a = 1.0;
+    #if USE_TEXTURE
+      a = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
+    #endif
+
+    vec2 p = uv0 - 0.5;
+    float d = length(p) * 2.0;
+    float core = exp(-d * d * 14.0);        // white-hot centre
+    float halo = exp(-d * d * 3.2) * 0.55;  // soft light falloff
+
+    vec3 rgb = color.rgb * (core * 1.4 + halo) + vec3(core * 0.35); // core blows toward white
+    float outA = clamp(core + halo, 0.0, 1.0) * u_intensity * a * color.a;
+
+    vec4 o = vec4(rgb, outA);
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

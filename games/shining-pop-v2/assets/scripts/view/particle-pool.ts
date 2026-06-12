@@ -6,24 +6,45 @@
 //
 // Task 5.4 / CC-2 in ULTRACODE-BLUEPRINT.md.
 
-import { _decorator, Color, Component, Graphics, Node, UIOpacity, UITransform } from 'cc';
+import {
+  _decorator,
+  Color,
+  Component,
+  Graphics,
+  Material,
+  Node,
+  Sprite,
+  SpriteFrame,
+  UIOpacity,
+  UITransform,
+} from 'cc';
 import { VIEW_CONFIG } from './view-config';
 
 const { ccclass } = _decorator;
 
 /** Unit-diamond half-extent in design px. Node scale multiplies this. */
 const UNIT = 8;
+/** Glow-sprite extent — wider than the diamond so the halo can feather out. */
+const GLOW = UNIT * 6;
 
 export interface PoolShard {
   node: Node;
   graphics: Graphics;
   opacity: UIOpacity;
+  /** Set once the shard is upgraded to the additive glow sprite. */
+  sprite?: Sprite;
   /** Stable slot index for O(1) return-to-pool. */
   idx: number;
 }
 
 @ccclass('ParticlePool')
 export class ParticlePool extends Component {
+  // CGI upgrade — SlotView injects the additive glow material + white frame
+  // once the effect kit loads; every shard then renders as a soft light point
+  // instead of a filled diamond. Statics so no plumbing through ParticleLayer.
+  static glowMat: Material | null = null;
+  static glowFrame: SpriteFrame | null = null;
+
   private slots: PoolShard[] = [];
   private freeIdx: number[] = [];
   private liveCount = 0;
@@ -92,10 +113,26 @@ export class ParticlePool extends Component {
       return null;
     }
 
-    const g = slot.graphics;
-    g.clear();
-    g.fillColor = color;
-    this.drawDiamond(g);
+    // Upgrade to the glow sprite the first time the material is available;
+    // the diamond stays as the no-material fallback.
+    if (!slot.sprite && ParticlePool.glowMat && ParticlePool.glowFrame) {
+      slot.graphics.clear();
+      const sp = slot.node.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.type = Sprite.Type.SIMPLE;
+      sp.spriteFrame = ParticlePool.glowFrame;
+      sp.customMaterial = ParticlePool.glowMat;
+      slot.node.getComponent(UITransform)!.setContentSize(GLOW, GLOW);
+      slot.sprite = sp;
+    }
+    if (slot.sprite) {
+      slot.sprite.color = color;
+    } else {
+      const g = slot.graphics;
+      g.clear();
+      g.fillColor = color;
+      this.drawDiamond(g);
+    }
 
     slot.node.setPosition(x, y, 0);
     slot.node.setScale(scale, scale, 1);
