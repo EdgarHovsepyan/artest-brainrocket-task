@@ -23,6 +23,9 @@ import {
   Graphics,
   Label,
   Color,
+  resources,
+  Sprite,
+  SpriteFrame,
   UITransform,
   UIOpacity,
   Vec3,
@@ -339,14 +342,43 @@ export class BettingBarMobile extends Component {
     g.lineWidth = 1.2;
     g.strokeColor = col(C.divider, 0.3);
     g.stroke();
-    // menu glyph (static; sound glyph is its own node for setSoundOn)
-    [16, 22, 28].forEach((dy) => {
-      g.moveTo(478, Y(560 + dy));
-      g.lineTo(500, Y(560 + dy));
+    // menu glyph moved to its own node in buildSoundMenu so the authored icon
+    // can replace it (lines in this shared decor layer could not be retired).
+  }
+
+  /** ICON SET — authored `resources/icons/ic_*.png` sprites (white art, tinted)
+   *  replacing the hand-drawn glyphs. Async: the node stays hidden until the
+   *  frame lands and `onReady` retires the Graphics fallback, so a missing icon
+   *  can never leave a control glyph-less. Coordinates are design-space (Y()). */
+  private icon(
+    parent: Node,
+    x: number,
+    yDesign: number,
+    size: number,
+    name: string,
+    tint: string,
+    onReady?: () => void,
+  ): Node {
+    const n = new Node(name);
+    n.layer = this.node.layer;
+    parent.addChild(n);
+    const ui = n.addComponent(UITransform);
+    ui.setAnchorPoint(0.5, 0.5);
+    ui.setContentSize(size, size);
+    n.setPosition(x, this.Y(yDesign), 0);
+    const sp = n.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = Sprite.Type.SIMPLE;
+    sp.color = col(tint);
+    n.active = false;
+    resources.load(`icons/${name}/spriteFrame`, SpriteFrame, (err, sf) => {
+      if (!err && sf && n.isValid) {
+        sp.spriteFrame = sf;
+        n.active = true;
+        onReady?.();
+      }
     });
-    g.lineWidth = 2.6;
-    g.strokeColor = col(C.icon);
-    g.stroke();
+    return n;
   }
 
   // ── hero SPIN: ring + center in face; arrow + stop as toggleable nodes; group
@@ -383,6 +415,7 @@ export class BettingBarMobile extends Component {
     arrow.close();
     arrow.fillColor = col(C.icon);
     arrow.fill();
+    this.icon(arrow.node, 270, 392, 62, 'ic_spin', C.icon, () => arrow.clear());
     this.spinArrow = arrow.node;
 
     const stop = this.gfx('stop', this.spinGroup);
@@ -403,6 +436,8 @@ export class BettingBarMobile extends Component {
     glyph.close();
     glyph.fillColor = col(C.active);
     glyph.fill();
+    // Loop-arrow icon reads "autoplay" clearer than the bare play triangle.
+    this.icon(glyph.node, 104, 506, 36, 'ic_autoplay', C.active, () => glyph.clear());
     this.autoGlyph = glyph.node;
     this.autoCount = this.mkLabel('autoCount', 104, 506, 17, C.value, 0.5);
     this.autoCount.string = '';
@@ -418,6 +453,7 @@ export class BettingBarMobile extends Component {
     minus.lineWidth = 3;
     minus.strokeColor = col(C.icon);
     minus.stroke();
+    this.icon(minus.node, 203, 506, 26, 'ic_minus', C.icon, () => minus.clear());
     this.minusOp = minus.node.addComponent(UIOpacity);
 
     const plus = this.gfx('plus');
@@ -428,6 +464,7 @@ export class BettingBarMobile extends Component {
     plus.lineWidth = 3;
     plus.strokeColor = col(C.icon);
     plus.stroke();
+    this.icon(plus.node, 337, 506, 26, 'ic_plus', C.icon, () => plus.clear());
     this.plusOp = plus.node.addComponent(UIOpacity);
   }
 
@@ -444,6 +481,7 @@ export class BettingBarMobile extends Component {
     glyph.close();
     glyph.fillColor = col(C.active);
     glyph.fill();
+    this.icon(glyph.node, 436, 507, 30, 'ic_bolt', C.active, () => glyph.clear());
     this.turboGlyphOp = glyph.node.addComponent(UIOpacity);
     this.turboGlyphOp.opacity = 115; // off by default
 
@@ -460,9 +498,19 @@ export class BettingBarMobile extends Component {
     this.turboPip.active = false;
   }
 
-  // ── sound glyph (own node so setSoundOn can dim it); menu glyph is static. ──
+  // ── sound glyph (own node so setSoundOn can dim it) + menu glyph (own node
+  //    so the authored icon can retire the drawn fallback). ──
   private buildSoundMenu(): void {
     const Y = this.Y.bind(this);
+    const menu = this.gfx('menuGlyph');
+    [16, 22, 28].forEach((dy) => {
+      menu.moveTo(478, Y(560 + dy));
+      menu.lineTo(500, Y(560 + dy));
+    });
+    menu.lineWidth = 2.6;
+    menu.strokeColor = col(C.icon);
+    menu.stroke();
+    this.icon(menu.node, 489, 582, 28, 'ic_menu', C.icon, () => menu.clear());
     // Sound icon relocated to design-x ~362 (left of the menu glyph) so its
     // enlarged ≥44px hit area no longer overlaps the menu's.
     const snd = this.gfx('sound');
@@ -479,6 +527,7 @@ export class BettingBarMobile extends Component {
     snd.lineWidth = 2;
     snd.strokeColor = col(C.icon);
     snd.stroke();
+    this.icon(snd.node, 369, 582, 28, 'ic_sound', C.icon, () => snd.clear());
     this.soundOp = snd.node.addComponent(UIOpacity);
 
     // muted slash (shown when sound is OFF) — its own node so setSoundOn toggles it.
