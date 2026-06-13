@@ -202,11 +202,14 @@ export class CeremonyView extends Component {
     SUPER: 'epic-win',
     EPIC: 'wicked-win',
   };
+  // Win-amount Y on the banner cloud, per tier. 2026-06-14: raised ~70px (was
+  // -92..-120) — the number was stranded LOW on the cloud, visually disconnected
+  // from the banner. Now it sits just under the plaque, integrated with the win.
   private static readonly TIER_NUM_Y: Record<string, number> = {
-    BIG: -92,
-    MEGA: -110,
-    SUPER: -116,
-    EPIC: -120,
+    BIG: -22,
+    MEGA: -38,
+    SUPER: -44,
+    EPIC: -50,
   };
   private loadWinCallout(ov: Node): void {
     resources.load('spine/cupid-wf/cupid-wf', sp.SkeletonData, (err, data) => {
