@@ -175,9 +175,9 @@ export const VIEW_CONFIG = {
      *  on the SECOND segment's .call so the squash coincides with rest. Designers
      *  tune weight/elasticity/speed live; reducedMotion disables the bounce. */
     bounce: {
-      overtravelFrac: 0.1,
-      bounceMs: 260,
-      easing: 'elasticOut',
+      overtravelFrac: 0.08,
+      bounceMs: 190,
+      easing: 'backOut',
       weight: 1,
       speed: 1,
       elasticity: 1,
@@ -230,7 +230,7 @@ export const VIEW_CONFIG = {
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    burst: { enabled: true, intensity: 1.15, scale: 1.9 },
+    burst: { enabled: true, intensity: 1.05, scale: 1.4 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the

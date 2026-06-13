@@ -51,9 +51,9 @@ _Cocos Creator 3.8.8 — candy reskin, authored icon set, full-bleed reels_
 
 _Win presentation: gold payline core + flowing plasma beam · per-symbol shader fire · jelly squash-and-stretch · win-focus dim_
 
-<img width="860" alt="Cocos Creator — EPIC WIN ceremony" src="docs/media/cocos-ceremony.png" />
+<img width="860" alt="Cocos Creator — Spine win-callout ceremony" src="docs/media/cocos-ceremony.png" />
 
-_Tiered ceremony: outlined headline, rolling count-up, rotating god-rays, warm gold light_
+_Spine 4.2 win-callout: winged golden-heart banner, cotton-candy cloud, floating petals, kinetic gold count-up — tier-scaled, with a procedural fallback_
 
 <table>
   <tr>
@@ -125,8 +125,9 @@ sequenceDiagram
   plasma. Every shader honors a master switch, reduced-motion, and a vector
   fallback.
 - **Modern win language** — winners jelly-wobble while non-winners dim back;
-  a crisp 3 px gold payline core rides a soft plasma bloom; tiered ceremonies
-  escalate continuously with the win multiple up to an EPIC max-win detonation.
+  a crisp 3 px gold payline core rides a soft plasma bloom; a tier-scaled Spine
+  win-callout (winged-heart banner + cotton-candy cloud) crowns the big wins,
+  with a procedural light-rig fallback if the skeleton is unavailable.
 - **Full control surface** — authored icon set across both bars, swipeable bet
   carousel, ×2 gamble, quick-bet stack, turbo, autoplay with stop conditions,
   4-state buttons with hover/press glow, animated panel transitions, and a
