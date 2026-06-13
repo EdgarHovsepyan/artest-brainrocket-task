@@ -192,12 +192,21 @@ export class CeremonyView extends Component {
   }
 
   private winSpine: sp.Skeleton | null = null;
-  /** Tier name -> Spine win-callout animation prefix (each has -start + -loop). */
+  private winSpineOp: UIOpacity | null = null;
+  /** Tier name -> Spine win-callout animation prefix (each has -start + -loop) +
+   *  the count-up number's Y on that tier's banner cloud (the art differs per
+   *  tier, so the number is centred per-tier rather than one fixed offset). */
   private static readonly TIER_ANIM: Record<string, string> = {
     BIG: 'big-win',
     MEGA: 'mega-win',
     SUPER: 'epic-win',
     EPIC: 'wicked-win',
+  };
+  private static readonly TIER_NUM_Y: Record<string, number> = {
+    BIG: -92,
+    MEGA: -110,
+    SUPER: -116,
+    EPIC: -120,
   };
   private loadWinCallout(ov: Node): void {
     resources.load('spine/cupid-wf/cupid-wf', sp.SkeletonData, (err, data) => {
@@ -212,6 +221,8 @@ export class CeremonyView extends Component {
       const sk = n.addComponent(sp.Skeleton);
       sk.skeletonData = data;
       sk.premultipliedAlpha = true;
+      this.winSpineOp = n.addComponent(UIOpacity);
+      this.winSpineOp.opacity = 255;
       ov.addChild(n);
       // sit the banner just under the number rig: covers the procedural
       // ground/header diamonds, while glow/shadow/amount/badge render on top.
@@ -256,8 +267,18 @@ export class CeremonyView extends Component {
       const useSpine = !!this.winSpine && this.winSpine.isValid && !reduced;
       if (useSpine) {
         const anim = CeremonyView.TIER_ANIM[tier.name] ?? 'normal-win';
+        this.winSpine!.node.active = true;
         this.winSpine!.setAnimation(0, `${anim}-start`, false);
         this.winSpine!.addAnimation(0, `${anim}-loop`, true, 0);
+        // fade the banner IN with the detonation (no hard pop-on).
+        if (this.winSpineOp) {
+          Tween.stopAllByTarget(this.winSpineOp);
+          this.winSpineOp.opacity = 0;
+          tween(this.winSpineOp).to(0.2, { opacity: 255 }, { easing: 'quadOut' }).start();
+        }
+      } else if (this.winSpine) {
+        // procedural/reduced path: keep the banner hidden so it can't linger.
+        this.winSpine.node.active = false;
       }
       if (!reduced) {
         if (!useSpine) {
@@ -298,13 +319,13 @@ export class CeremonyView extends Component {
           .to(0.14, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // settle
           .start();
       }
-      // Position the count-up number: on the banner's cloud (lower) when the
-      // Spine banner is the hero, at the panel centre for the procedural look.
-      const numY = useSpine ? -118 : -16;
+      // Centre the count-up number on the banner's cloud (per-tier, since each
+      // tier's banner art sits the cloud differently); panel centre otherwise.
+      const numY = useSpine ? (CeremonyView.TIER_NUM_Y[tier.name] ?? -110) : -16;
       this.amountLabel.node.setPosition(0, numY, 0);
       this.amountShadow.node.setPosition(4, numY - 5, 0);
       this.numberGlow.node.setPosition(0, numY, 0);
-      this.badgeLabel.node.setPosition(0, useSpine ? -178 : -86, 0);
+      this.badgeLabel.node.setPosition(0, useSpine ? numY - 56 : -86, 0);
       // WC9/RQ7 — light the number's emissive backing for this tier; it ramps in
       // with the detonation, then breathes with the heartbeat inside tickCount.
       this.numberGlowBase = reduced ? 90 : Math.round(120 + 100 * Math.min(1, tx));
@@ -444,9 +465,20 @@ export class CeremonyView extends Component {
       Tween.stopAllByTarget(this.numberGlowOp);
       tween(this.numberGlowOp).to(0.18, { opacity: 0 }).start();
     }
+    // Spine banner fades OUT (cupid-wf has no -out anim) so the hero exits
+    // gracefully instead of vanishing with the scale-down.
+    if (this.winSpineOp) {
+      Tween.stopAllByTarget(this.winSpineOp);
+      tween(this.winSpineOp).to(0.2, { opacity: 0 }, { easing: 'quadIn' }).start();
+    }
     tween(this.overlay)
-      .to(0.18, { scale: new Vec3(0.6, 0.6, 1) }, { easing: 'quadIn' })
-      .call(() => (this.overlay.active = false))
+      .to(0.22, { scale: new Vec3(0.6, 0.6, 1) }, { easing: 'quadIn' })
+      .call(() => {
+        this.overlay.active = false;
+        // park the banner inactive + opaque so the next show's fade-in is clean.
+        if (this.winSpine) this.winSpine.node.active = false;
+        if (this.winSpineOp) this.winSpineOp.opacity = 255;
+      })
       .start();
   }
 
@@ -677,6 +709,13 @@ export class CeremonyView extends Component {
     if (this.overlay) Tween.stopAllByTarget(this.overlay);
     if (this.raysNode) Tween.stopAllByTarget(this.raysNode);
     if (this.shockNode) Tween.stopAllByTarget(this.shockNode);
+    // Reset the Spine banner: stop its fade, deactivate, restore full opacity so
+    // the next show() fades in from a clean state (no stuck half-faded banner).
+    if (this.winSpineOp) {
+      Tween.stopAllByTarget(this.winSpineOp);
+      this.winSpineOp.opacity = 255;
+    }
+    if (this.winSpine) this.winSpine.node.active = false;
     if (this.amountLabel) {
       Tween.stopAllByTarget(this.amountLabel);
       // Task 5.1 — wipe heartbeat state so a new ceremony starts clean.
