@@ -11697,7 +11697,7 @@
       let popScale = 1;
       if(winFx.popT0 && !isReduced()){
         const pe = (now - winFx.popT0) / 380;             // 380ms spring window
-        if(pe < 1) popScale = 1 + popElastic(pe) * (winFx.tier>=5 ? 0.42 : 0.30);   // sharp hit, not a soft bounce
+        if(pe < 1) popScale = 1 + popElastic(pe) * (winFx.tier>=5 ? 0.50 : 0.36);   // bolder hit (was .42/.30) — still sharp, not a soft bounce
       }
       bigWinAmount.scale.set(dynScale * popScale);
       // ── LIVING TINT — warm to crystal-white-pink on landing (NOT gold), then

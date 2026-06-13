@@ -450,6 +450,9 @@ export class BuyBonusModal extends Component {
     if (!this.built) return;
     this.node.active = true;
     const op = this.card.getComponent(UIOpacity) ?? this.card.addComponent(UIOpacity);
+    // Cancel any in-flight close tween so a fast re-open starts from a clean pose.
+    Tween.stopAllByTarget(op);
+    Tween.stopAllByTarget(this.card);
     op.opacity = 0;
     this.card.setScale(0.9 * this.cardScale, 0.9 * this.cardScale, 1);
     tween(op).to(0.2, { opacity: 255 }).start();
@@ -458,8 +461,26 @@ export class BuyBonusModal extends Component {
       .start();
   }
 
+  /** Symmetric reverse of open() — settle-in scale + fade, then deactivate and
+   *  reset so the next open starts clean. Mirrors slot-view's house popClose so
+   *  every overlay shares one dismiss feel (was an abrupt active=false). */
   close(): void {
-    this.node.active = false;
+    if (!this.node.active) return;
+    const op = this.card.getComponent(UIOpacity) ?? this.card.addComponent(UIOpacity);
+    Tween.stopAllByTarget(op);
+    Tween.stopAllByTarget(this.card);
+    const settled = 0.92 * this.cardScale;
+    tween(this.card)
+      .to(0.12, { scale: new Vec3(settled, settled, 1) }, { easing: 'quadIn' })
+      .start();
+    tween(op)
+      .to(0.12, { opacity: 0 })
+      .call(() => {
+        this.node.active = false;
+        this.card.setScale(this.cardScale, this.cardScale, 1);
+        op.opacity = 255;
+      })
+      .start();
   }
 
   isOpen(): boolean {
