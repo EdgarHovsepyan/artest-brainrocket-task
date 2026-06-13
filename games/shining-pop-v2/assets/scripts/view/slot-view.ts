@@ -1298,8 +1298,12 @@ export class SlotView extends Component {
       for (const w of lineWins) {
         const pts = this.linePts(w);
         if (pts.length < 2) continue;
+        // Per-line colour identity (WL6): each payline traces in its own hue so a
+        // multi-line win reads as distinct ribbons, not one gold jumble. A hot
+        // white hairline rides the centre to keep the core crisp and bright.
+        const hue = LINE_HUES[w.lineIndex % LINE_HUES.length];
         for (const [width, color] of [
-          [3, new Color(255, 214, 140, 235)],
+          [4, new Color(hue.r, hue.g, hue.b, 205)],
           [1.2, new Color(255, 248, 230, 255)],
         ] as [number, Color][]) {
           cg.lineWidth = width;
