@@ -239,11 +239,16 @@ export class CeremonyView extends Component {
         const lightAlpha = reduced ? 0 : Math.round(tier.panelLight * 255);
         tween(this.panelLightOp).to(0.3, { opacity: lightAlpha }).start();
       }
-      // header overshoot pop on top of the panel scale-in
-      this.headerLabel.node.setScale(0.3, 0.3, 1);
+      // WC2 — header ARRIVAL (not a pop-in): the banner slams in from oversized,
+      // overshoots past rest with a squash, then settles — a weighted impact that
+      // escalates per tier (EPIC enters bigger). backIn slam → quadOut rebound →
+      // backOut settle reads as mass hitting a surface, not a balloon inflating.
+      const slamFrom = 1.45 + 0.28 * Math.min(1, tx);
+      this.headerLabel.node.setScale(slamFrom, slamFrom, 1);
       tween(this.headerLabel.node)
-        .to(0.34, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'backOut' })
-        .to(0.12, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
+        .to(0.15, { scale: new Vec3(0.9, 0.9, 1) }, { easing: 'quadIn' }) // slam down past rest
+        .to(0.12, { scale: new Vec3(1.08, 1.08, 1) }, { easing: 'quadOut' }) // rebound
+        .to(0.14, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // settle
         .start();
       // WC9/RQ7 — light the number's emissive backing for this tier; it ramps in
       // with the detonation, then breathes with the heartbeat inside tickCount.
