@@ -199,7 +199,7 @@ export const VIEW_CONFIG = {
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
-    loserDimOpacity: 115,
+    loserDimOpacity: 95,
     /** Seconds each winning line stays highlighted before cycling to the next. */
     lineCycleSeconds: 0.85,
     /** 2026-06-11 FIRE redesign — `showLines:false` removes the drawn payline
@@ -212,7 +212,7 @@ export const VIEW_CONFIG = {
      *  per winning cell; warm orange→gold, rise + fade. Bumped 6→9 so even a
      *  small win reads clearly (the embers + symbol glow are the only win cue
      *  now that lines are gone). */
-    fireEmbers: { perCell: 12, riseSpeed: 180, lifeMs: 820, spreadPx: 46 },
+    fireEmbers: { perCell: 16, riseSpeed: 180, lifeMs: 820, spreadPx: 52 },
 
     /** The OLD rectangular win-fire flame QUADS behind winning cells read as a
      *  "fire background box" (user-rejected). Fire is now painted PER-SYMBOL,
@@ -224,8 +224,19 @@ export const VIEW_CONFIG = {
      *  ember/gold plasma ribbon stretched between consecutive winning-cell
      *  centres. This is the shader "win line" — no drawn stroke, no magenta
      *  geometry. heightPx = ribbon thickness; maxSegments = pooled sprites;
-     *  fadeInMs/holdOpacity = reveal envelope. */
-    beams: { enabled: true, heightPx: 52, maxSegments: 16, fadeInMs: 180, holdOpacity: 225 },
+     *  fadeInMs/holdOpacity = reveal envelope; intensity/flowSpeed drive the
+     *  shader (intensity was a hardcoded 1.15 in slot-view — now config-driven).
+     *  Bolder ribbon (2026-06-13): thicker + brighter + faster flow + snappier
+     *  reveal so the win line reads as a charged energy stream, not a soft glow. */
+    beams: {
+      enabled: true,
+      heightPx: 62,
+      maxSegments: 16,
+      fadeInMs: 150,
+      holdOpacity: 245,
+      intensity: 1.35,
+      flowSpeed: 2.8,
+    },
 
     /** CINEMA WAVE — soft-burst.effect replaces the 10-layer Graphics radial glow
      *  behind winners (it BANDED into visible concentric circles — rejected).
@@ -340,7 +351,7 @@ export const VIEW_CONFIG = {
         color: '#ff1e8c',
         headerKey: 'header_mega_win',
         coinParticles: 1,
-        boardDimAlpha: 0.72,
+        boardDimAlpha: 0.78,
         panelLight: 1.0,
         textPopScale: 1.28,
       },
@@ -351,7 +362,7 @@ export const VIEW_CONFIG = {
         color: '#ff5ab0',
         headerKey: 'header_mega_win',
         coinParticles: 1,
-        boardDimAlpha: 0.5,
+        boardDimAlpha: 0.56,
         panelLight: 0.72,
         textPopScale: 1.22,
       },
