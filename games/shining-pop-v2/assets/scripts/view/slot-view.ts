@@ -385,9 +385,9 @@ export class SlotView extends Component {
     }
     const tints: Record<typeof mode, [number, number, number, number]> = {
       idle: [0, 0, 0, 0],
-      wilds: [255, 90, 156, 26],
-      crowns: [255, 0, 127, 38],
-      reels: [186, 60, 218, 44],
+      wilds: [255, 90, 156, 26], // STICKY WILDS — hot pink world
+      crowns: [255, 200, 70, 44], // STICKY CROWNS — GOLD world (matches the crown; was magenta, clashed with WILDS)
+      reels: [186, 60, 218, 44], // WILD REELS — electric violet world
     };
     const [r, g, b, a] = tints[mode];
     if (!this.bonusWash) {
@@ -3401,12 +3401,25 @@ export class SlotView extends Component {
 
   /** Bounce the sticky cells (persistent wilds/crowns) after a free spin so they
    *  read as locked + alive rather than respun. positions = [reel, row][]. */
-  pulseSticky(positions: Array<[number, number]>): void {
+  pulseSticky(
+    positions: Array<[number, number]>,
+    mode: 'idle' | 'wilds' | 'crowns' | 'reels' = this.lastBonusMode,
+  ): void {
     if (!positions || positions.length === 0) return;
+    // Distinct lock "feel" per bonus mechanic so the three features don't read as
+    // the same bounce (paired with the per-mode world tint in setBonusAtmosphere):
+    //   STICKY WILDS — energetic double-pop; CROWNS — tight, bright authoritative
+    //   snap (gold world); WILD REELS — big column surge as the whole reel locks.
+    const lock =
+      mode === 'crowns'
+        ? { peak: 1.1, glowPeak: 210 }
+        : mode === 'reels'
+          ? { peak: 1.24, glowPeak: 150 }
+          : { peak: 1.16, glowPeak: 175 };
     const byReel: number[][] = this.reels.map(() => []);
     for (const [reel, row] of positions) if (byReel[reel]) byReel[reel].push(row);
     this.reels.forEach((reel, i) => {
-      if (byReel[i].length) reel.bounceSticky(byReel[i]);
+      if (byReel[i].length) reel.bounceSticky(byReel[i], lock);
     });
   }
 

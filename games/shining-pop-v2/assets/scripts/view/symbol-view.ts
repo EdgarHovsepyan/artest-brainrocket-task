@@ -460,13 +460,15 @@ export class SymbolView extends Component {
 
   /** Sticky-lock confirmation: small settle pop + a HELD glow rim (reads as
    *  "locked in", not a respin win). */
-  playLock(delay = 0): void {
+  playLock(delay = 0, opts?: { peak?: number; glowPeak?: number }): void {
+    const peak = opts?.peak ?? 1.14;
+    const glowPeak = opts?.glowPeak ?? 150;
     this.ensureBurst(); // shader burst, never the banded Graphics circles
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
     tween(this.node)
       .delay(delay)
-      .to(0.08, { scale: new Vec3(1.14, 1.14, 1) }, { easing: 'quadOut' })
+      .to(0.08, { scale: new Vec3(peak, peak, 1) }, { easing: 'quadOut' })
       .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
       .start();
     if (this.glow && this.glowOp) {
@@ -475,7 +477,7 @@ export class SymbolView extends Component {
       this.glow.setScale(1, 1, 1);
       tween(this.glowOp)
         .delay(delay)
-        .to(0.1, { opacity: 150 })
+        .to(0.1, { opacity: glowPeak })
         .delay(0.45)
         .to(0.35, { opacity: 0 })
         .start();
