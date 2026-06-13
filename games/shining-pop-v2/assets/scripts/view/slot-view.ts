@@ -1715,47 +1715,73 @@ export class SlotView extends Component {
     const h = this.gh + 24;
     const frame = this.mkNode('frame', w, h, this.node);
     frame.setPosition(0, reelCenterY, 0);
+    // 2026-06-13 PORTAL REDESIGN — the old frame was a flat dark rounded-rect with
+    // 5+ concentric stroke layers (3 pink halos + smoke-white rim + pink inner rim),
+    // which read as a busy "CSS container" and crushed at the corners. Reworked to
+    // a PORTAL: a pulsing energy halo around the window (separate node, behind the
+    // glass so only the outer ring shows), a deep well with centre-darkening for
+    // real depth, and ONE clean bright rim. No more concentric-stroke crush.
+
+    // (a) PORTAL ENERGY HALO — feathered ring hugging the window, drawn on its own
+    // node BEHIND the frame so the glass covers the inner part and only the outer
+    // glow shows. It breathes (opacity tween) so the board feels alive, not static.
+    const halo = this.mkNode('portalGlow', w + 120, h + 120, this.node);
+    halo.setPosition(0, reelCenterY, 0);
+    const hg = halo.addComponent(Graphics);
+    for (let i = 9; i >= 0; i--) {
+      const t = i / 9; // 0 = tight/hot at the rim, 1 = wide/faint outer
+      const sp = i * 6;
+      hg.lineWidth = 9 - t * 6;
+      // candy-pink core → magenta outer, quadratic feather to nothing
+      hg.strokeColor = new Color(
+        255,
+        Math.round(60 + (1 - t) * 110),
+        Math.round(150 + (1 - t) * 60),
+        Math.round((1 - t) * (1 - t) * 90),
+      );
+      hg.roundRect(-w / 2 - sp, -h / 2 - sp, w + sp * 2, h + sp * 2, 16 + sp);
+      hg.stroke();
+    }
+    const haloOp = halo.addComponent(UIOpacity);
+    haloOp.opacity = 170;
+    tween(haloOp)
+      .to(1.7, { opacity: 255 }, { easing: 'sineInOut' })
+      .to(1.7, { opacity: 140 }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+
     const g = frame.addComponent(Graphics);
-    // Drop shadow grounds the board on the bg (master: every panel floats on shadow).
-    g.fillColor = new Color(0, 0, 0, 150);
-    g.roundRect(-w / 2 - 6, -h / 2 - 12, w + 12, h + 8, 16);
+    // (b) Drop shadow grounds the portal on the bg.
+    g.fillColor = new Color(0, 0, 0, 160);
+    g.roundRect(-w / 2 - 6, -h / 2 - 12, w + 12, h + 8, 18);
     g.fill();
-    // Master frame proportions (flagship drawReelFrame): no hard bezel box — a
-    // layered soft pink halo lifts the window off the bg instead of a 4px border.
-    g.lineWidth = 2.5;
-    g.strokeColor = new Color(255, 138, 184, 13);
-    for (let k = 3; k >= 1; k--) {
-      g.roundRect(-w / 2 - k * 2.5, -h / 2 - k * 2.5, w + k * 5, h + k * 5, 12 + k * 2.5);
-      g.stroke();
-    }
-    // Dark glass window — translucent (master 0.72) so the painted bg reads through.
-    g.fillColor = new Color(20, 10, 32, 184);
-    g.roundRect(-w / 2, -h / 2, w, h, 12);
+    // (c) PORTAL WELL — deep glass + stacked centre-darkening insets give the
+    // window genuine DEPTH (a portal into another space), not a flat panel.
+    g.fillColor = new Color(14, 7, 26, 214);
+    g.roundRect(-w / 2, -h / 2, w, h, 14);
     g.fill();
-    // Flagship 2-color rim system: smoke-white outer + soft pink inner edge.
-    g.lineWidth = 2.5;
-    g.strokeColor = new Color(245, 247, 250, 140);
-    g.roundRect(-w / 2, -h / 2, w, h, 12);
-    g.stroke();
-    g.lineWidth = 1.6;
-    g.strokeColor = new Color(255, 90, 156, 89);
-    g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 9);
-    g.stroke();
-    // Beveled crystal read (master ART-02): bright top-inner band, deep bottom shadow.
-    const bevH = h * 0.12;
-    for (let i = 1; i <= 4; i++) {
-      const bh = bevH * (1.05 - i * 0.18);
-      g.fillColor = new Color(245, 247, 250, Math.round((0.06 - i * 0.012) * 255));
-      g.roundRect(-w / 2 + 4, h / 2 - 4 - bh, w - 8, bh, 8);
+    for (let i = 1; i <= 5; i++) {
+      const inset = i * 9;
+      g.fillColor = new Color(7, 3, 16, 16);
+      g.roundRect(
+        -w / 2 + inset,
+        -h / 2 + inset,
+        w - inset * 2,
+        h - inset * 2,
+        Math.max(2, 14 - i * 2),
+      );
       g.fill();
     }
-    for (let i = 1; i <= 3; i++) {
-      g.fillColor = new Color(5, 2, 10, Math.round((0.08 - i * 0.015) * 255));
-      g.rect(-w / 2 + 4, -h / 2 + 4 + (i - 1) * 2, w - 8, bevH * 0.65);
-      g.fill();
-    }
-    // (corner crystals removed 2026-06-12 — the magenta facets fought the candy
-    // identity; the frame's bevel + clean rim carry the corners.)
+    // (d) ONE clean bright energy rim (replaces the crushed multi-stroke stack).
+    g.lineWidth = 3;
+    g.strokeColor = new Color(255, 150, 205, 205);
+    g.roundRect(-w / 2, -h / 2, w, h, 14);
+    g.stroke();
+    // (e) thin top gloss sheen — one band, no bevel stack.
+    g.fillColor = new Color(245, 247, 250, 20);
+    g.roundRect(-w / 2 + 8, h / 2 - 16, w - 16, 9, 6);
+    g.fill();
 
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
