@@ -55,8 +55,13 @@ type FlowState = 'idle' | 'spinning' | 'resolving' | 'bonus';
 
 @ccclass('SlotController')
 export class SlotController extends Component {
+  // Demo starting play-money. Raised 100_00 -> 1000_00 so ALL three Buy-Feature
+  // tiers are affordable at the default bet (STICKY WILDS costs 110.68x total
+  // bet = $110.68 at $1 — it was unbuyable at $100, which read as "only one
+  // bonus works"). Also restores parity with the Pixi build (starts at $1,000).
+  // Play-money only — does NOT touch odds/RTP/payouts (those live in math-core).
   @property
-  startBalanceCents = 100_00;
+  startBalanceCents = 1000_00;
 
   @property
   betCents = 1_00;
