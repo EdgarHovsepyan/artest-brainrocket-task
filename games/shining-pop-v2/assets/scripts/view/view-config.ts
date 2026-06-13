@@ -186,15 +186,16 @@ export const VIEW_CONFIG = {
 
   /** Winning-line presentation. */
   win: {
-    /** Pulse scale applied to winning symbols. */
-    symbolPulseScale: 1.18,
+    /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
+     *  winning cells punch harder before settling into the jelly wobble. */
+    symbolPulseScale: 1.24,
     symbolPulseMs: 420,
     /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
      *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
      *  until the next spin clears them — the modern candy-slot "yummy" feel, not
      *  a uniform scale pulse. jelly = axis amplitude; ms = one full wobble cycle.
      *  The shader rim/sweep shine loops alongside (SlotView's u_time). */
-    winBounceLoop: { enabled: true, jelly: 0.085, ms: 520 },
+    winBounceLoop: { enabled: true, jelly: 0.1, ms: 520 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
@@ -230,7 +231,7 @@ export const VIEW_CONFIG = {
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    burst: { enabled: true, intensity: 1.15, scale: 1.9 },
+    burst: { enabled: true, intensity: 1.32, scale: 2.05 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the
@@ -243,7 +244,7 @@ export const VIEW_CONFIG = {
      *  scale = overlay size vs the symbol (1.06 gives the rim a hair of room). */
     symbolFx: {
       enabled: true,
-      intensity: 1.2,
+      intensity: 1.35,
       rimWidth: 0.035,
       sweepSpeed: 0.55,
       envInMs: 220,
@@ -294,7 +295,7 @@ export const VIEW_CONFIG = {
     antHoldMs: { epic: 320, big: 240, base: 150 },
     /** Landing pop on count-complete (damped-elastic). */
     landingPopMs: 380,
-    landingPopScale: 0.3, // +0.42 for MEGA+
+    landingPopScale: 0.36, // bolder land (was 0.3); +0.42 for MEGA+
     landingTintMs: 420,
 
     // ── Task 5.1: heartbeat ticker (log-feel beats) ────────────────────────
@@ -303,8 +304,8 @@ export const VIEW_CONFIG = {
      *  then decay toward 1 per-frame: popScale += (1−popScale)*min(1, decayPerSec*dt).
      *  Beats are dense early, sparse late — the log feel. */
     heartbeat: {
-      popScale: 1.18,
-      decayPerSec: 9,
+      popScale: 1.22,
+      decayPerSec: 8,
       milestoneCount: 6,
     },
   },
@@ -336,7 +337,7 @@ export const VIEW_CONFIG = {
         name: 'EPIC',
         minMultiple: 100,
         shakeAmp: 20,
-        color: '#ff3cac',
+        color: '#ff1e8c',
         headerKey: 'header_mega_win',
         coinParticles: 1,
         boardDimAlpha: 0.72,
