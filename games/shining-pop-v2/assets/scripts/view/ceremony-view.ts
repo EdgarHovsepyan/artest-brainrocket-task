@@ -57,6 +57,10 @@ export class CeremonyView extends Component {
   private numberGlowBase = 0; // tier-scaled resting opacity, set in show()
   private badgeLabel!: Label;
   private dim!: UIOpacity;
+  // MAXIMUM-DRAMA detonation flash — a fullscreen warm-white punch that whiteouts
+  // the screen for a few frames on the hit, then fades to reveal the win beneath.
+  private flashNode!: Node;
+  private flashOp!: UIOpacity;
   private shakeNode: Node | null = null;
   // Rest transform captured LIVE at each shake start (NOT at build time). The
   // shake target is the responsive root that fit() rescales/repositions, so a
@@ -184,6 +188,20 @@ export class CeremonyView extends Component {
 
     this.overlay = ov;
 
+    // MAXIMUM-DRAMA detonation FLASH — a fullscreen warm-white sheet rendered
+    // ABOVE the overlay (added last). On the hit it punches to a tier-scaled
+    // peak (BIG = a soft lift, EPIC = a full white-out) over a few frames then
+    // fades, so the win is "revealed out of the blast". Skipped under reduced FX.
+    const flashNode = this.mk('detoFlash', 4000, 4000, this.node);
+    const fg = flashNode.addComponent(Graphics);
+    fg.fillColor = new Color(255, 244, 214, 255); // warm white (a hair of gold)
+    fg.rect(-2000, -2000, 4000, 4000);
+    fg.fill();
+    this.flashOp = flashNode.addComponent(UIOpacity);
+    this.flashOp.opacity = 0;
+    flashNode.active = false;
+    this.flashNode = flashNode;
+
     // Authored Spine win-callout (Cupids-Crush, Spine 4.2) — the hero banner that
     // replaces the procedural rays/shock/header. Loaded once, mounted into the
     // overlay so it inherits the scale-in + active, sitting just BELOW the
@@ -281,6 +299,12 @@ export class CeremonyView extends Component {
         this.winSpine.node.active = false;
       }
       if (!reduced) {
+        // MAXIMUM DRAMA — the fullscreen flash + light-bloom shock fire on EVERY
+        // tier INCLUDING the Spine path, so the hit always BANGS (previously the
+        // Spine path had no flash/shock and read flat). The rotating god-rays
+        // stay procedural-only — the authored Spine banner carries its own rays.
+        this.fireDetonationFlash(tx);
+        this.fireShock(240 + 200 * tx);
         if (!useSpine) {
           this.drawRays(Math.round(8 + 12 * tx), 300 + 320 * tx, 0.5 + 0.5 * t);
           this.raysNode.angle = 0;
@@ -288,7 +312,6 @@ export class CeremonyView extends Component {
             .by(6, { angle: 14 + 12 * tx })
             .repeatForever()
             .start();
-          this.fireShock(220 + 180 * tx);
         }
         // amplitude tracks the realised win continuously, but CAP it (~tier*4)
         // so a max-win can't nauseate (slot-vfx restraint rule).
@@ -412,6 +435,24 @@ export class CeremonyView extends Component {
       g.close();
       g.fill();
     }
+  }
+
+  /** MAXIMUM-DRAMA fullscreen flash on the detonation frame — the literal "BANG".
+   *  Punches to a tier-scaled peak in ~3 frames (whiteout on EPIC), then fades so
+   *  the banner + number are revealed out of the blast. intensity = tx (0..1.6). */
+  private fireDetonationFlash(intensity: number): void {
+    if (!this.flashOp || !this.flashNode) return;
+    Tween.stopAllByTarget(this.flashOp);
+    this.flashNode.active = true;
+    this.flashOp.opacity = 0;
+    const peak = Math.round(110 + 145 * Math.min(1, intensity)); // BIG ~110 → EPIC 255
+    tween(this.flashOp)
+      .to(0.05, { opacity: peak }, { easing: 'quadOut' }) // punch ON (~3 frames)
+      .to(0.34, { opacity: 0 }, { easing: 'quadIn' }) // bloom OUT, reveal the win
+      .call(() => {
+        if (this.flashNode && this.flashNode.isValid) this.flashNode.active = false;
+      })
+      .start();
   }
 
   /** One-shot detonation FLASH (2026-06-11 redesign). The old version was a
@@ -709,6 +750,13 @@ export class CeremonyView extends Component {
     if (this.overlay) Tween.stopAllByTarget(this.overlay);
     if (this.raysNode) Tween.stopAllByTarget(this.raysNode);
     if (this.shockNode) Tween.stopAllByTarget(this.shockNode);
+    // Kill any in-flight detonation flash so a fast-forward can't leave the
+    // screen stuck mid-whiteout.
+    if (this.flashOp) {
+      Tween.stopAllByTarget(this.flashOp);
+      this.flashOp.opacity = 0;
+      if (this.flashNode && this.flashNode.isValid) this.flashNode.active = false;
+    }
     // Reset the Spine banner: stop its fade, deactivate, restore full opacity so
     // the next show() fades in from a clean state (no stuck half-faded banner).
     if (this.winSpineOp) {

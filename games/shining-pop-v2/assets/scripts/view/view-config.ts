@@ -373,7 +373,7 @@ export const VIEW_CONFIG = {
         shakeAmp: 11,
         color: '#ffb000',
         headerKey: 'header_mega_win',
-        coinParticles: 0,
+        coinParticles: 1,
         boardDimAlpha: 0.28,
         panelLight: 0.44,
         textPopScale: 1.18,
