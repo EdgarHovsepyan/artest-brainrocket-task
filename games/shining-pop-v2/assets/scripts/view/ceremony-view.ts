@@ -13,6 +13,8 @@ import {
   Graphics,
   Label,
   Node,
+  resources,
+  sp,
   tween,
   Tween,
   UIOpacity,
@@ -181,6 +183,41 @@ export class CeremonyView extends Component {
     ov.on(Node.EventType.TOUCH_END, () => this.fastForward());
 
     this.overlay = ov;
+
+    // Authored Spine win-callout (Cupids-Crush, Spine 4.2) — the hero banner that
+    // replaces the procedural rays/shock/header. Loaded once, mounted into the
+    // overlay so it inherits the scale-in + active, sitting just BELOW the
+    // count-up number. Falls back to the procedural ceremony if it can't load.
+    this.loadWinCallout(ov);
+  }
+
+  private winSpine: sp.Skeleton | null = null;
+  /** Tier name -> Spine win-callout animation prefix (each has -start + -loop). */
+  private static readonly TIER_ANIM: Record<string, string> = {
+    BIG: 'big-win',
+    MEGA: 'mega-win',
+    SUPER: 'epic-win',
+    EPIC: 'wicked-win',
+  };
+  private loadWinCallout(ov: Node): void {
+    resources.load('spine/cupid-wf/cupid-wf', sp.SkeletonData, (err, data) => {
+      if (err || !data || !ov.isValid) {
+        console.warn('[spine] win-callout load failed; procedural fallback', err);
+        return;
+      }
+      const n = new Node('winCallout');
+      n.layer = ov.layer;
+      n.setPosition(0, 36, 0);
+      n.setScale(0.62, 0.62, 1);
+      const sk = n.addComponent(sp.Skeleton);
+      sk.skeletonData = data;
+      sk.premultipliedAlpha = true;
+      ov.addChild(n);
+      // sit the banner just under the number rig: covers the procedural
+      // ground/header diamonds, while glow/shadow/amount/badge render on top.
+      n.setSiblingIndex(this.numberGlow.node.getSiblingIndex());
+      this.winSpine = sk;
+    });
   }
 
   /** Show the tiered ceremony. Intensity scales continuously with the multiple.
@@ -214,14 +251,24 @@ export class CeremonyView extends Component {
       tween(ov)
         .to(0.3, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
         .start();
+      // Authored Spine banner is the hero when available; the procedural
+      // rays/shock/header are the FALLBACK only (no skeleton / reduced-motion).
+      const useSpine = !!this.winSpine && this.winSpine.isValid && !reduced;
+      if (useSpine) {
+        const anim = CeremonyView.TIER_ANIM[tier.name] ?? 'normal-win';
+        this.winSpine!.setAnimation(0, `${anim}-start`, false);
+        this.winSpine!.addAnimation(0, `${anim}-loop`, true, 0);
+      }
       if (!reduced) {
-        this.drawRays(Math.round(8 + 12 * tx), 300 + 320 * tx, 0.5 + 0.5 * t);
-        this.raysNode.angle = 0;
-        tween(this.raysNode)
-          .by(6, { angle: 14 + 12 * tx })
-          .repeatForever()
-          .start();
-        this.fireShock(220 + 180 * tx);
+        if (!useSpine) {
+          this.drawRays(Math.round(8 + 12 * tx), 300 + 320 * tx, 0.5 + 0.5 * t);
+          this.raysNode.angle = 0;
+          tween(this.raysNode)
+            .by(6, { angle: 14 + 12 * tx })
+            .repeatForever()
+            .start();
+          this.fireShock(220 + 180 * tx);
+        }
         // amplitude tracks the realised win continuously, but CAP it (~tier*4)
         // so a max-win can't nauseate (slot-vfx restraint rule).
         this.shake(Math.min(tier.shakeAmp * 1.8, tier.shakeAmp + 14 * tx));
@@ -232,24 +279,32 @@ export class CeremonyView extends Component {
       // Task 5.MATRIX — EPIC coin geyser. The hook wakes particle-layer.coinGeyser
       // on the slot-view; null-safe so other tiers stay clean.
       if (!reduced && tier.coinParticles > 0) this.onCoinGeyser?.();
-      // Task 5.MATRIX — panel-light brighten (SUPER/EPIC only). 0..1 → 0..255.
-      // Tween up here, decayed by hide()/abort() back to 0.
+      // panel-light belongs to the procedural look only — the Spine banner has
+      // its own backing glow, so skip it when the banner is the hero.
       if (this.panelLightOp) {
         Tween.stopAllByTarget(this.panelLightOp);
-        const lightAlpha = reduced ? 0 : Math.round(tier.panelLight * 255);
+        const lightAlpha = reduced || useSpine ? 0 : Math.round(tier.panelLight * 255);
         tween(this.panelLightOp).to(0.3, { opacity: lightAlpha }).start();
       }
-      // WC2 — header ARRIVAL (not a pop-in): the banner slams in from oversized,
-      // overshoots past rest with a squash, then settles — a weighted impact that
-      // escalates per tier (EPIC enters bigger). backIn slam → quadOut rebound →
-      // backOut settle reads as mass hitting a surface, not a balloon inflating.
-      const slamFrom = 1.45 + 0.28 * Math.min(1, tx);
-      this.headerLabel.node.setScale(slamFrom, slamFrom, 1);
-      tween(this.headerLabel.node)
-        .to(0.15, { scale: new Vec3(0.9, 0.9, 1) }, { easing: 'quadIn' }) // slam down past rest
-        .to(0.12, { scale: new Vec3(1.08, 1.08, 1) }, { easing: 'quadOut' }) // rebound
-        .to(0.14, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // settle
-        .start();
+      // The Spine banner carries the tier word; the procedural header label only
+      // shows as the fallback. When it shows, it ARRIVES (slam → squash → settle).
+      this.headerLabel.node.active = !useSpine;
+      if (!useSpine) {
+        const slamFrom = 1.45 + 0.28 * Math.min(1, tx);
+        this.headerLabel.node.setScale(slamFrom, slamFrom, 1);
+        tween(this.headerLabel.node)
+          .to(0.15, { scale: new Vec3(0.9, 0.9, 1) }, { easing: 'quadIn' }) // slam past rest
+          .to(0.12, { scale: new Vec3(1.08, 1.08, 1) }, { easing: 'quadOut' }) // rebound
+          .to(0.14, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // settle
+          .start();
+      }
+      // Position the count-up number: on the banner's cloud (lower) when the
+      // Spine banner is the hero, at the panel centre for the procedural look.
+      const numY = useSpine ? -118 : -16;
+      this.amountLabel.node.setPosition(0, numY, 0);
+      this.amountShadow.node.setPosition(4, numY - 5, 0);
+      this.numberGlow.node.setPosition(0, numY, 0);
+      this.badgeLabel.node.setPosition(0, useSpine ? -178 : -86, 0);
       // WC9/RQ7 — light the number's emissive backing for this tier; it ramps in
       // with the detonation, then breathes with the heartbeat inside tickCount.
       this.numberGlowBase = reduced ? 90 : Math.round(120 + 100 * Math.min(1, tx));
