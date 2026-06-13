@@ -331,8 +331,9 @@ export const VIEW_CONFIG = {
     showMinMultiple: 10,
     /** How long the overlay holds before auto-dismiss (ms). */
     holdMs: 2000,
-    /** "Held breath" dim before a BIG+ detonation (ms). */
-    microSilenceMs: 200,
+    /** "Held breath" dim before a BIG+ detonation (ms). Lengthened 200→260 for a
+     *  more cinematic hush — the silence makes the detonation hit harder. */
+    microSilenceMs: 260,
     /** Task 5.MATRIX — 4-tier ceremony re-band (presentation only — math unchanged).
      *  Tiers by win/TOTAL-bet multiple, high → low. First match wins. Per-tier knobs:
      *  - shakeAmp ........ board kick amplitude in px (capped at *1.8 inside the view)
