@@ -42,6 +42,17 @@ export class CeremonyView extends Component {
   private panelLightOp!: UIOpacity; // Task 5.MATRIX — SUPER/EPIC amount-backing glow
   private headerLabel!: Label;
   private amountLabel!: Label;
+  // WC9/RQ7 — the win number is treated as a LIT METALLIC OBJECT, not flat text:
+  //  • amountShadow  — a dark duplicate offset down/right for bevel weight + depth
+  //  • numberGlow    — a warm-gold emissive lens pooled behind the digits so the
+  //                    number reads as EMITTING light (the "feeds-bloom" quality),
+  //                    drawn as stacked-alpha filled diamonds (codebase no-banding
+  //                    pattern — never a circle/ring), opacity + scale breathing
+  //                    with the heartbeat and tier intensity.
+  private amountShadow!: Label;
+  private numberGlow!: Graphics;
+  private numberGlowOp!: UIOpacity;
+  private numberGlowBase = 0; // tier-scaled resting opacity, set in show()
   private badgeLabel!: Label;
   private dim!: UIOpacity;
   private shakeNode: Node | null = null;
@@ -143,6 +154,19 @@ export class CeremonyView extends Component {
     this.panelLightOp.opacity = 0;
 
     this.headerLabel = this.mkLabel(ov, 0, 96, 56, TITLE);
+
+    // WC9/RQ7 — number light-rig, built BELOW the amount so it reads as backing:
+    //  1) emissive glow lens (warm gold) pooled behind the digits
+    //  2) dark depth duplicate offset down/right for bevel weight
+    //  3) the crisp amount on top
+    const glowNode = this.mk('numberGlow', 20, 20, ov);
+    glowNode.setPosition(0, -16, 0);
+    this.numberGlow = glowNode.addComponent(Graphics);
+    this.drawNumberGlow();
+    this.numberGlowOp = glowNode.addComponent(UIOpacity);
+    this.numberGlowOp.opacity = 0;
+
+    this.amountShadow = this.mkLabel(ov, 4, -21, 66, new Color(28, 8, 2, 235));
     this.amountLabel = this.mkLabel(ov, 0, -16, 66, CRYSTAL);
     this.badgeLabel = this.mkLabel(ov, 0, -86, 30, Color.WHITE);
     // Slot-title text treatment: a deep amber outline lifts the headline and
@@ -221,6 +245,15 @@ export class CeremonyView extends Component {
         .to(0.34, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'backOut' })
         .to(0.12, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
         .start();
+      // WC9/RQ7 — light the number's emissive backing for this tier; it ramps in
+      // with the detonation, then breathes with the heartbeat inside tickCount.
+      this.numberGlowBase = reduced ? 90 : Math.round(120 + 100 * Math.min(1, tx));
+      this.numberGlow.node.setScale(1, 1, 1);
+      if (this.numberGlowOp) {
+        Tween.stopAllByTarget(this.numberGlowOp);
+        this.numberGlowOp.opacity = 0;
+        tween(this.numberGlowOp).to(0.3, { opacity: this.numberGlowBase }).start();
+      }
       // bigger wins savour longer — duration tracks the extended intensity.
       // Task 5.1 — pass tier.textPopScale so the heartbeat scales per tier.
       this.countUp(winCents, 0.8 + 1.0 * tx, tier.textPopScale);
@@ -250,8 +283,17 @@ export class CeremonyView extends Component {
     this.headerLabel.string = name;
     this.headerLabel.color = TITLE;
     this.headerLabel.fontSize = 50;
-    this.amountLabel.string = 'FEATURE';
+    this.setAmount('FEATURE');
     this.badgeLabel.string = '';
+    // WC9 — light the emissive backing at the fixed mid intensity too, so the
+    // FEATURE word glows like the win number rather than reading as flat text.
+    this.numberGlowBase = 150;
+    this.numberGlow.node.setScale(1, 1, 1);
+    if (this.numberGlowOp) {
+      Tween.stopAllByTarget(this.numberGlowOp);
+      this.numberGlowOp.opacity = 0;
+      tween(this.numberGlowOp).to(0.3, { opacity: this.numberGlowBase }).start();
+    }
     const ov = this.overlay;
     ov.active = true;
     ov.setScale(0.6, 0.6, 1);
@@ -337,6 +379,11 @@ export class CeremonyView extends Component {
       Tween.stopAllByTarget(this.panelLightOp);
       tween(this.panelLightOp).to(0.18, { opacity: 0 }).start();
     }
+    // WC9 — fade the number's emissive backing out with the panel.
+    if (this.numberGlowOp) {
+      Tween.stopAllByTarget(this.numberGlowOp);
+      tween(this.numberGlowOp).to(0.18, { opacity: 0 }).start();
+    }
     tween(this.overlay)
       .to(0.18, { scale: new Vec3(0.6, 0.6, 1) }, { easing: 'quadIn' })
       .call(() => (this.overlay.active = false))
@@ -348,7 +395,7 @@ export class CeremonyView extends Component {
     if (!this.overlay.active) return;
     if (this.counting) {
       this.unschedule(this.tickCount);
-      this.amountLabel.string = fmt(this.countTarget);
+      this.setAmount(fmt(this.countTarget));
       this.amountLabel.color = CRYSTAL;
       this.landingPop();
       this.counting = false;
@@ -364,7 +411,8 @@ export class CeremonyView extends Component {
     this.countDur = Math.max(0.2, dur);
     this.countElapsed = 0;
     this.pipAccum = 0;
-    this.amountLabel.string = '0.00';
+    this.setAmount('0.00');
+    this.amountShadow.node.setScale(1, 1, 1);
     // Task 5.1 — pre-compute heartbeat milestones (log scale — dense early,
     // sparse late). 10ⁿ crossings the count will pass through give the natural
     // "log feel" beats described in the blueprint. milestoneCount caps how many
@@ -392,7 +440,7 @@ export class CeremonyView extends Component {
     const p = Math.min(1, this.countElapsed / this.countDur);
     const e = 1 - Math.pow(1 - p, 4); // quartOut
     const v = this.countFrom + (this.countTarget - this.countFrom) * e;
-    this.amountLabel.string = fmt(Math.round(v));
+    this.setAmount(fmt(Math.round(v)));
     Color.lerp(this._tintTmp, WARM, CRYSTAL, e);
     this.amountLabel.color = this._tintTmp; // reassign so the Label marks dirty
     // Task 5.1 — heartbeat: consume any 10ⁿ thresholds the rolling count passed
@@ -406,6 +454,19 @@ export class CeremonyView extends Component {
     const { decayPerSec } = VIEW_CONFIG.counter.heartbeat;
     this.heartbeatScale += (1 - this.heartbeatScale) * Math.min(1, decayPerSec * dt);
     this.amountLabel.node.setScale(this.heartbeatScale, this.heartbeatScale, 1);
+    this.amountShadow.node.setScale(this.heartbeatScale, this.heartbeatScale, 1);
+    // WC9 — the emissive lens breathes with the heartbeat: brighter + larger on
+    // each 10ⁿ pop, settling back toward the tier's resting glow between beats.
+    if (this.numberGlowOp) {
+      const beat =
+        this.currentTextPop > 1 ? (this.heartbeatScale - 1) / (this.currentTextPop - 1) : 0;
+      this.numberGlowOp.opacity = Math.min(
+        255,
+        Math.round(this.numberGlowBase * (0.85 + 0.5 * beat)),
+      );
+      const gs = 1 + 0.22 * beat;
+      this.numberGlow.node.setScale(gs, gs, 1);
+    }
     // per-pip tick ~ every 70ms while rolling (skips the final settle)
     this.pipAccum += dt;
     if (p < 0.98 && this.pipAccum >= 0.07) {
@@ -414,11 +475,13 @@ export class CeremonyView extends Component {
     }
     if (p >= 1) {
       this.unschedule(this.tickCount);
-      this.amountLabel.string = fmt(this.countTarget);
+      this.setAmount(fmt(this.countTarget));
       this.amountLabel.color = CRYSTAL;
       this.counting = false;
       this.heartbeatScale = 1;
       this.amountLabel.node.setScale(1, 1, 1); // reset before landingPop tweens
+      this.amountShadow.node.setScale(1, 1, 1);
+      this.numberGlow.node.setScale(1, 1, 1);
       this.landingPop();
     }
   };
@@ -431,6 +494,31 @@ export class CeremonyView extends Component {
       .to(0.14, { scale: new Vec3(1.36, 1.36, 1) }, { easing: 'quadOut' })
       .to(0.26, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .start();
+    // WC9 — the depth-shadow pops with the number so the bevel never detaches.
+    if (this.amountShadow) {
+      const s = this.amountShadow.node;
+      s.setScale(1, 1, 1);
+      tween(s)
+        .to(0.14, { scale: new Vec3(1.36, 1.36, 1) }, { easing: 'quadOut' })
+        .to(0.26, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .start();
+    }
+    // WC9 — the emissive lens flares on landing (the gold "catches fire" as the
+    // value locks) then settles to the tier's resting glow.
+    if (this.numberGlowOp) {
+      const peak = Math.min(255, Math.round(this.numberGlowBase * 1.6));
+      Tween.stopAllByTarget(this.numberGlowOp);
+      tween(this.numberGlowOp)
+        .to(0.12, { opacity: peak }, { easing: 'quadOut' })
+        .to(0.34, { opacity: this.numberGlowBase }, { easing: 'quadOut' })
+        .start();
+      const gn = this.numberGlow.node;
+      gn.setScale(1, 1, 1);
+      tween(gn)
+        .to(0.12, { scale: new Vec3(1.3, 1.3, 1) }, { easing: 'quadOut' })
+        .to(0.34, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .start();
+    }
     // VISUAL BUST (WC9) — a bright specular streak sweeps across the number on
     // landing, like light catching polished gold. A tilted white parallelogram
     // masked to the label width, swept L→R once, then destroyed.
@@ -470,6 +558,36 @@ export class CeremonyView extends Component {
     this.numberSheen = n;
   }
 
+  /** WC9/RQ7 — warm-gold emissive lens behind the number. Stacked-alpha filled
+   *  diamonds (wide+flat to pool light along the horizontal digits), inner layers
+   *  brighter → a smooth glow with NO banding and NO circle/ring (codebase rule).
+   *  The number appears to EMIT light, the single biggest "expensive" tell. */
+  private drawNumberGlow(): void {
+    const g = this.numberGlow;
+    g.clear();
+    const layers = 9;
+    for (let i = layers; i >= 1; i--) {
+      const f = i / layers; // 1 outer → ~0.11 inner
+      const halfW = 64 + 250 * f;
+      const halfH = 24 + 64 * f;
+      const a = Math.round(8 + 26 * (1 - f)); // inner brighter, outer feathered
+      g.fillColor = new Color(255, 198, 96, a);
+      g.moveTo(0, -halfH);
+      g.lineTo(halfW, 0);
+      g.lineTo(0, halfH);
+      g.lineTo(-halfW, 0);
+      g.close();
+      g.fill();
+    }
+  }
+
+  /** Write the win value to the crisp label AND its depth-shadow duplicate so the
+   *  bevel layer never desyncs from the rolling number. */
+  private setAmount(s: string): void {
+    this.amountLabel.string = s;
+    if (this.amountShadow) this.amountShadow.string = s;
+  }
+
   private shake(amp: number): void {
     const n = this.shakeNode;
     if (!n) return;
@@ -503,6 +621,18 @@ export class CeremonyView extends Component {
       Tween.stopAllByTarget(this.amountLabel);
       // Task 5.1 — wipe heartbeat state so a new ceremony starts clean.
       this.amountLabel.node.setScale(1, 1, 1);
+    }
+    // WC9 — wipe the number light-rig (shadow scale + emissive lens) so a rapid
+    // re-win starts from a clean dark state rather than a stuck glow.
+    if (this.amountShadow) {
+      Tween.stopAllByTarget(this.amountShadow.node);
+      this.amountShadow.node.setScale(1, 1, 1);
+    }
+    if (this.numberGlowOp) {
+      Tween.stopAllByTarget(this.numberGlowOp);
+      this.numberGlowOp.opacity = 0;
+      Tween.stopAllByTarget(this.numberGlow.node);
+      this.numberGlow.node.setScale(1, 1, 1);
     }
     if (this.panelLightOp) {
       Tween.stopAllByTarget(this.panelLightOp);
