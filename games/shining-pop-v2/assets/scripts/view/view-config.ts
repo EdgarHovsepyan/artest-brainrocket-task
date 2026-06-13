@@ -91,9 +91,15 @@ export const VIEW_CONFIG = {
      *  through the board scale so they hold at any viewport. */
     logo: {
       topY: 322,
-      /** 0.66 dominated the web layout — 0.52 reads brand-present, not loud. */
-      landscapeScale: 0.52,
-      landscapeScreenX: 0.18,
+      /** Anomaly fix (2026-06-13): at scale 0.52 / x0.18 the wordmark was 262px
+       *  wide centred at cx≈230, but the reels start at x≈219 (left margin only
+       *  ~219px) — so its right half spilled ~143px into reel_0 and, painting
+       *  BEHIND the reels (logo i<reels i), the "NING/OP" of SHINING POP was
+       *  occluded by the reel panel. Shrink to 0.40 (≈202px) and centre it in the
+       *  left margin (x0.085 → cx≈109, right edge ≈210 < 219) so it clears the
+       *  reels entirely — no overlap, so paint order no longer matters. */
+      landscapeScale: 0.4,
+      landscapeScreenX: 0.085,
       landscapeScreenY: 0.88,
       bonusScreenX: 0.12,
       bonusScreenY: 0.5,
