@@ -191,6 +191,9 @@ export class SlotView extends Component {
   private fsBg: sp.Skeleton | null = null;
   private fsBgOp: UIOpacity | null = null;
   private fsBgLoading = false;
+  // Transient cinematic win bloom-flash — opacity 0 at REST (never covers the
+  // board), flares warm on the big-win detonation frame, then decays.
+  private cineBloomOp: UIOpacity | null = null;
   // The buy-FAB's build-time scale (targetW/aw) — fit() multiplies it by a
   // per-orientation factor so the badge stays a consistent on-screen size.
   private buyFabBaseScale = 1;
@@ -781,6 +784,7 @@ export class SlotView extends Component {
     this.buildTitle();
     this.buildFrame();
     this.buildReels();
+    this.buildCinematicBloom(); // transient win bloom-flash (opacity 0 at rest)
 
     this.winLineG = this.mkNode('winLines', 10, 10, this.node).addComponent(Graphics);
     // Hot leading-edge spark that rides along each line as it draws L->R (WL1).
@@ -1864,6 +1868,36 @@ export class SlotView extends Component {
     };
     this.windowFeatherTop = make(1, 'windowFeatherTop');
     this.windowFeatherBottom = make(-1, 'windowFeatherBottom');
+  }
+
+  /** Build the transient cinematic win bloom — a warm full-screen node held at
+   *  opacity 0 (so it can NEVER cover the resting board), flared on the big-win
+   *  detonation frame. Mounted above the board but below the win FX / HUD /
+   *  ceremony built next, so the win number + banner stay readable over the flash. */
+  private buildCinematicBloom(): void {
+    const W = 2600;
+    const H = 2200;
+    const bloom = this.mkNode('cineBloom', W, H, this.node);
+    const bg = bloom.addComponent(Graphics);
+    bg.fillColor = new Color(255, 238, 205, 255); // warm white-gold light
+    bg.rect(-W / 2, -H / 2, W, H);
+    bg.fill();
+    this.cineBloomOp = bloom.addComponent(UIOpacity);
+    this.cineBloomOp.opacity = 0;
+  }
+
+  /** Fire the cinematic light-bloom flare (detonation frame). intensity 0..1 maps
+   *  to a brief, warm (never pure-white) flash — a single rare-event flash, well
+   *  within the flash-safety budget. */
+  cinematicBloom(intensity = 1): void {
+    if (!this.cineBloomOp || this.reducedFx) return;
+    const peak = Math.round(34 + 60 * Math.min(1, Math.max(0, intensity)));
+    Tween.stopAllByTarget(this.cineBloomOp);
+    this.cineBloomOp.opacity = 0;
+    tween(this.cineBloomOp)
+      .to(0.08, { opacity: peak }, { easing: 'quadOut' })
+      .to(0.5, { opacity: 0 }, { easing: 'quadIn' })
+      .start();
   }
 
   private buildHud(): void {
@@ -3451,7 +3485,12 @@ export class SlotView extends Component {
    *  8x+ wins, never an LDW return). */
   playCeremony(winCents: number, betCents: number, multiplier: number): boolean {
     this.ceremony.onDetonate = () => {
-      if (!this.reducedFx) this.audio.impact();
+      if (!this.reducedFx) {
+        this.audio.impact();
+        // Cinematic light-bloom flare on the detonation frame; intensity by tier.
+        const mult = betCents > 0 ? winCents / betCents : 0;
+        this.cinematicBloom(Math.min(1, mult / 100));
+      }
     };
     this.ceremony.onCountPip = () => this.audio.countTick(0.6);
     // Task 5.MATRIX — EPIC-tier coin geyser fires through the CC-2 particle pool.
