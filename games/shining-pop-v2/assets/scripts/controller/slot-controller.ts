@@ -592,7 +592,7 @@ export class SlotController extends Component {
       await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul);
       // Sticky wilds / crowns persist in the grid — bounce them so they read as
       // locked + alive each spin (not respun). [reel,row][] from the bonus engine.
-      this.view.pulseSticky(step.sticky);
+      this.view.pulseSticky(step.sticky, mode);
       if (step.sticky.length > 0) this.view.audio.stickyLock();
       runningPayout += step.payout;
       this.view.setBonusHud(i, totalSpins, Math.round(runningPayout * lineBetCents));
