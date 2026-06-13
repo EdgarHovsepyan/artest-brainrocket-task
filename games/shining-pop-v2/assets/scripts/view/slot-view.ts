@@ -14,6 +14,7 @@ import {
   Material,
   Node,
   resources,
+  sp,
   Sprite,
   SpriteFrame,
   Texture2D,
@@ -185,6 +186,11 @@ export class SlotView extends Component {
   // True while a bonus/free-spin feature is running — moves the logo to the
   // reels-left, vertically-centred spot (per fit()).
   private inBonus = false;
+  // Authored free-spins background Spine (Cupids-Crush, lazy-loaded on first
+  // bonus enter — the 2.2 MB webp shouldn't bloat boot).
+  private fsBg: sp.Skeleton | null = null;
+  private fsBgOp: UIOpacity | null = null;
+  private fsBgLoading = false;
   // The buy-FAB's build-time scale (targetW/aw) — fit() multiplies it by a
   // per-orientation factor so the badge stays a consistent on-screen size.
   private buyFabBaseScale = 1;
@@ -370,7 +376,13 @@ export class SlotView extends Component {
     // so the logo repositions immediately on enter/exit.
     const wasBonus = this.inBonus;
     this.inBonus = mode !== 'idle';
-    if (this.inBonus !== wasBonus) this.fit();
+    if (this.inBonus !== wasBonus) {
+      this.fit();
+      // Authored free-spins world (Cupids-Crush Spine): intro on enter, idle
+      // loop during, outro on exit — turns the bonus into a distinct world
+      // instead of a recoloured base board. Lazy-loaded on first enter.
+      this.updateFreeSpinScene(this.inBonus);
+    }
     const tints: Record<typeof mode, [number, number, number, number]> = {
       idle: [0, 0, 0, 0],
       wilds: [255, 90, 156, 26],
@@ -394,6 +406,63 @@ export class SlotView extends Component {
     tween(this.bonusWashOp!)
       .to(0.45, { opacity: mode === 'idle' ? 0 : 255 }, { easing: 'sineInOut' })
       .start();
+  }
+
+  /** Free-spins authored scene: play intro→idle on enter, outro→hide on exit.
+   *  Falls back silently (procedural wash still runs) if the skeleton can't load. */
+  private updateFreeSpinScene(entering: boolean): void {
+    if (entering) {
+      this.ensureFsBg(() => {
+        const sk = this.fsBg;
+        if (!sk || !sk.node.isValid) return;
+        sk.node.active = true;
+        sk.setAnimation(0, 'freespins-intro', false);
+        sk.addAnimation(0, 'freespins-idle', true, 0);
+        if (this.fsBgOp) {
+          Tween.stopAllByTarget(this.fsBgOp);
+          this.fsBgOp.opacity = 0;
+          tween(this.fsBgOp).to(0.5, { opacity: 255 }, { easing: 'sineOut' }).start();
+        }
+      });
+    } else if (this.fsBg && this.fsBg.node.active && this.fsBgOp) {
+      this.fsBg.setAnimation(0, 'freespins-outro', false);
+      Tween.stopAllByTarget(this.fsBgOp);
+      tween(this.fsBgOp)
+        .to(0.5, { opacity: 0 }, { easing: 'sineIn' })
+        .call(() => {
+          if (this.fsBg) this.fsBg.node.active = false;
+        })
+        .start();
+    }
+  }
+
+  private ensureFsBg(cb: () => void): void {
+    if (this.fsBg) {
+      cb();
+      return;
+    }
+    if (this.fsBgLoading) return;
+    this.fsBgLoading = true;
+    resources.load('spine/cupid-fs-bg/cupid_freespins_background', sp.SkeletonData, (err, data) => {
+      this.fsBgLoading = false;
+      if (err || !data || !this.node.isValid) {
+        console.warn('[spine] free-spins bg load failed; wash fallback', err);
+        return;
+      }
+      const n = this.mkNode('fsBg', 10, 10, this.node);
+      n.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+      n.setScale(1, 1, 1);
+      const sk = n.addComponent(sp.Skeleton);
+      sk.skeletonData = data;
+      sk.premultipliedAlpha = true;
+      this.fsBgOp = n.addComponent(UIOpacity);
+      this.fsBgOp.opacity = 0;
+      n.active = false;
+      // above the painted bg + mode wash, below the reels.
+      if (this.bonusWash) n.setSiblingIndex(this.bonusWash.getSiblingIndex() + 1);
+      this.fsBg = sk;
+      cb();
+    });
   }
 
   /** Free-spin HUD: spins remaining + running total. Approval point — the
