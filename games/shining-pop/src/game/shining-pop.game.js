@@ -11279,7 +11279,7 @@
             // and lift off the reel — "dumped" onto the stage.
             const tier=winVfxTier||1;
             const prem=reels[r].symbols[k]>=6;   // Seven & Crown — premium symbols
-            const hold=1.15 + Math.min(tier,5)*0.05 + (prem?0.22:0);
+            const hold=1.20 + Math.min(tier,5)*0.07 + (prem?0.26:0);   // bolder winner dominance (was 1.15/.05/.22)
             const t=now-revealT0-r*46;
             let pop=1, rot=0, hop=0, sx3d=1;
             if(reducedHl){ pop=1.08; }
@@ -11302,9 +11302,10 @@
             s.y=(k-0.5)*CELL + reels[r].offset + hop;
             s.alpha=1;
           } else {
-            // LOSER — only dim; keep renderReels' enveloped idle breathing so the
-            // symbol stays alive and the win⇄idle state change is still smooth
-            s.alpha=0.4;
+            // LOSER — dim harder so the winners clearly dominate the board (the
+            // "win focus" read). Keep renderReels' enveloped idle breathing so the
+            // symbol stays alive and the win⇄idle state change is still smooth.
+            s.alpha=0.26;
           }
         } else {
           s.alpha=1;
