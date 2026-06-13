@@ -18,11 +18,19 @@ import {
   UITransform,
   Vec3,
 } from 'cc';
-import { SYMBOL_NAMES } from '../logic/game-config';
+import { SYMBOL_NAMES, SYMBOLS } from '../logic/game-config';
 import { VIEW_CONFIG } from './view-config';
 import { applyFont } from './fonts';
 
 const { ccclass } = _decorator;
+
+// Asset balance: the WILD (gingerbread + lollipop) and SCATTER (rainbow lollipop,
+// id 8 = sym_l4_j) art carry their own padding, so they sit right at full size.
+// Every OTHER symbol fills its PNG edge-to-edge and reads ~15% too big — it
+// overflows the cell and bleeds into the neighbour (the "cropped / I see another
+// symbol's part" report). Render those at 85% so the whole set balances in-cell.
+const FULL_SIZE_IDS = new Set<number>([SYMBOLS.WILD, 8]);
+const SYMBOL_SHRINK = 0.85;
 
 @ccclass('SymbolView')
 export class SymbolView extends Component {
@@ -66,6 +74,9 @@ export class SymbolView extends Component {
   private idlePhase = 0;
   private idleAmp = 0;
   private idleOn = false;
+  // Per-symbol base art scale (1 for WILD/SCATTER, 0.85 for the rest). The idle
+  // breathe + setIdle reset multiply by this so the 15% shrink always holds.
+  private artBaseScale = 1;
 
   /** Build the cell's sprite + text fallback at `size` px square. `phase` desyncs
    *  this cell's idle breathing from its neighbours. */
@@ -144,6 +155,10 @@ export class SymbolView extends Component {
     // High-value symbols (wild + H1..H4 = ids 0..4) carry more visual "weight" —
     // they breathe a touch deeper, the textbook AAA cue that they matter more.
     this.idleAmp = id <= 4 ? 0.03 : 0.018;
+    // WILD + SCATTER stay full size; every other symbol renders 15% smaller so
+    // it sits inside its cell instead of overflowing into the neighbour.
+    this.artBaseScale = FULL_SIZE_IDS.has(id) ? 1 : SYMBOL_SHRINK;
+    if (this.art) this.art.setScale(this.artBaseScale, this.artBaseScale, 1);
   }
 
   /** SY1 idle breathing: a desynced sine scale on the art child while the reel is
@@ -153,14 +168,14 @@ export class SymbolView extends Component {
   update(dt: number): void {
     if (!this.idleOn || !this.art) return;
     this.idleT += dt;
-    const sc = 1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp;
+    const sc = (1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp) * this.artBaseScale;
     this.art.setScale(sc, sc, 1);
   }
 
   /** Toggle idle breathing (ReelView: on when settled, off while spinning). */
   setIdle(on: boolean): void {
     this.idleOn = on;
-    if (!on && this.art) this.art.setScale(1, 1, 1);
+    if (!on && this.art) this.art.setScale(this.artBaseScale, this.artBaseScale, 1);
   }
 
   /** Win pulse + light-up — driven by Cocos Tween. `delay` enables an L→R ripple.
