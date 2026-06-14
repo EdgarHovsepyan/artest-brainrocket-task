@@ -714,7 +714,10 @@ export const VIEW_CONFIG = {
         // Defaults match the legacy betting-bar-web literals — designers
         // tweak here, never in code (Task 2.3).
         cellW: 132,
-        pillCenterX: 388,
+        // Mask-local centre = (SW-24)/2 = (460-24)/2 = 218 (was 388 for SW=800).
+        // Keeps the active cell aligned under the centred pill after the carousel
+        // was narrowed to kill the empty-void (betting-bar-web buildCarousel).
+        pillCenterX: 218,
         fadeScale: [1.0, 0.74, 0.56, 0.5] as readonly number[],
         fadeOpacity: [255, 185, 95, 0] as readonly number[],
       },

@@ -546,8 +546,14 @@ export class BettingBarWeb extends Component {
   }
 
   private buildCarousel(): void {
-    const SX = 1100;
-    const SW = 800;
+    // 2026-06-15 (owner: "carousel empty part, needs centering") — the 800px-wide
+    // container only ever showed ~3 cells (the rest fade to 0), leaving a big empty
+    // void to the right. Narrowed to tightly frame the active pill + one neighbour
+    // each side, and shifted right so the active bet sits at the SAME centre (x1500)
+    // — no void, properly centred. (Pair: view-config bar.web.carousel.pillCenterX
+    // = (SW-24)/2 so the cell-align centre tracks the new mask centre.)
+    const SX = 1270;
+    const SW = 460;
     const g = this.gfx('selector');
     this.panel(g, SX, 148, SW, 76, 38);
     g.fillColor = col(C.activeLo);
