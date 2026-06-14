@@ -168,21 +168,45 @@ export class ParticleLayer extends Component {
     }
   }
 
-  /** Epic-ceremony coin geyser: ballistic gold-tinted shards launched from a point. */
+  /** Epic-ceremony coin geyser: ballistic gold shards launched from a point.
+   *  Real parabola — each coin RISES to an apex (quadOut), then FALLS well past
+   *  the board (quadIn) while spinning, fading only near the end, so the screen
+   *  reads as a torrent of coins raining down, not a puff that vanishes mid-air. */
   coinGeyser(originX = 0, originY = VIEW_CONFIG.layout.reelCenterY): void {
     const cfg = VIEW_CONFIG.particles.coin;
     const spread = (cfg.spreadDeg * Math.PI) / 180;
-    const life = 1.0;
+    const pool = this.pool;
     for (let i = 0; i < cfg.count; i++) {
-      const slot = this.pool.get(originX, originY, COIN, 1.2);
+      const slot = pool.get(originX, originY, COIN, 1.2);
       if (!slot) return;
       const ang = -Math.PI / 2 + (Math.random() - 0.5) * spread; // upward cone
-      const v = cfg.launchSpeed * (0.85 + Math.random() * 0.3);
+      const v = cfg.launchSpeed * (0.85 + Math.random() * 0.45);
       const vx = Math.cos(ang) * v;
       const vy = Math.sin(ang) * v;
-      const endX = originX + vx * life;
-      const endY = originY + vy * life - 0.5 * cfg.gravity * life * life;
-      this.ballistic(slot, endX, endY, life, 'quadIn');
+      // Rise to the apex, then fall far below the launch point.
+      const tApex = Math.max(0.18, Math.abs(vy) / cfg.gravity);
+      const apexX = originX + vx * tApex;
+      const apexY = originY + vy * tApex - 0.5 * cfg.gravity * tApex * tApex;
+      const fall = tApex + 0.55 + Math.random() * 0.35;
+      const endX = apexX + vx * fall * 0.65;
+      const endY = apexY - 0.5 * cfg.gravity * fall * fall; // drops below the board
+      const spin = Math.random() * 720 - 360; // each coin tumbles its own way
+      const node = slot.node;
+      node.angle = 0;
+      tween(node)
+        .to(
+          tApex,
+          { position: new Vec3(apexX, apexY, 0), angle: spin * 0.4 },
+          { easing: 'quadOut' },
+        )
+        .to(fall, { position: new Vec3(endX, endY, 0), angle: spin }, { easing: 'quadIn' })
+        .start();
+      const total = tApex + fall;
+      tween(slot.opacity)
+        .delay(total * 0.72)
+        .to(total * 0.28, { opacity: 0 })
+        .call(() => pool.put(slot))
+        .start();
     }
   }
 

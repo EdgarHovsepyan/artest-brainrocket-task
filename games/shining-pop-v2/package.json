@@ -10,7 +10,7 @@
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "test": "node --import tsx --test tests/spin-engine.test.ts tests/feature.test.ts tests/autoplay.test.ts tests/info-content.test.ts tests/bet-levels.test.ts tests/money.test.ts tests/compliance.test.ts",
+    "test": "node --import tsx --test tests/spin-engine.test.ts tests/feature.test.ts tests/autoplay.test.ts tests/info-content.test.ts tests/bet-levels.test.ts tests/money.test.ts tests/compliance.test.ts tests/architecture.test.ts tests/view-config.test.ts tests/design-tokens.test.ts",
     "sim": "tsx tools/rtp-sim.ts",
     "sim:bonus": "tsx tools/bonus-sim.ts"
   },

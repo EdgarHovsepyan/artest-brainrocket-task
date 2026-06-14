@@ -7,6 +7,7 @@ import { createRng } from '../assets/scripts/logic/rng';
 import { spinGrid, wildStrikeMultiplier } from '../assets/scripts/logic/spin-engine';
 import { runFreeSpins } from '../assets/scripts/logic/bonus-engine';
 import {
+  BONUS_MODES,
   GRID,
   PAYLINES,
   PAYTABLE,
@@ -34,6 +35,21 @@ test('WILD STRIKE triggers at minWilds and caps at maxMultiplier', () => {
   assert.equal(wildStrikeMultiplier(three), Math.min(3, WILD_STRIKE.maxMultiplier));
   const five = Array.from({ length: 5 }, () => [W, 1, 2]);
   assert.equal(wildStrikeMultiplier(five), WILD_STRIKE.maxMultiplier);
+});
+
+test('all Buy-Feature tiers are affordable at the demo start balance', () => {
+  // Demo starts at $1,000 (slot-controller.startBalanceCents = 1000_00) and the
+  // default bet is $1. bonusCost = bet x multiple; the priciest tier (STICKY
+  // WILDS, 110.68x = $110.68) must be buyable from the first interaction. Guards
+  // the "only one bonus works" regression (was a $100 start → WILDS unbuyable).
+  const DEMO_START_CENTS = 1000_00;
+  const model = new SlotModel({ balanceCents: DEMO_START_CENTS, betCents: 1_00 });
+  for (const mode of Object.keys(BONUS_MODES) as (keyof typeof BONUS_MODES)[]) {
+    assert.ok(
+      model.bonusCost(mode) <= DEMO_START_CENTS,
+      `${mode} costs ${model.bonusCost(mode)} > start balance ${DEMO_START_CENTS}`,
+    );
+  }
 });
 
 test('bonus free-spins are deterministic per mode + seed', () => {

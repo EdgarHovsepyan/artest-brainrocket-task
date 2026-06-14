@@ -198,8 +198,9 @@ export const VIEW_CONFIG = {
 
   /** Winning-line presentation. */
   win: {
-    /** Pulse scale applied to winning symbols. */
-    symbolPulseScale: 1.18,
+    /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
+     *  winning cells punch harder before settling into the jelly wobble. */
+    symbolPulseScale: 1.24,
     symbolPulseMs: 420,
     /** PER-SYMBOL WIN IDENTITY — each symbol id celebrates at its OWN intensity
      *  (`heat`), so a WILD win EXPLODES while a low-pays win is a polite bump.
@@ -223,11 +224,11 @@ export const VIEW_CONFIG = {
      *  until the next spin clears them — the modern candy-slot "yummy" feel, not
      *  a uniform scale pulse. jelly = axis amplitude; ms = one full wobble cycle.
      *  The shader rim/sweep shine loops alongside (SlotView's u_time). */
-    winBounceLoop: { enabled: true, jelly: 0.085, ms: 520 },
+    winBounceLoop: { enabled: true, jelly: 0.1, ms: 520 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
-    loserDimOpacity: 115,
+    loserDimOpacity: 95,
     /** Seconds each winning line stays highlighted before cycling to the next. */
     lineCycleSeconds: 0.85,
     /** 2026-06-11 FIRE redesign — `showLines:false` removes the drawn payline
@@ -240,7 +241,7 @@ export const VIEW_CONFIG = {
      *  per winning cell; warm orange→gold, rise + fade. Bumped 6→9 so even a
      *  small win reads clearly (the embers + symbol glow are the only win cue
      *  now that lines are gone). */
-    fireEmbers: { perCell: 12, riseSpeed: 180, lifeMs: 820, spreadPx: 46 },
+    fireEmbers: { perCell: 16, riseSpeed: 180, lifeMs: 820, spreadPx: 52 },
 
     /** The OLD rectangular win-fire flame QUADS behind winning cells read as a
      *  "fire background box" (user-rejected). Fire is now painted PER-SYMBOL,
@@ -252,26 +253,28 @@ export const VIEW_CONFIG = {
      *  ember/gold plasma ribbon stretched between consecutive winning-cell
      *  centres. This is the shader "win line" — no drawn stroke, no magenta
      *  geometry. heightPx = ribbon thickness; maxSegments = pooled sprites;
-     *  fadeInMs/holdOpacity = reveal envelope. */
-    /** revealStaggerMs: each consecutive segment starts its fade this many ms
-     *  after the previous one, so the ribbon DRAWS progressively along the line
-     *  (left→right, line by line) instead of all lighting at once — owner: "win
-     *  line progressive line animation". heightPx trimmed 52→36 for a more
-     *  COMPACT ribbon; holdOpacity lifted for more bloom punch. */
+     *  fadeInMs/holdOpacity = reveal envelope; intensity/flowSpeed drive the
+     *  shader (config-driven; was a hardcoded value in slot-view). revealStaggerMs:
+     *  each segment starts its fade this many ms after the previous so the ribbon
+     *  DRAWS progressively along the line (owner "progressive line animation").
+     *  heightPx 36 = COMPACT ribbon (owner "more compact"); intensity 1.55 = more
+     *  bloom (owner "more bloom"); flowSpeed = charged-stream flow. */
     beams: {
       enabled: true,
       heightPx: 36,
       maxSegments: 16,
       fadeInMs: 150,
-      holdOpacity: 240,
+      holdOpacity: 245,
       revealStaggerMs: 70,
+      intensity: 1.55,
+      flowSpeed: 2.8,
     },
 
     /** CINEMA WAVE — soft-burst.effect replaces the 10-layer Graphics radial glow
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    burst: { enabled: true, intensity: 1.05, scale: 1.4 },
+    burst: { enabled: true, intensity: 1.32, scale: 2.05 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the
@@ -284,7 +287,7 @@ export const VIEW_CONFIG = {
      *  scale = overlay size vs the symbol (1.06 gives the rim a hair of room). */
     symbolFx: {
       enabled: true,
-      intensity: 1.2,
+      intensity: 1.35,
       rimWidth: 0.035,
       sweepSpeed: 0.55,
       envInMs: 220,
@@ -335,7 +338,7 @@ export const VIEW_CONFIG = {
     antHoldMs: { epic: 320, big: 240, base: 150 },
     /** Landing pop on count-complete (damped-elastic). */
     landingPopMs: 380,
-    landingPopScale: 0.3, // +0.42 for MEGA+
+    landingPopScale: 0.36, // bolder land (was 0.3); +0.42 for MEGA+
     landingTintMs: 420,
 
     // ── Task 5.1: heartbeat ticker (log-feel beats) ────────────────────────
@@ -344,8 +347,8 @@ export const VIEW_CONFIG = {
      *  then decay toward 1 per-frame: popScale += (1−popScale)*min(1, decayPerSec*dt).
      *  Beats are dense early, sparse late — the log feel. */
     heartbeat: {
-      popScale: 1.18,
-      decayPerSec: 9,
+      popScale: 1.22,
+      decayPerSec: 8,
       milestoneCount: 6,
     },
   },
@@ -358,10 +361,25 @@ export const VIEW_CONFIG = {
      *  The BIG tier floor stays 15 (resolveBigWinTier), so 10–15x shows a light
      *  ceremony without a named tier banner — graceful escalation. */
     showMinMultiple: 10,
-    /** How long the overlay holds before auto-dismiss (ms). */
-    holdMs: 2000,
-    /** "Held breath" dim before a BIG+ detonation (ms). */
-    microSilenceMs: 200,
+    /** Sylvester — the big win as a 4-beat scripted STORY, expressed as DATA.
+     *  Every duration the ceremony's emotional pacing depends on lives here, so
+     *  the whole arc is one tunable, test-guarded artifact (wired into
+     *  ceremony-view show() + fireDetonationFlash()). Beats run in order:
+     *    1 hush       — held breath before the bang
+     *    2 detonation — flash punch ON, then bloom OUT (the win is revealed)
+     *    3 climax     — count-up roll (longer for bigger wins: base + perTx*tx)
+     *    4 savour     — settle the vignette, hold, then exit
+     *  Replaces the former flat `holdMs` / `microSilenceMs` scalars. */
+    beats: {
+      hushMs: 260,
+      detonationFlashInMs: 50,
+      detonationFlashOutMs: 340,
+      climaxBaseMs: 800,
+      climaxPerTxMs: 1000,
+      savourDimMs: 500,
+      savourHoldBaseMs: 2000,
+      savourHoldPerTxMs: 1100,
+    },
     /** Task 5.MATRIX — 4-tier ceremony re-band (presentation only — math unchanged).
      *  Tiers by win/TOTAL-bet multiple, high → low. First match wins. Per-tier knobs:
      *  - shakeAmp ........ board kick amplitude in px (capped at *1.8 inside the view)
@@ -377,10 +395,10 @@ export const VIEW_CONFIG = {
         name: 'EPIC',
         minMultiple: 100,
         shakeAmp: 20,
-        color: '#ff3cac',
+        color: '#ff1e8c',
         headerKey: 'header_mega_win',
         coinParticles: 1,
-        boardDimAlpha: 0.72,
+        boardDimAlpha: 0.78,
         panelLight: 1.0,
         textPopScale: 1.28,
       },
@@ -391,7 +409,7 @@ export const VIEW_CONFIG = {
         color: '#ff5ab0',
         headerKey: 'header_mega_win',
         coinParticles: 1,
-        boardDimAlpha: 0.5,
+        boardDimAlpha: 0.56,
         panelLight: 0.72,
         textPopScale: 1.22,
       },
@@ -401,7 +419,7 @@ export const VIEW_CONFIG = {
         shakeAmp: 11,
         color: '#ffb000',
         headerKey: 'header_mega_win',
-        coinParticles: 0,
+        coinParticles: 1,
         boardDimAlpha: 0.28,
         panelLight: 0.44,
         textPopScale: 1.18,

@@ -415,9 +415,9 @@ export class SlotView extends Component {
     }
     const tints: Record<typeof mode, [number, number, number, number]> = {
       idle: [0, 0, 0, 0],
-      wilds: [255, 90, 156, 26],
-      crowns: [255, 0, 127, 38],
-      reels: [186, 60, 218, 44],
+      wilds: [255, 90, 156, 26], // STICKY WILDS — hot pink world
+      crowns: [255, 200, 70, 44], // STICKY CROWNS — GOLD world (matches the crown; was magenta, clashed with WILDS)
+      reels: [186, 60, 218, 44], // WILD REELS — electric violet world
     };
     const [r, g, b, a] = tints[mode];
     if (!this.bonusWash) {
@@ -925,9 +925,10 @@ export class SlotView extends Component {
       'u_intensity',
       VIEW_CONFIG.win.burst.intensity,
     );
-    // Lifted 1.15→1.55 for more additive BLOOM on the win ribbon (owner: "more
-    // bloom effect"); the thinner beam (heightPx 36) keeps it from washing out.
-    this.getEffectMaterial('win-beam')?.setProperty('u_intensity', 1.55);
+    // Config-driven (intensity 1.55 = owner "more bloom"; flowSpeed = charged flow).
+    const beam = VIEW_CONFIG.win.beams;
+    this.getEffectMaterial('win-beam')?.setProperty('u_intensity', beam.intensity);
+    this.getEffectMaterial('win-beam')?.setProperty('u_flowSpeed', beam.flowSpeed);
 
     // VFX layers above the reels/win-lines
     this.anticipation = this.mkNode('anticipation', 10, 10, this.node).addComponent(
@@ -1393,11 +1394,15 @@ export class SlotView extends Component {
       for (const w of lineWins) {
         const pts = this.linePts(w);
         if (pts.length < 2) continue;
+        // Per-line colour identity (WL6): each payline traces in its own hue so a
+        // multi-line win reads as distinct ribbons, not one gold jumble. A hot
+        // white hairline rides the centre to keep the core crisp and bright.
+        const hue = LINE_HUES[w.lineIndex % LINE_HUES.length];
         for (const [width, color] of [
-          // Neutral pink-white hairline — the elegant "the line itself" read that
-          // harmonises with the candy-pink bloom WITHOUT being a saturated magenta
-          // drawn stroke (that geometry was the rejected look).
-          [3, new Color(255, 224, 240, 220)],
+          // Per-line hue CORE (color identity, "our palette") under the candy-pink
+          // additive bloom (win-beam.effect). Thin trace (not a heavy stroke) +
+          // a hot white hairline keep it elegant, not a hard magenta line.
+          [3, new Color(hue.r, hue.g, hue.b, 205)],
           [1.2, new Color(255, 250, 252, 255)],
         ] as [number, Color][]) {
           cg.lineWidth = width;
@@ -3537,12 +3542,25 @@ export class SlotView extends Component {
 
   /** Bounce the sticky cells (persistent wilds/crowns) after a free spin so they
    *  read as locked + alive rather than respun. positions = [reel, row][]. */
-  pulseSticky(positions: Array<[number, number]>): void {
+  pulseSticky(
+    positions: Array<[number, number]>,
+    mode: 'idle' | 'wilds' | 'crowns' | 'reels' = this.lastBonusMode,
+  ): void {
     if (!positions || positions.length === 0) return;
+    // Distinct lock "feel" per bonus mechanic so the three features don't read as
+    // the same bounce (paired with the per-mode world tint in setBonusAtmosphere):
+    //   STICKY WILDS — energetic double-pop; CROWNS — tight, bright authoritative
+    //   snap (gold world); WILD REELS — big column surge as the whole reel locks.
+    const lock =
+      mode === 'crowns'
+        ? { peak: 1.1, glowPeak: 210 }
+        : mode === 'reels'
+          ? { peak: 1.24, glowPeak: 150 }
+          : { peak: 1.16, glowPeak: 175 };
     const byReel: number[][] = this.reels.map(() => []);
     for (const [reel, row] of positions) if (byReel[reel]) byReel[reel].push(row);
     this.reels.forEach((reel, i) => {
-      if (byReel[i].length) reel.bounceSticky(byReel[i]);
+      if (byReel[i].length) reel.bounceSticky(byReel[i], lock);
     });
   }
 
