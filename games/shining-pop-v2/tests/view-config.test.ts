@@ -64,6 +64,12 @@ test('win-focus + win-line beams stay within valid ranges', () => {
   assert.ok(b.heightPx > 0);
   assert.ok(b.holdOpacity > 0 && b.holdOpacity <= 255);
   assert.ok(b.intensity > 0 && b.flowSpeed > 0, 'beam shader uniforms must be positive');
+  // win-symbol wave: a positive, brisk per-reel stagger (a sluggish wave > ~0.3s
+  // would make a win feel laggy across the board).
+  assert.ok(
+    VIEW_CONFIG.win.highlightWaveStagger > 0 && VIEW_CONFIG.win.highlightWaveStagger < 0.3,
+    'win highlight wave stagger must be a brisk positive (0, 0.3) seconds',
+  );
 });
 
 test('resolveBigWinTier maps win multiples to the right tier band', () => {

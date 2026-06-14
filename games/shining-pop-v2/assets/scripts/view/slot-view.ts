@@ -3187,7 +3187,8 @@ export class SlotView extends Component {
     // symbol falls back to the Graphics sheen; otherwise advance the shared
     // material's u_time globally (one stepper, all overlays animate in sync).
     const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
-    this.reels.forEach((reel, i) => reel.highlight(byReel[i] ?? [], i * 0.06, rich, winMat));
+    const waveStagger = VIEW_CONFIG.win.highlightWaveStagger;
+    this.reels.forEach((reel, i) => reel.highlight(byReel[i] ?? [], i * waveStagger, rich, winMat));
     // One global u_time stepper drives symbol-win + soft-burst + win-beam in sync.
     // The burst shows on EVERY win (it replaced the always-on glow), so schedule
     // whenever any shader-backed win layer can be visible.
