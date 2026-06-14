@@ -9,9 +9,20 @@ import { ParticlePool, PoolShard } from './particle-pool';
 import { VIEW_CONFIG } from './view-config';
 
 const { ccclass } = _decorator;
-const ACID = new Color(234, 255, 0, 255);
 const WHITE = new Color(255, 255, 255, 255);
 const COIN = new Color(255, 196, 64, 255);
+// CANDY CONFETTI — the win burst sprays a sweet-shop mix (pink, mint, gold,
+// lavender, sugar-white, sky) so a win reads "yummy candy", not harsh acid/fire.
+const CANDY = [
+  new Color(255, 120, 180, 255), // candy pink
+  new Color(255, 90, 156, 255), // hot pink
+  new Color(126, 240, 192, 255), // mint
+  new Color(255, 205, 90, 255), // gold
+  new Color(200, 160, 255, 255), // lavender
+  new Color(255, 250, 252, 255), // sugar white
+  new Color(150, 215, 255, 255), // sky candy
+];
+const candy = () => CANDY[(Math.random() * CANDY.length) | 0]!;
 
 interface PhysParticle {
   slot: PoolShard;
@@ -101,18 +112,19 @@ export class ParticleLayer extends Component {
     }
   }
 
-  /** FIRE EMBERS (2026-06-11): warm orange→gold motes rising from each winning
-   *  cell centre, drifting up + sideways and fading — the win indicator that
-   *  replaces the drawn payline. Reads as heat/embers off the symbol, no
-   *  geometry. */
+  /** SUGAR SPARKLES (candy redesign): sweet-coloured motes rising from each
+   *  winning cell — pink/gold/mint/sugar-white — drifting up + sideways and
+   *  fading. The win indicator that replaces the drawn payline; reads as candy
+   *  sparkle off the symbol (was warm fire embers — off-theme for a candy slot),
+   *  no geometry. */
   fireEmbers(centers: Vec3[]): void {
     const cfg = VIEW_CONFIG.win.fireEmbers;
     const life = cfg.lifeMs / 1000;
     const warm = [
-      new Color(255, 170, 60, 255), // amber
-      new Color(255, 120, 30, 255), // orange
-      new Color(255, 220, 130, 255), // gold
-      new Color(255, 248, 222, 255), // white-hot spark
+      new Color(255, 130, 190, 255), // candy pink
+      new Color(255, 205, 90, 255), // gold
+      new Color(140, 240, 200, 255), // mint
+      new Color(255, 250, 250, 255), // sugar-white spark
     ];
     for (const c of centers) {
       // Phase 1 — IGNITE RING: a radial pop of fast, hard-damped light points
@@ -211,8 +223,9 @@ export class ParticleLayer extends Component {
   }
 
   private spawn(x: number, y: number, big: boolean): void {
-    const color = Math.random() < 0.5 ? ACID : WHITE;
-    const scale = big ? 0.9 : 0.6;
+    // Candy confetti: mostly the sweet-shop mix, a sugar-white sparkle ~1 in 5.
+    const color = Math.random() < 0.2 ? WHITE : candy();
+    const scale = big ? 0.95 : 0.62;
     const slot = this.pool.get(x, y, color, scale);
     if (!slot) return; // pool full — silent drop
     const ang = Math.random() * Math.PI * 2;
