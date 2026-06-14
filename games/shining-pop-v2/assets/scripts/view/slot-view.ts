@@ -419,6 +419,14 @@ export class SlotView extends Component {
         const sk = this.fsBg;
         if (!sk || !sk.node.isValid) return;
         sk.node.active = true;
+        // Z-ORDER FIX — the fs-world was buried at a low sibling index, BELOW the
+        // base-game bg decorations (bokeh/glow/vignette) which painted over it and
+        // washed it out. Raise it to just under the reel FRAME so the Cupids
+        // free-spins world dominates the backdrop (still below the reels), AND
+        // dim the base bg atmosphere so the two backgrounds don't clash.
+        const frame = this.node.getChildByName('frame');
+        if (frame) sk.node.setSiblingIndex(Math.max(0, frame.getSiblingIndex() - 1));
+        this.fadeBaseBgForBonus(true);
         sk.setAnimation(0, 'freespins-intro', false);
         sk.addAnimation(0, 'freespins-idle', true, 0);
         if (this.fsBgOp) {
@@ -428,6 +436,7 @@ export class SlotView extends Component {
         }
       });
     } else if (this.fsBg && this.fsBg.node.active && this.fsBgOp) {
+      this.fadeBaseBgForBonus(false);
       this.fsBg.setAnimation(0, 'freespins-outro', false);
       Tween.stopAllByTarget(this.fsBgOp);
       tween(this.fsBgOp)
@@ -435,6 +444,27 @@ export class SlotView extends Component {
         .call(() => {
           if (this.fsBg) this.fsBg.node.active = false;
         })
+        .start();
+    } else if (!entering) {
+      this.fadeBaseBgForBonus(false); // no fs-bg loaded — still restore the base bg
+    }
+  }
+
+  /** Dim the base-game background atmosphere (bokeh / glow / vignette) while the
+   *  Cupids free-spins world is up, so the two backdrops don't clash; restore on
+   *  exit. Found by name (no extra wiring) and cached on first use. */
+  private baseBgLayers: UIOpacity[] | null = null;
+  private fadeBaseBgForBonus(dim: boolean): void {
+    if (!this.baseBgLayers) {
+      this.baseBgLayers = ['bg_bokeh', 'bg_glow', 'bg_vignette']
+        .map((nm) => this.node.getChildByName(nm))
+        .filter((n): n is Node => !!n)
+        .map((n) => n.getComponent(UIOpacity) ?? n.addComponent(UIOpacity));
+    }
+    for (const op of this.baseBgLayers) {
+      Tween.stopAllByTarget(op);
+      tween(op)
+        .to(0.45, { opacity: dim ? 40 : 255 }, { easing: 'sineInOut' })
         .start();
     }
   }
