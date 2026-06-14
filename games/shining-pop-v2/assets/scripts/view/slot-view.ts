@@ -3494,11 +3494,11 @@ export class SlotView extends Component {
     if (this.candySpark) return this.candySpark;
     const n = this.mkNode('candySpark', 18, 18, this.winLineG!.node);
     const g = n.addComponent(Graphics);
-    // bright filled gold diamond core (no ring/stroke — slot-vfx shape rule)
+    // bright candy spark: soft red halo → white-hot core (no ring/stroke)
     (
       [
-        [10, 255, 245, 210, 90],
-        [6, 255, 255, 255, 235],
+        [11, 255, 70, 96, 90],
+        [6, 255, 255, 255, 245],
       ] as number[][]
     ).forEach(([r, cr, cg, cb, a]) => {
       g.fillColor = new Color(cr, cg, cb, a);
@@ -3519,10 +3519,19 @@ export class SlotView extends Component {
    *  bright leading SPARK that races L→R as if drawing the line. NOT the rejected
    *  magenta polyline or the rainbow plasma beam — one elegant gold thread that
    *  reads the win PATH. Pure Graphics + one pooled spark; cleared in clearWins. */
+  private candyLinePts: Vec3[][] = [];
+  private tickCandyLine = (): void => this.paintCandyLines();
+
+  /** CANDY-MATERIAL win line (owner: "candy material, red + whitesmoke, bloom, all
+   *  lines, master level"). Collects EVERY winning line's cell-centre path, then
+   *  paints them as a flowing red+whitesmoke CANDY-CANE stripe over a soft red
+   *  BLOOM, re-painted each frame so the stripes scroll like a live peppermint
+   *  ribbon. A bright candy spark traces the longest line on reveal. reducedFx →
+   *  a single static paint, no scroll, no spark. */
   private drawCandyWinLines(lines: { lineIndex: number; count: number }[]): void {
     const g = this.winLineG;
     if (!g) return;
-    g.clear();
+    this.candyLinePts = [];
     let longest: Vec3[] = [];
     for (const { lineIndex, count } of lines) {
       const rows = PAYLINES[lineIndex];
@@ -3530,27 +3539,20 @@ export class SlotView extends Component {
       const pts: Vec3[] = [];
       for (let reel = 0; reel < count; reel++) pts.push(this.cellCenter(reel, rows[reel]));
       if (pts.length < 2) continue;
+      this.candyLinePts.push(pts);
       if (pts.length > longest.length) longest = pts;
-      // soft warm-gold glow underlay (wide, low alpha — reads as light, not a stroke)
-      g.lineWidth = 11;
-      g.strokeColor = new Color(255, 198, 96, 38);
-      g.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
-      g.stroke();
-      // crisp gold core
-      g.lineWidth = 3.5;
-      g.strokeColor = new Color(255, 228, 156, 235);
-      g.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
-      g.stroke();
+    }
+    this.paintCandyLines();
+    if (!this.reducedFx) {
+      this.unschedule(this.tickCandyLine);
+      this.schedule(this.tickCandyLine, 0); // flowing stripes (the "material" lives)
     }
     // soft fade-in of the whole line layer (ease-out entrance — web-animations)
     const op = g.node.getComponent(UIOpacity) ?? g.node.addComponent(UIOpacity);
     Tween.stopAllByTarget(op);
     op.opacity = 0;
     tween(op).to(0.18, { opacity: 255 }, { easing: 'quadOut' }).start();
-    // leading SPARK races L→R along the longest line (the "draw" cue) — skipped
-    // under reducedFx (the static gold line is the information; the spark is motion).
+    // leading candy SPARK traces the longest line on reveal (skipped under reducedFx)
     if (longest.length >= 2 && !this.reducedFx) {
       const spark = this.ensureCandySpark();
       spark.active = true;
@@ -3563,7 +3565,56 @@ export class SlotView extends Component {
       for (let i = 1; i < longest.length; i++) {
         chain = chain.to(0.085, { position: longest[i] }, { easing: 'sineInOut' });
       }
-      chain.call(() => tween(sop).to(0.18, { opacity: 0 }, { easing: 'quadIn' }).start()).start();
+      chain.call(() => tween(sop).to(0.2, { opacity: 0 }, { easing: 'quadIn' }).start()).start();
+    }
+  }
+
+  /** Paint all candy win lines this frame: a soft red BLOOM (stacked translucent
+   *  strokes, reads as candy glow) + a red+whitesmoke CANDY-CANE core whose dashes
+   *  scroll by a u_time phase so the peppermint stripe flows. */
+  private paintCandyLines(): void {
+    const g = this.winLineG;
+    if (!g) return;
+    g.clear();
+    const RED = new Color(255, 58, 74, 242);
+    const SMOKE = new Color(247, 247, 250, 250);
+    const DASH = 12;
+    const phase = this.reducedFx ? 0 : (this.uTime * 46) % (DASH * 2); // scroll
+    for (const pts of this.candyLinePts) {
+      // BLOOM underlay — stacked soft red/pink strokes (wide→narrow, low→higher a)
+      const glow = (cr: number, cg: number, cb: number, ca: number, w: number) => {
+        g.lineWidth = w;
+        g.strokeColor = new Color(cr, cg, cb, ca);
+        g.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+        g.stroke();
+      };
+      glow(255, 72, 110, 24, 20);
+      glow(255, 96, 124, 48, 12);
+      glow(255, 162, 182, 80, 7);
+      // CANDY-CANE core — continuous DASH chunks coloured by global distance +
+      // phase so red/whitesmoke stripes flow seamlessly along the whole line.
+      let accum = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const ax = pts[i - 1].x,
+          ay = pts[i - 1].y;
+        const dx = pts[i].x - ax,
+          dy = pts[i].y - ay;
+        const len = Math.hypot(dx, dy) || 1;
+        const ux = dx / len,
+          uy = dy / len;
+        let d = 0;
+        while (d < len) {
+          const s1 = Math.min(len, d + DASH);
+          g.lineWidth = 5;
+          g.strokeColor = Math.floor((accum + d + phase) / DASH) % 2 === 0 ? RED : SMOKE;
+          g.moveTo(ax + ux * d, ay + uy * d);
+          g.lineTo(ax + ux * s1, ay + uy * s1);
+          g.stroke();
+          d += DASH;
+        }
+        accum += len;
+      }
     }
   }
 
@@ -3590,6 +3641,8 @@ export class SlotView extends Component {
     });
     this.lineWinPops.length = 0;
     this.winLines = [];
+    this.unschedule(this.tickCandyLine); // stop the flowing candy-line repaint
+    this.candyLinePts = [];
     this.winLineG?.clear();
     // Candy win-line spark + the line layer's fade go inactive/reset on clear.
     if (this.candySpark) {
