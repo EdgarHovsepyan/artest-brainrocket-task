@@ -108,6 +108,14 @@ export class CeremonyView extends Component {
     // the eye. This is the premium "scene reacts" look, never a black box.
     const dimNode = this.mk('dim', 4000, 4000, this.node);
     const dg = dimNode.addComponent(Graphics);
+    // FULLSCREEN dark base (2026-06-15) — DIM-THE-REST so the banner + win number
+    // read on a dark field, not the pale candy-world background (the residual
+    // "washed/white screen" feel during a big win: the old dim was a vignette that
+    // left the CENTRE — exactly where the banner sits — bright). The vignette rings
+    // below deepen the edges on top of this uniform base to funnel the eye to centre.
+    dg.fillColor = new Color(6, 3, 13, 142);
+    dg.rect(-2000, -2000, 4000, 4000);
+    dg.fill();
     const RINGS = 16;
     for (let i = 0; i < RINGS; i++) {
       const t = i / (RINGS - 1); // 0 = outer screen edge, 1 = centre
@@ -301,33 +309,55 @@ export class CeremonyView extends Component {
       const useSpine = !!this.winSpine && this.winSpine.isValid && !reduced;
       if (useSpine) {
         const anim = CeremonyView.TIER_ANIM[tier.name] ?? 'normal-win';
-        // WHITE-GLITCH FIX — force opacity 0, queue the animation, PRIME frame-0
-        // (update(0)) and only THEN activate the node, so Cocos never paints the
-        // skeleton's white setup/bind quad on the first active frame.
+        const sk = this.winSpine!;
+        // WHITE-GLITCH FIX (2 parts):
+        // (1) PRIME frame-0 (updateAnimation(0)) BEFORE active so Cocos never paints
+        //     the skeleton's white setup/bind quad on the first active frame.
+        // (2) Fade via the SKELETON COLOR, never UIOpacity. Fading a PREMULTIPLIED-
+        //     alpha Spine (pma:true) with UIOpacity scales the vertex ALPHA but not
+        //     the already-premultiplied RGB, so it washes to WHITE mid-fade (the
+        //     reported "white screen"). Tinting all 4 colour channels by f scales the
+        //     premultiplied RGB too → a clean fade to transparent. Node opacity stays
+        //     255; the tint does the fade.
         if (this.winSpineOp) {
           Tween.stopAllByTarget(this.winSpineOp);
-          this.winSpineOp.opacity = 0;
+          this.winSpineOp.opacity = 255;
         }
-        this.winSpine!.setAnimation(0, `${anim}-start`, false);
-        this.winSpine!.addAnimation(0, `${anim}-loop`, true, 0);
-        this.winSpine!.updateAnimation(0); // real frame-0 pose before the node shows
-        this.winSpine!.node.active = true; // active LAST: posed + invisible
-        // fade the banner IN with the detonation (no hard pop-on / no white quad).
-        if (this.winSpineOp) {
-          tween(this.winSpineOp).to(0.2, { opacity: 255 }, { easing: 'quadOut' }).start();
-        }
+        sk.setAnimation(0, `${anim}-start`, false);
+        sk.addAnimation(0, `${anim}-loop`, true, 0);
+        sk.updateAnimation(0); // real frame-0 pose before the node shows
+        sk.color = new Color(0, 0, 0, 0); // start transparent (pma-correct)
+        sk.node.active = true; // active LAST: posed + transparent
+        const fadeIn = { f: 0 };
+        Tween.stopAllByTarget(fadeIn);
+        tween(fadeIn)
+          .to(
+            0.24,
+            { f: 1 },
+            {
+              easing: 'quadOut',
+              onUpdate: () => {
+                if (!sk.isValid) return;
+                const v = Math.round(255 * fadeIn.f);
+                sk.color = new Color(v, v, v, v);
+              },
+            },
+          )
+          .start();
       } else if (this.winSpine) {
         // procedural/reduced path: keep the banner hidden so it can't linger.
         this.winSpine.node.active = false;
       }
       if (!reduced) {
-        // MAXIMUM DRAMA — the fullscreen flash + light-bloom shock fire on EVERY
-        // tier INCLUDING the Spine path, so the hit always BANGS (previously the
-        // Spine path had no flash/shock and read flat). The rotating god-rays
-        // stay procedural-only — the authored Spine banner carries its own rays.
-        this.fireDetonationFlash(tx);
-        this.fireShock(240 + 200 * tx);
+        // FLASH/SHOCK ARE FALLBACK-ONLY (2026-06-15 white-screen fix). The Spine
+        // banner is the HERO and carries its OWN backglow + rays + bloom; firing the
+        // fullscreen detonation flash + the big expanding shock on the Spine path
+        // WASHED the banner white (the reported "white screen on big win"). On the
+        // Spine path the banner SLAM (its -start animation) + the camera shake below
+        // ARE the impact. The procedural drama stays for the no-skeleton fallback.
         if (!useSpine) {
+          this.fireDetonationFlash(tx);
+          this.fireShock(240 + 200 * tx);
           this.drawRays(Math.round(8 + 12 * tx), 300 + 320 * tx, 0.5 + 0.5 * t);
           this.raysNode.angle = 0;
           tween(this.raysNode)
@@ -336,7 +366,7 @@ export class CeremonyView extends Component {
             .start();
         }
         // amplitude tracks the realised win continuously, but CAP it (~tier*4)
-        // so a max-win can't nauseate (slot-vfx restraint rule).
+        // so a max-win can't nauseate (slot-vfx restraint rule). Both paths shake.
         this.shake(Math.min(tier.shakeAmp * 1.8, tier.shakeAmp + 14 * tx));
       }
       // AV-sync hook: the controller fires the braam/win sting on this exact
@@ -576,18 +606,38 @@ export class CeremonyView extends Component {
       Tween.stopAllByTarget(this.numberGlowOp);
       tween(this.numberGlowOp).to(0.18, { opacity: 0 }).start();
     }
-    // Spine banner fades OUT (cupid-wf has no -out anim) so the hero exits
-    // gracefully instead of vanishing with the scale-down.
-    if (this.winSpineOp) {
-      Tween.stopAllByTarget(this.winSpineOp);
-      tween(this.winSpineOp).to(0.2, { opacity: 0 }, { easing: 'quadIn' }).start();
+    // Spine banner fades OUT via the SKELETON COLOR (same pma reason as the fade-in:
+    // UIOpacity-fading a premultiplied Spine washes it white). Tint all 4 channels
+    // down to 0 so the hero exits cleanly to transparent, never a white flash.
+    if (this.winSpine && this.winSpine.isValid) {
+      const sk = this.winSpine;
+      const fadeOut = { f: 1 };
+      Tween.stopAllByTarget(fadeOut);
+      tween(fadeOut)
+        .to(
+          0.2,
+          { f: 0 },
+          {
+            easing: 'quadIn',
+            onUpdate: () => {
+              if (!sk.isValid) return;
+              const v = Math.round(255 * fadeOut.f);
+              sk.color = new Color(v, v, v, v);
+            },
+          },
+        )
+        .start();
     }
     tween(this.overlay)
       .to(0.22, { scale: new Vec3(0.6, 0.6, 1) }, { easing: 'quadIn' })
       .call(() => {
         this.overlay.active = false;
-        // park the banner inactive + opaque so the next show's fade-in is clean.
-        if (this.winSpine) this.winSpine.node.active = false;
+        // park the banner inactive + RESET the tint to full so the next show's
+        // fade-in starts from a clean, fully-coloured skeleton.
+        if (this.winSpine) {
+          this.winSpine.node.active = false;
+          if (this.winSpine.isValid) this.winSpine.color = new Color(255, 255, 255, 255);
+        }
         if (this.winSpineOp) this.winSpineOp.opacity = 255;
       })
       .start();
