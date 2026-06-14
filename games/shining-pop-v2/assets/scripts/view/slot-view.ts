@@ -203,6 +203,14 @@ export class SlotView extends Component {
   // Transient cinematic win bloom-flash — opacity 0 at REST (never covers the
   // board), flares warm on the big-win detonation frame, then decays.
   private cineBloomOp: UIOpacity | null = null;
+  // DEPTH PARALLAX — the painted bg layers leak a small per-layer offset (deeper
+  // layers move less) driven by spin-lean + win-pulse, so the flat backdrop reads
+  // as a layered world that LEANS into the spin and breathes out on a win. Pure
+  // transform on existing nodes (no new draw). Frozen at base under reducedFx.
+  private parallaxLayers: { node: Node; depth: number; baseX: number; baseY: number }[] = [];
+  private pxLean = 0; // lerped 0..1 spin lean
+  private pxLeanTarget = 0; // 0 at rest, 1 while spinning
+  private pxPulse = 0; // win breathe, decays to 0
   // The buy-FAB's build-time scale (targetW/aw) — fit() multiplies it by a
   // per-orientation factor so the badge stays a consistent on-screen size.
   private buyFabBaseScale = 1;
@@ -1689,6 +1697,22 @@ export class SlotView extends Component {
         this.plasmaDiscs[i].setScale(s, s, 1);
       }
     }
+    // DEPTH PARALLAX — lerp the spin-lean toward its target, decay the win pulse,
+    // and push each painted layer by its depth weight. reducedFx freezes at base.
+    if (this.parallaxLayers.length) {
+      const p = VIEW_CONFIG.world.parallax;
+      if (this.reducedFx) {
+        this.pxLean = 0;
+        this.pxPulse = 0;
+      } else {
+        this.pxLean += (this.pxLeanTarget - this.pxLean) * Math.min(1, dt * p.leanLerp);
+        this.pxPulse *= Math.max(0, 1 - dt * p.pulseDecay);
+      }
+      const offY = -this.pxLean * p.spinLeanPx + this.pxPulse * p.winPulsePx;
+      for (const L of this.parallaxLayers) {
+        L.node.setPosition(L.baseX, L.baseY + offY * L.depth, 0);
+      }
+    }
   };
 
   private buildBackground(): void {
@@ -1798,6 +1822,22 @@ export class SlotView extends Component {
       vg.lineTo(cx, cy + dy * 420);
       vg.close();
       vg.fill();
+    });
+
+    // DEPTH PARALLAX — register the painted layers with a depth weight (the deep
+    // painting moves MOST as the world "leans", sparkles/glow follow at a fraction;
+    // the vignette never moves). tickUTime offsets each by depth × (spin-lean +
+    // win-pulse). Base = the node's build position so a resize never drifts it.
+    (
+      [
+        ['bg_art', 1.0],
+        ['bg_bokeh', 0.55],
+        ['bg_glow', 0.35],
+      ] as [string, number][]
+    ).forEach(([name, depth]) => {
+      const node = this.node.getChildByName(name);
+      if (node)
+        this.parallaxLayers.push({ node, depth, baseX: node.position.x, baseY: node.position.y });
     });
   }
 
@@ -3308,6 +3348,7 @@ export class SlotView extends Component {
 
     this.audio.spinStart();
     this.audio.startRush();
+    this.pxLeanTarget = 1; // world leans into the spin (depth parallax)
     if (antic) this.audio.anticipation();
     // Task 4.2 — portal entry pulse at launch (single fire — both top/bottom).
     this.playReelPortalEntry();
@@ -3355,6 +3396,7 @@ export class SlotView extends Component {
       }),
     );
     this.audio.stopRush();
+    this.pxLeanTarget = 0; // reels landed → world eases back out of the lean
     this.anticipation.clear();
   }
 
@@ -3384,6 +3426,7 @@ export class SlotView extends Component {
         const progress = winningReels.length > 1 ? order / (winningReels.length - 1) : 0;
         this.scheduleOnce(() => this.audio.countTick(progress), reelIdx * waveStagger);
       });
+      this.pxPulse = 1; // world "breathes out" on the win (depth parallax)
     }
     // One global u_time stepper drives symbol-win + soft-burst + win-beam in sync.
     // The burst shows on EVERY win (it replaced the always-on glow), so schedule

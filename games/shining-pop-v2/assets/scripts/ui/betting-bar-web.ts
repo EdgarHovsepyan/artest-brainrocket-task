@@ -979,7 +979,16 @@ export class BettingBarWeb extends Component {
    *  spinBody (a child) so it composes with, never fights, the ring press-squash.
    *  Paused while spinning. (Schell "Lens of the Toy": the base game should feel
    *  alive to fidget with before any win.) */
+  private reducedMotion = false;
+  /** WCAG 2.3.3 — honor reduced-motion: stop the perpetual idle CTA breathe and
+   *  make the win count-up instant (see setLastWin). Press/state feedback stays. */
+  setReducedFx(on: boolean): void {
+    this.reducedMotion = on;
+    if (on) this.stopSpinBreathe();
+    else this.startSpinBreathe();
+  }
   private startSpinBreathe(): void {
+    if (this.reducedMotion) return; // WCAG 2.3.3 — no perpetual idle motion
     if (!this.spinBody) return;
     Tween.stopAllByTarget(this.spinBody);
     this.spinBody.setScale(1, 1, 1);
@@ -1228,6 +1237,13 @@ export class BettingBarWeb extends Component {
     lo.width = Math.max(1, Math.round(2 * FS));
   }
   setLastWin(n: number): void {
+    // WCAG 2.3.3 — reduced-motion: skip the count-up + pop, set the value instantly.
+    if (this.reducedMotion) {
+      this.counters.win.shown = n;
+      this.lastWinValue.string = this.fmt(n);
+      this.relayoutBanners();
+      return;
+    }
     // Classic 0 -> win tick: reset the shown value so it always counts up.
     this.counters.win.shown = 0;
     this.countTo('win', n, (v) => {

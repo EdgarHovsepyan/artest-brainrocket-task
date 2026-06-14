@@ -452,6 +452,7 @@ export class BettingBarMobile extends Component {
    *  slow ~3s sine so the spin CTA feels alive between spins. (Schell "Lens of the
    *  Toy": the base game should feel alive to fidget with before any win.) */
   private startSpinBreathe(): void {
+    if (this.reducedMotion) return; // WCAG 2.3.3 — no perpetual idle motion
     if (!this.spinHalo || !this.spinHaloOp) return;
     Tween.stopAllByTarget(this.spinHalo);
     Tween.stopAllByTarget(this.spinHaloOp);
@@ -892,6 +893,14 @@ export class BettingBarMobile extends Component {
     if (emit) this.events.emit('volume', this.volume);
   }
   // ── live game-state (matches the Pixi bar) ──
+  private reducedMotion = false;
+  /** WCAG 2.3.3 — honor reduced-motion: stop the perpetual idle CTA breathe (non-
+   *  essential motion). The static CTA still reads; press/state feedback stays. */
+  setReducedFx(on: boolean): void {
+    this.reducedMotion = on;
+    if (on) this.stopSpinBreathe();
+    else this.startSpinBreathe();
+  }
   setSpinning(on: boolean): void {
     this.spinArrow.active = !on;
     this.spinStop.active = !!on;

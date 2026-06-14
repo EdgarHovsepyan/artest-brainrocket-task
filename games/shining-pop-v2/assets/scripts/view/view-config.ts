@@ -521,6 +521,19 @@ export const VIEW_CONFIG = {
   /** Turbo speed scalar (OFF/TURBO/MAX) — scales reel baseDur + stagger. */
   turbo: { off: 1.0, turbo: 0.4, max: 0.16 },
 
+  /** World depth. The painted bg layers offset by depth × (spin-lean + win-pulse)
+   *  so the flat backdrop reads as a layered world that LEANS into the spin and
+   *  breathes out on a win. Pure transform on existing nodes; frozen at base under
+   *  reducedFx. Deeper layers (the painting) move most; the vignette never moves. */
+  world: {
+    parallax: {
+      spinLeanPx: 16, // peak downward lean of the deepest layer while spinning
+      winPulsePx: 12, // upward breathe of the deepest layer on a win (decays)
+      leanLerp: 5, // spin-lean ease rate (× dt)
+      pulseDecay: 2.0, // win-pulse decay rate (× dt)
+    },
+  },
+
   /** Reel land / squash / settle (damped-spring), per turbo mode. */
   land: {
     armAt: 0.965, // p >= armAt arms the landing

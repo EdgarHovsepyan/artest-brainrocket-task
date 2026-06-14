@@ -237,6 +237,7 @@ export class SlotController extends Component {
       this.bar.setLastWin(0);
       this.bar.setTurbo(this.turboMode);
       this.bar.setSoundOn(!this.muted);
+      this.bar.setReducedFx(this.reducedFx); // re-built bar inherits the WCAG setting
       this.bar.setAutoplay(this.autoplay.active ? this.autoplay.remaining : null);
       if (this.barIsWeb) {
         (this.bar as BettingBarWeb).setSpinArt(this.view.getBrandFrame('spinArt'));
@@ -426,6 +427,7 @@ export class SlotController extends Component {
     } else {
       this.reducedFx = value as boolean;
       this.view.setReducedFx(this.reducedFx);
+      this.bar.setReducedFx(this.reducedFx); // WCAG 2.3.3 — propagate to the HUD bar
     }
     this.refreshSettingsPanel();
     this.view.openSettingsPanel();
