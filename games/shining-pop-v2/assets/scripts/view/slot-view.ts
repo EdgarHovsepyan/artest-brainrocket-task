@@ -1941,7 +1941,11 @@ export class SlotView extends Component {
     g.fill();
     // (c) PORTAL WELL — deep glass + stacked centre-darkening insets give the
     // window genuine DEPTH (a portal into another space), not a flat panel.
-    g.fillColor = new Color(14, 7, 26, 214);
+    // TRANSPARENCY (owner: "reels need a transparency effect") — the well is now
+    // a semi-transparent glass (alpha 158, was 214) so the cosmic shimmer + the
+    // painted candy world read THROUGH the window like a real portal, not a solid
+    // dark panel. Symbols stay fully opaque, so readability is untouched.
+    g.fillColor = new Color(14, 7, 26, 158);
     g.roundRect(-w / 2, -h / 2, w, h, 14);
     g.fill();
     for (let i = 1; i <= 5; i++) {
