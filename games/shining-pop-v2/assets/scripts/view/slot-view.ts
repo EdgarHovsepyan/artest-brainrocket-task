@@ -3634,8 +3634,8 @@ export class SlotView extends Component {
     return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }
 
-  showFeatureUnlocked(name: string): void {
-    this.ceremony.showFeatureUnlocked(name);
+  showFeatureUnlocked(name: string, mode?: 'wilds' | 'crowns' | 'reels'): void {
+    this.ceremony.showFeatureUnlocked(name, mode);
   }
 
   /** Shard burst from the winning cells, scaled by win/total-bet multiple. */

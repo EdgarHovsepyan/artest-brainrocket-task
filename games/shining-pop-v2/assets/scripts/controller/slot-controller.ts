@@ -215,7 +215,12 @@ export class SlotController extends Component {
     this.bar.on('autoplay', () => this.toggleAuto());
     this.bar.on('sound', () => this.toggleSound());
     this.bar.on('volume', (v: number) => this.view.setVolume(v));
-    this.bar.on('menu', () => this.view.openMenuHub());
+    // Only open the hub when idle — during a bought feature (state==='bonus') the
+    // hub would expose a "BUY FEATURE" entry while a feature is already running
+    // (approval-reviewer trip). Mid-spin it's also a dead distraction.
+    this.bar.on('menu', () => {
+      if (this.state === 'idle') this.view.openMenuHub();
+    });
     this.bar.on('ui:click', () => this.view.audio.click());
     // Task 7.2 — portrait bar emits 'buy' from its new Buy control next to
     // the spin ring. Web bar already routes to openBuyMenu via the FAB.
@@ -590,12 +595,15 @@ export class SlotController extends Component {
     this.view.clearWins();
     this.view.setWin(0);
     this.view.setBanner(BONUS_MODES[mode].name);
-    this.view.showFeatureUnlocked(BONUS_MODES[mode].name);
+    // ONE cohesive unlock beat: the mode-coloured splash AND the world tint fire
+    // together (the atmosphere's 0.45s ramp hides under the splash hold) so it
+    // reads as "you unlocked WILDS", not a banner then a separate tint.
+    this.view.showFeatureUnlocked(BONUS_MODES[mode].name, mode);
+    this.view.setBonusAtmosphere(mode);
 
     const outcome = this.model.buyBonus(mode);
     this.view.audio.buyConfirm();
     this.view.audio.bonusIntro();
-    this.view.setBonusAtmosphere(mode);
     this.view.setBalance(outcome.balanceCents);
     this.bar.setBalance(outcome.balanceCents / 100);
 

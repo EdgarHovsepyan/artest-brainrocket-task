@@ -401,16 +401,35 @@ export class CeremonyView extends Component {
     return true;
   }
 
-  /** Feature-unlocked splash (reuses the light rig at fixed mid intensity). */
-  showFeatureUnlocked(name: string): void {
+  /** Per-mode unlock colour so the splash GLOWS in the bonus's own hue (was a
+   *  mode-blind magenta for all three). */
+  private static MODE_RGB: Record<string, [number, number, number]> = {
+    wilds: [255, 90, 156], // hot candy pink
+    crowns: [255, 198, 70], // regal gold
+    reels: [188, 70, 224], // electric violet
+  };
+
+  /** Feature-unlocked splash (reuses the light rig at fixed mid intensity). Now
+   *  mode-coloured + a buy-confirm detonation flash so spending money BANGS. */
+  showFeatureUnlocked(name: string, mode?: 'wilds' | 'crowns' | 'reels'): void {
     this.abort();
+    const rgb = mode ? CeremonyView.MODE_RGB[mode] : null;
+    const modeCol = rgb ? new Color(rgb[0], rgb[1], rgb[2], 255) : TITLE;
     this.headerLabel.string = name;
-    this.headerLabel.color = TITLE;
+    this.headerLabel.color = modeCol;
     this.headerLabel.fontSize = 50;
-    this.setAmount('FEATURE');
+    this.setAmount('UNLOCKED'); // was "FEATURE" — clearer + more celebratory
+    this.amountLabel.color = rgb
+      ? new Color(
+          Math.min(255, rgb[0] + 40),
+          Math.min(255, rgb[1] + 40),
+          Math.min(255, rgb[2] + 40),
+          255,
+        )
+      : CRYSTAL;
     this.badgeLabel.string = '';
     // WC9 — light the emissive backing at the fixed mid intensity too, so the
-    // FEATURE word glows like the win number rather than reading as flat text.
+    // word glows like the win number rather than reading as flat text.
     this.numberGlowBase = 150;
     this.numberGlow.node.setScale(1, 1, 1);
     if (this.numberGlowOp) {
@@ -421,9 +440,10 @@ export class CeremonyView extends Component {
     const ov = this.overlay;
     ov.active = true;
     ov.setScale(0.6, 0.6, 1);
-    this.drawRays(12, 380, 0.7);
+    this.drawRays(12, 380, 0.7, rgb ? modeCol : undefined); // mode-coloured shafts
     tween(this.raysNode).by(6, { angle: 18 }).repeatForever().start();
     this.fireShock(280);
+    this.fireDetonationFlash(0.6); // buy-confirm BANG — the purchase lands as impact
     tween(ov)
       .to(0.3, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .start();
@@ -436,7 +456,7 @@ export class CeremonyView extends Component {
    *  VISUAL BUST — warmed from magenta to GOLD/AMBER so the ceremony light
    *  matches the fire aesthetic (WC7 diegetic warm light). Alternating gold +
    *  hot-orange shafts read as radiant heat, not neon. */
-  private drawRays(count: number, len: number, alpha: number): void {
+  private drawRays(count: number, len: number, alpha: number, tint?: Color): void {
     const g = this.raysG;
     g.clear();
     for (let i = 0; i < count; i++) {
@@ -444,7 +464,22 @@ export class CeremonyView extends Component {
       const cos = Math.cos(a);
       const sin = Math.sin(a);
       const w = 14 + (i % 3) * 6;
-      // Gold (even) ↔ hot-orange (odd) warm shafts.
+      // Default: gold (even) ↔ hot-orange (odd) warm shafts. With a `tint` (the
+      // feature-unlock mode colour) the shafts alternate MODE-colour ↔ white
+      // sparkle, so the burst reads in the bonus's own hue, not a flat magenta.
+      if (tint) {
+        g.fillColor =
+          i % 2
+            ? new Color(255, 255, 255, Math.round(24 * alpha + (i % 3) * 6))
+            : new Color(tint.r, tint.g, tint.b, Math.round(36 * alpha + (i % 3) * 8));
+        g.moveTo(cos * 70, sin * 70);
+        g.lineTo(cos * len * 0.5 - sin * w, sin * len * 0.5 + cos * w);
+        g.lineTo(cos * len, sin * len);
+        g.lineTo(cos * len * 0.5 + sin * w, sin * len * 0.5 - cos * w);
+        g.close();
+        g.fill();
+        continue;
+      }
       const gch = i % 2 ? 150 : 205;
       const bch = i % 2 ? 40 : 90;
       g.fillColor = new Color(255, gch, bch, Math.round(30 * alpha + (i % 3) * 7));
