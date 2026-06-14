@@ -1,0 +1,24 @@
+{
+  "$comment": "Single source of truth for the Shining Pop brand palette (Wave 2 of ARCHITECTURE-STRATEGY.md). The Cocos palette (shining-pop-v2 view/palette.ts) and ceremony tier colours are drift-tested against this file in CI (tests/design-tokens.test.ts). Change a colour HERE, then update the consumer — the test fails if they diverge, so the two engines can never silently drift apart. Pixi THEME lives in the vendored single-file game; wire it into the same guard as a follow-up.",
+  "brand": {
+    "pageBg": "#0a0610",
+    "chrome": "#f5f7fa",
+    "accent": "#ff007f",
+    "accentHot": "#ff2f93",
+    "accentGlow": "#ff5a9c",
+    "accentGlow2": "#ff5ab0",
+    "pinkBloom": "#ff8ab8",
+    "valueText": "#ffe6f4",
+    "violet": "#9a3bd6",
+    "megaFuchsia": "#ff2ad0",
+    "cyan": "#7fe7ff",
+    "winGreen": "#52d189",
+    "lossRed": "#ff6b6b"
+  },
+  "ceremonyTiers": {
+    "EPIC": "#ff1e8c",
+    "SUPER": "#ff5ab0",
+    "MEGA": "#ffb000",
+    "BIG": "#ffe14d"
+  }
+}
