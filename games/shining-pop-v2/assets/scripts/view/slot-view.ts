@@ -445,7 +445,18 @@ export class SlotView extends Component {
       this.ensureFsBg(() => {
         const sk = this.fsBg;
         if (!sk || !sk.node.isValid) return;
-        sk.node.active = true;
+        // WHITE-GLITCH FIX — Cocos 3.8.8 sp.Skeleton paints its SETUP/BIND pose (a
+        // full-coverage white pma quad) on the first frame it's active if the pose
+        // isn't primed yet. So: force opacity 0, set the animation, PRIME frame-0
+        // with update(0), and only THEN make the node active (active=true LAST).
+        // No white sheet can render because the node is invisible + already posed.
+        if (this.fsBgOp) {
+          Tween.stopAllByTarget(this.fsBgOp);
+          this.fsBgOp.opacity = 0;
+        }
+        sk.setAnimation(0, 'freespins-intro', false);
+        sk.addAnimation(0, 'freespins-idle', true, 0);
+        sk.updateAnimation(0); // compute the real frame-0 pose before the node ever shows
         // Z-ORDER FIX — the fs-world was buried at a low sibling index, BELOW the
         // base-game bg decorations (bokeh/glow/vignette) which painted over it and
         // washed it out. Raise it to just under the reel FRAME so the Cupids
@@ -454,11 +465,8 @@ export class SlotView extends Component {
         const frame = this.node.getChildByName('frame');
         if (frame) sk.node.setSiblingIndex(Math.max(0, frame.getSiblingIndex() - 1));
         this.fadeBaseBgForBonus(true);
-        sk.setAnimation(0, 'freespins-intro', false);
-        sk.addAnimation(0, 'freespins-idle', true, 0);
+        sk.node.active = true; // safe now: posed + invisible, then fade up
         if (this.fsBgOp) {
-          Tween.stopAllByTarget(this.fsBgOp);
-          this.fsBgOp.opacity = 0;
           tween(this.fsBgOp).to(0.5, { opacity: 255 }, { easing: 'sineOut' }).start();
         }
       });

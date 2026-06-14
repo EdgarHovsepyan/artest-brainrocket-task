@@ -243,7 +243,8 @@ export class CeremonyView extends Component {
       sk.skeletonData = data;
       sk.premultipliedAlpha = true;
       this.winSpineOp = n.addComponent(UIOpacity);
-      this.winSpineOp.opacity = 255;
+      this.winSpineOp.opacity = 0; // dormant + invisible until show() reveals it
+      n.active = false; // never render the bind-pose quad between load and reveal
       ov.addChild(n);
       // sit the banner just under the number rig: covers the procedural
       // ground/header diamonds, while glow/shadow/amount/badge render on top.
@@ -288,13 +289,19 @@ export class CeremonyView extends Component {
       const useSpine = !!this.winSpine && this.winSpine.isValid && !reduced;
       if (useSpine) {
         const anim = CeremonyView.TIER_ANIM[tier.name] ?? 'normal-win';
-        this.winSpine!.node.active = true;
-        this.winSpine!.setAnimation(0, `${anim}-start`, false);
-        this.winSpine!.addAnimation(0, `${anim}-loop`, true, 0);
-        // fade the banner IN with the detonation (no hard pop-on).
+        // WHITE-GLITCH FIX — force opacity 0, queue the animation, PRIME frame-0
+        // (update(0)) and only THEN activate the node, so Cocos never paints the
+        // skeleton's white setup/bind quad on the first active frame.
         if (this.winSpineOp) {
           Tween.stopAllByTarget(this.winSpineOp);
           this.winSpineOp.opacity = 0;
+        }
+        this.winSpine!.setAnimation(0, `${anim}-start`, false);
+        this.winSpine!.addAnimation(0, `${anim}-loop`, true, 0);
+        this.winSpine!.updateAnimation(0); // real frame-0 pose before the node shows
+        this.winSpine!.node.active = true; // active LAST: posed + invisible
+        // fade the banner IN with the detonation (no hard pop-on / no white quad).
+        if (this.winSpineOp) {
           tween(this.winSpineOp).to(0.2, { opacity: 255 }, { easing: 'quadOut' }).start();
         }
       } else if (this.winSpine) {
@@ -451,14 +458,16 @@ export class CeremonyView extends Component {
   }
 
   /** MAXIMUM-DRAMA fullscreen flash on the detonation frame — the literal "BANG".
-   *  Punches to a tier-scaled peak in ~3 frames (whiteout on EPIC), then fades so
-   *  the banner + number are revealed out of the blast. intensity = tx (0..1.6). */
+   *  Punches to a tier-scaled peak in ~3 frames, then fades so the banner + number
+   *  are revealed out of the blast. intensity = tx (0..1.6). Peak CAPPED below pure
+   *  white (was 255 on EPIC = a full "white screen" over the authored banner; owner
+   *  read it as a white glitch) so it reads as a warm BANG, not a screen wipe. */
   private fireDetonationFlash(intensity: number): void {
     if (!this.flashOp || !this.flashNode) return;
     Tween.stopAllByTarget(this.flashOp);
     this.flashNode.active = true;
     this.flashOp.opacity = 0;
-    const peak = Math.round(110 + 145 * Math.min(1, intensity)); // BIG ~110 → EPIC 255
+    const peak = Math.round(90 + 110 * Math.min(1, intensity)); // BIG ~90 → EPIC 200 (never 255)
     const beats = VIEW_CONFIG.ceremony.beats; // beat 2 — detonation timings
     tween(this.flashOp)
       .to(beats.detonationFlashInMs / 1000, { opacity: peak }, { easing: 'quadOut' }) // punch ON
