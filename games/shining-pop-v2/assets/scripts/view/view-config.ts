@@ -190,6 +190,11 @@ export const VIEW_CONFIG = {
      *  winning cells punch harder before settling into the jelly wobble. */
     symbolPulseScale: 1.3,
     symbolPulseMs: 420,
+    /** Per-reel L→R stagger (seconds) of the win-symbol highlight, so winners
+     *  "blink" on in a WAVE across the board rather than all at once — the eye
+     *  tracks the win building reel-by-reel. Was a hardcoded 0.06 in slot-view;
+     *  bumped to 0.085 for a clearer, more satisfying wave. */
+    highlightWaveStagger: 0.085,
     /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
      *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
      *  until the next spin clears them — the modern candy-slot "yummy" feel, not
