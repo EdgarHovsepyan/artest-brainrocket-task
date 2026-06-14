@@ -28,26 +28,25 @@ designed, built and verified end-to-end by a single developer._
 
 ## ▶ Live demo
 
-Both games are deployed from one static bundle behind a landing page — reviewers
-can play either without cloning or installing anything:
+**▶ Live now — play in the browser, no install:**
 
-|                                    | Play                                                  |
-| ---------------------------------- | ----------------------------------------------------- |
-| **Landing** (both games)           | `https://<your-vercel-app>.vercel.app/`               |
-| **shining-pop** · PixiJS v8        | `https://<your-vercel-app>.vercel.app/shining-pop`    |
-| **shining-pop-v2** · Cocos Creator | `https://<your-vercel-app>.vercel.app/shining-pop-v2` |
+|                                    | Play                                                           |
+| ---------------------------------- | -------------------------------------------------------------- |
+| **Landing** (both games)           | **https://artest-brainrocket-task.vercel.app/**                |
+| **shining-pop** · PixiJS v8        | **https://artest-brainrocket-task.vercel.app/shining-pop/**    |
+| **shining-pop-v2** · Cocos Creator | **https://artest-brainrocket-task.vercel.app/shining-pop-v2/** |
 
-> Replace `<your-vercel-app>` with the deployed URL. **Deploy in one step** — the
-> repo is Vercel-ready (`vercel.json` + `scripts/assemble-demo.mjs`):
+> Deployed on Vercel from one static bundle behind a landing page. The repo is
+> deploy-ready (`vercel.json` + `scripts/assemble-demo.mjs`) — to redeploy:
 >
 > ```bash
 > npx vercel --prod          # or: import the GitHub repo at vercel.com/new
 > ```
 >
 > Vercel runs `assemble-demo.mjs`, which copies the two committed builds into
-> `/public` at clean paths (`/shining-pop`, `/shining-pop-v2`) behind an
-> expert landing page. Each game keeps its own directory root so its assets
-> resolve — verified booting at both subpaths. Works the same on Netlify /
+> `/public` at clean paths (`/shining-pop/`, `/shining-pop-v2/`) behind the
+> landing page. Each game keeps its own directory root (`trailingSlash: true`) so
+> its assets resolve — both verified booting live. Works the same on Netlify /
 > GitHub Pages (point the host at the `public/` the script produces).
 
 ## Instant run — no toolchain needed
@@ -173,11 +172,29 @@ pnpm --filter @artest/shining-pop dev          # PixiJS dev server :5173
 pnpm --filter @artest/shining-pop-v2 sim       # Cocos RTP sim (2M spins)
 ```
 
-Cocos rebuilds headlessly — no editor session needed:
+### Building both games for production
+
+Each game builds to a static bundle that the demo (and any host) serves as-is.
+
+**shining-pop — PixiJS v8 (Vite):** bundles + inlines into a single reviewable `dist/`.
+
+```bash
+pnpm --filter @artest/shining-pop build      # → games/shining-pop/dist/
+#  or, from the game folder:  cd games/shining-pop && pnpm build
+```
+
+**shining-pop-v2 — Cocos Creator 3.8.8:** headless CLI build, no editor session needed.
 
 ```bash
 CocosCreator --project games/shining-pop-v2 --build "platform=web-mobile;debug=false"
+#  Windows path example:
+#  "C:/ProgramData/cocos/editors/Creator/3.8.8/CocosCreator.exe" \
+#    --project games/shining-pop-v2 --build "platform=web-mobile;debug=false"
+#  → games/shining-pop-v2/build/web-mobile/
 ```
+
+Then `node scripts/assemble-demo.mjs` stitches both builds into `public/` for the
+[live demo](#-live-demo), or `node scripts/preview.mjs` serves them locally.
 
 ## Quality gates
 
