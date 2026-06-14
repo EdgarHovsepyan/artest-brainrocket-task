@@ -921,6 +921,21 @@ export class SlotView extends Component {
     this.buildWinBeams();
     SymbolView.fxBurstMat = this.getEffectMaterial('soft-burst');
     SymbolView.fxWhiteFrame = this.getWhiteFrame();
+    // Dedicated win-HALO material: svarka-additive with USE_TEXTURE forced ON so
+    // the additive glow is alpha-clipped to each winning symbol's silhouette (a
+    // candy-shaped aura, never a square/disc). We mint a SEPARATE instance — the
+    // shared svarka-additive is used texture-less by the plasma core (a radial
+    // disc), so flipping the macro there would break it. cc_spriteTexture is a
+    // per-sprite binding, so one shared halo material still samples each symbol's
+    // own frame. Null when materials are off → ensureHalo() no-ops (shader carries).
+    const haloBase = this.getEffectMaterial('svarka-additive');
+    if (haloBase?.effectAsset) {
+      const hm = new Material();
+      hm.initialize({ effectAsset: haloBase.effectAsset, defines: { USE_TEXTURE: true } });
+      SymbolView.fxHaloMat = hm;
+    } else {
+      SymbolView.fxHaloMat = null;
+    }
     // CGI particles — every pooled shard upgrades to an additive light point.
     ParticlePool.glowMat = this.getEffectMaterial('particle-glow');
     ParticlePool.glowFrame = this.getWhiteFrame();

@@ -39,6 +39,11 @@ export class SymbolView extends Component {
   private frames: SpriteFrame[] = [];
   private glow: Node | null = null;
   private glowOp: UIOpacity | null = null;
+  // Symbol-shaped win HALO — a glowing additive copy of the symbol's own art
+  // (svarka-additive), scaled up behind it. Pulses on a win = on-symbol light.
+  private halo: Node | null = null;
+  private haloOp: UIOpacity | null = null;
+  private haloSp: Sprite | null = null;
   private size = 90;
   /** Current symbol id — set by setSymbol, read by ReelView's spin-mask logic
    *  so it can paint off-screen buffer cells with the SAME symbols currently in
@@ -64,6 +69,10 @@ export class SymbolView extends Component {
   // first win. Statics so no per-cell plumbing through ReelView.
   static fxBurstMat: Material | null = null;
   static fxWhiteFrame: SpriteFrame | null = null;
+  // svarka-additive: renders the symbol's OWN texture additively (× a radial
+  // pulse). On a symbol-frame sprite scaled up behind the art it makes a glowing
+  // halo in the SYMBOL'S shape — cool on-win light, never a square bg box.
+  static fxHaloMat: Material | null = null;
   private burstUpgraded = false;
   // SY1 idle breathing — the sprite lives on `art` (a child) so the per-frame
   // breathe composes with the win/land tweens that scale the CELL node, with no
@@ -216,6 +225,31 @@ export class SymbolView extends Component {
     this.burstUpgraded = true;
   }
 
+  /** Lazily build the symbol-shaped win HALO — a Sprite child that wears the
+   *  symbol's OWN spriteFrame under the `svarka-additive` material, so the glow
+   *  is alpha-clipped to the candy silhouette (radial falloff + additive blend),
+   *  never a square. Sits behind the art (sibling 0). The frame is (re)assigned
+   *  per win in `playWin` because it changes per symbol. */
+  private ensureHalo(): void {
+    if (this.halo || !SymbolView.fxHaloMat) return; // no material → on-symbol shader carries it
+    const s = this.size * 1.2; // slightly larger than the art → reads as an aura around it
+    const n = new Node('winHalo');
+    n.layer = this.node.layer;
+    n.addComponent(UITransform).setContentSize(s, s);
+    this.node.addChild(n);
+    n.setSiblingIndex(0); // behind the symbol art
+    const sp = n.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = Sprite.Type.SIMPLE;
+    sp.customMaterial = SymbolView.fxHaloMat;
+    const op = n.addComponent(UIOpacity);
+    op.opacity = 0;
+    n.active = false;
+    this.halo = n;
+    this.haloSp = sp;
+    this.haloOp = op;
+  }
+
   playWin(delay = 0, rich = true, winMat: Material | null = null): void {
     this.ensureBurst();
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
@@ -257,15 +291,42 @@ export class SymbolView extends Component {
         .repeatForever()
         .start();
     }
-    // NO behind-symbol glow on a win — the win now reads PURELY from the ON-SYMBOL
-    // shader (rim-light + glints + shimmer, alpha-clipped to the candy) + the scale
-    // bounce (owner: "only the symbol effect, not the symbol bg / bounding box").
-    // Park the glow node invisible; lock/wild-land still use it for their moments.
+    // Keep the OLD square/box glow parked off (lock/wild-land still use it).
     if (this.glow && this.glowOp) {
       Tween.stopAllByTarget(this.glow);
       Tween.stopAllByTarget(this.glowOp);
       this.glowOp.opacity = 0;
       this.glow.setScale(0.8, 0.8, 1);
+    }
+    // COOL ON-SYMBOL GLOW (owner: the stripped-down win "looks not cool"): a glowing
+    // additive copy of the symbol's OWN art (svarka-additive samples its alpha) pulses
+    // behind it, so the light is the SYMBOL'S shape — a candy aura, never a bg box.
+    // heat-scaled: Wild glows hottest. Breathes until clear. Skipped on buffer cells
+    // with no frame (nothing to clip the glow to).
+    const haloFrame = this.sprite?.spriteFrame ?? null;
+    if (haloFrame) this.ensureHalo();
+    if (haloFrame && this.halo && this.haloOp && this.haloSp) {
+      this.haloSp.spriteFrame = haloFrame; // clip the glow to THIS symbol's silhouette
+      Tween.stopAllByTarget(this.halo);
+      Tween.stopAllByTarget(this.haloOp);
+      this.halo.active = true;
+      this.halo.setScale(1.12, 1.12, 1);
+      this.haloOp.opacity = 0;
+      const haloPeak = Math.min(210, Math.round(135 * heat));
+      tween(this.haloOp)
+        .delay(delay)
+        .to(half, { opacity: haloPeak }, { easing: 'sineOut' })
+        .to(half, { opacity: Math.round(haloPeak * 0.42) }, { easing: 'sineIn' })
+        .union()
+        .repeatForever()
+        .start();
+      tween(this.halo)
+        .delay(delay)
+        .to(half, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'sineInOut' })
+        .to(half, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'sineInOut' })
+        .union()
+        .repeatForever()
+        .start();
     }
     if (rich) {
       // CINEMA WAVE — prefer the shader rim-light/sweep overlay; the Graphics
@@ -426,6 +487,12 @@ export class SymbolView extends Component {
 
   /** Kill the looping win layers (called from clear on the next spin). */
   private stopWinFx(): void {
+    if (this.halo && this.haloOp) {
+      Tween.stopAllByTarget(this.halo);
+      Tween.stopAllByTarget(this.haloOp);
+      this.haloOp.opacity = 0;
+      this.halo.active = false;
+    }
     if (this.winOverlay && this.winOverlayOp) {
       Tween.stopAllByTarget(this.winOverlayOp);
       this.winOverlayOp.opacity = 0;
