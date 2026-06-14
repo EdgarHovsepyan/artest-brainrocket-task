@@ -464,7 +464,18 @@ export class SlotController extends Component {
       if (this.canStop) this.view.quickStopReels();
       return;
     }
-    if (this.state !== 'idle' || !this.model.canSpin()) return;
+    if (this.state !== 'idle' || this.autoplay.active) return;
+    if (!this.model.canSpin()) {
+      // Stake U8 — insufficient balance is a DISMISSIBLE notice, never a silent
+      // dead press (the spin used to just return with no feedback).
+      this.view.showError(
+        'Insufficient balance',
+        'You don’t have enough balance to spin at this bet.\nLower your bet to keep playing.',
+        'OK',
+        () => this.view.dismissError(),
+      );
+      return;
+    }
     void this.runSpin();
   }
 
@@ -590,7 +601,11 @@ export class SlotController extends Component {
       this.view.pulseSticky(step.sticky);
       if (step.sticky.length > 0) this.view.audio.stickyLock();
       runningPayout += step.payout;
-      this.view.setBonusHud(i, totalSpins, Math.round(runningPayout * lineBetCents));
+      const runCents = Math.round(runningPayout * lineBetCents);
+      this.view.setBonusHud(i, totalSpins, runCents);
+      // Mirror the running free-spin total onto the bar LAST WIN so a lit win
+      // line is NEVER paired with a 0.00 readout (read as "win on a no-win").
+      if (runCents > 0) this.bar.setLastWin(runCents / 100);
       // Per-spin MONEY MOMENT: a winning free spin gets its win lines, a tiered
       // sting and a savour dwell so a 40x spin no longer reads like a 0x dead one
       // (owner: "every free spin ceremony effects all need busting").
