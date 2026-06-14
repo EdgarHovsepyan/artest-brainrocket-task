@@ -245,6 +245,8 @@ export class SlotView extends Component {
   private titleCaption: Node | null = null;
 
   private winLines: { lineIndex: number; count: number }[] = [];
+  /** Live per-line win-amount pop labels (rise + fade); destroyed on clearWins. */
+  private lineWinPops: Node[] = [];
   private winCycle = 0;
 
   /** When `externalControls` is true the View skips its own HUD + control deck —
@@ -3221,6 +3223,10 @@ export class SlotView extends Component {
         // winning line's cell centres (win-beam.effect, ember/gold plasma).
         if (VIEW_CONFIG.win.beams.enabled) this.showWinBeams(this.winLines);
       }
+      // Per-line WIN-AMOUNT pops — a "×N" label rises off each winning line so the
+      // player sees WHICH line paid and HOW MUCH (discernible outcome; matches the
+      // Pixi fly-up). Shown even under reducedFx (it's information, not motion).
+      this.showLineWinPops(result);
       return;
     }
 
@@ -3254,9 +3260,63 @@ export class SlotView extends Component {
     this.hideWinFlames(); // VISUAL BUST — drop the flame sprites on clear
     this.hideWinBeams(); // CINEMA WAVE — drop the energy ribbons on clear
     this.stopWinLinePulse();
+    // Drop any in-flight per-line win-amount pops (stop their tweens first so a
+    // mid-flight step can't write to a destroyed node/opacity).
+    this.lineWinPops.forEach((n) => {
+      if (!n.isValid) return;
+      Tween.stopAllByTarget(n);
+      const op = n.getComponent(UIOpacity);
+      if (op) Tween.stopAllByTarget(op);
+      n.destroy();
+    });
+    this.lineWinPops.length = 0;
     this.winLines = [];
     this.winLineG?.clear();
     this.reels.forEach((reel) => reel.clearHighlight());
+  }
+
+  /** Per-line win-amount pop: a "×N" label (N = the line's paytable multiple)
+   *  rises + fades off the line's last winning cell, coloured by the line's hue —
+   *  so the player sees WHICH line paid and HOW MUCH (Salen & Zimmerman:
+   *  discernible outcome; parity with the Pixi fly-up). Tracked + destroyed in
+   *  clearWins. Under reducedFx it fades in place (no rise). */
+  private showLineWinPops(result: SpinResult): void {
+    for (const w of result.lineWins) {
+      if (w.payout <= 0) continue;
+      const rows = PAYLINES[w.lineIndex];
+      const lastReel = Math.min(w.count - 1, rows.length - 1);
+      if (lastReel < 0) continue;
+      const at = this.cellCenter(lastReel, rows[lastReel]);
+      const hue = LINE_HUES[w.lineIndex % LINE_HUES.length];
+      const node = this.mkLabel(`×${w.payout}`, at.x, at.y + 6, 26, hue, this.node, true).node;
+      this.lineWinPops.push(node);
+      const op = node.getComponent(UIOpacity) ?? node.addComponent(UIOpacity);
+      const done = () => {
+        const i = this.lineWinPops.indexOf(node);
+        if (i >= 0) this.lineWinPops.splice(i, 1);
+        if (node.isValid) node.destroy();
+      };
+      if (this.reducedFx) {
+        op.opacity = 255;
+        tween(op).delay(0.7).to(0.3, { opacity: 0 }).call(done).start();
+      } else {
+        op.opacity = 0;
+        node.setScale(0.6, 0.6, 1);
+        tween(node)
+          .to(
+            0.16,
+            { scale: new Vec3(1.12, 1.12, 1), position: new Vec3(at.x, at.y + 26, 0) },
+            { easing: 'backOut' },
+          )
+          .to(
+            0.74,
+            { scale: new Vec3(1, 1, 1), position: new Vec3(at.x, at.y + 72, 0) },
+            { easing: 'quadOut' },
+          )
+          .start();
+        tween(op).to(0.16, { opacity: 255 }).delay(0.5).to(0.4, { opacity: 0 }).call(done).start();
+      }
+    }
   }
 
   /** CINEMA WAVE — advance u_time on ALL win-presentation materials while a win
