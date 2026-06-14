@@ -188,14 +188,14 @@ export const VIEW_CONFIG = {
   win: {
     /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
      *  winning cells punch harder before settling into the jelly wobble. */
-    symbolPulseScale: 1.26,
+    symbolPulseScale: 1.3,
     symbolPulseMs: 420,
     /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
      *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
      *  until the next spin clears them — the modern candy-slot "yummy" feel, not
      *  a uniform scale pulse. jelly = axis amplitude; ms = one full wobble cycle.
      *  The shader rim/sweep shine loops alongside (SlotView's u_time). */
-    winBounceLoop: { enabled: true, jelly: 0.1, ms: 520 },
+    winBounceLoop: { enabled: true, jelly: 0.14, ms: 520 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
@@ -212,7 +212,7 @@ export const VIEW_CONFIG = {
      *  per winning cell; warm orange→gold, rise + fade. Bumped 6→9 so even a
      *  small win reads clearly (the embers + symbol glow are the only win cue
      *  now that lines are gone). */
-    fireEmbers: { perCell: 16, riseSpeed: 180, lifeMs: 820, spreadPx: 52 },
+    fireEmbers: { perCell: 22, riseSpeed: 180, lifeMs: 820, spreadPx: 58 },
 
     /** The OLD rectangular win-fire flame QUADS behind winning cells read as a
      *  "fire background box" (user-rejected). Fire is now painted PER-SYMBOL,
@@ -242,7 +242,7 @@ export const VIEW_CONFIG = {
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    burst: { enabled: true, intensity: 1.32, scale: 2.05 },
+    burst: { enabled: true, intensity: 1.42, scale: 2.25 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the
@@ -426,16 +426,18 @@ export const VIEW_CONFIG = {
 
   /** Win-burst shard particles. */
   particles: {
-    baseCount: 14,
+    baseCount: 18,
     perMultiple: 1.5,
-    maxCount: 56,
+    maxCount: 72,
 
     // ── Task 5.4: particle object pool (CC-2) ──────────────────────────────
     /** Ring of pre-built Graphics+UIOpacity shard Nodes. burst() borrows/returns
      *  instead of new/destroy. get() returns null if liveCount >= poolCap (drop
-     *  the spawn — never grow). prealloc on first burst (or onLoad). */
-    poolCap: 64,
-    prealloc: 48,
+     *  the spawn — never grow). prealloc on first burst (or onLoad). Ceiling
+     *  raised 64->96 so a rich win shows MORE simultaneous particles instead of
+     *  silently dropping spawns (counts above are useless without the headroom). */
+    poolCap: 96,
+    prealloc: 72,
 
     /** Epic-win coin geyser (CC-2 path B). count = ballistic coin nodes
      *  launched from a single point; spreadDeg = launch cone half-angle. */
