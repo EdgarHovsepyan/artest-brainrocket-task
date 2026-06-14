@@ -11621,24 +11621,34 @@
           // New: SOFT additive halo bloom + outward sparkle pips drifting
           // around the cell — no hard line, just light energy.
           if(drawProg >= 1 || drawProg > 0.85){
+            // IGNITE FLASH (2026-06-14) — at the win reveal each winning cell's
+            // halo FLARES bright + big, then settles to the steady pulse glow, so
+            // every winning symbol reads as "catching light" on the hit. Additive
+            // only (reuses lineG), shape-radial (never a box/ring), ~480ms decay;
+            // reduced-motion = no flash.
+            const igniteFlash = isReduced() ? 0 : Math.max(0, 1 - cycleElapsed/480);
             for(let r=0;r<n;r++){
               if(reach < r) break;
               const cc = full[r];
-              const rad = CELL*0.48 + pulse*2;
+              const rad = CELL*0.48 + pulse*2 + igniteFlash*CELL*0.30;
               // ── (a) RADIAL GLOW BLOOM — additive, 4 stacked layers
               // (softer-and-softer outward) → feels like the symbol is
-              // emitting light, not selected by a ring.
+              // emitting light, not selected by a ring. Ignite lifts the alpha.
               for(let gi = 4; gi >= 1; gi--){
                 const gr = rad * (0.55 + gi * 0.18);
                 const ga = (1 - gi/4) * 0.18 + 0.04;
                 lineG.circle(cc.x, cc.y, gr)
-                  .fill({ color:0xff007f, alpha: ga * (0.65 + 0.35*pulse) });
+                  .fill({ color:0xff007f, alpha: ga * (0.65 + 0.35*pulse + igniteFlash*0.9) });
               }
               // ── (b) SMOKE-WHITE INNER FLARE — focal hot core behind text
               lineG.circle(cc.x, cc.y, rad * 0.55)
-                .fill({ color:0xf5f7fa, alpha: 0.06 + 0.05*pulse });
-              // (c) orbiting sparkle cross+dot pips REMOVED (2026-06-02) — they read
-              // as cheap "dots" around each symbol; the soft radial halo is enough.
+                .fill({ color:0xf5f7fa, alpha: 0.06 + 0.05*pulse + igniteFlash*0.45 });
+              // ── (c) WHITE-HOT IGNITE CORE — a brief pinpoint that blooms outward
+              // on the hit, gone within ~480ms (the "catch light" spark).
+              if(igniteFlash > 0.02){
+                lineG.circle(cc.x, cc.y, rad*(0.28 + 0.5*(1-igniteFlash)))
+                  .fill({ color:0xffffff, alpha: 0.5*igniteFlash });
+              }
             }
           }
         }
