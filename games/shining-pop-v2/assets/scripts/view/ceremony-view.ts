@@ -44,6 +44,8 @@ export class CeremonyView extends Component {
   private raysG!: Graphics;
   private shockNode!: Node;
   private shockG!: Graphics;
+  private sparkleRoot!: Node;
+  private sparkles: { node: Node; op: UIOpacity }[] = [];
   private panelLightOp!: UIOpacity; // Task 5.MATRIX — SUPER/EPIC amount-backing glow
   private headerLabel!: Label;
   private amountLabel!: Label;
@@ -143,6 +145,13 @@ export class CeremonyView extends Component {
     // one-shot expanding shock diamond
     this.shockNode = this.mk('shock', 10, 10, ov);
     this.shockG = this.shockNode.addComponent(Graphics);
+
+    // CANDY SPARKLE BURST pool — top-level unlock detonation glints (owner:
+    // "UNLOCKED splash old diamond effects → top-level"). A spray of tiny star
+    // glints that fly outward on the buy-confirm BANG, layered over the god-rays
+    // so the unlock reads as a celebration explosion, not flat diamond shafts.
+    this.sparkleRoot = this.mk('sparkles', 10, 10, ov);
+    this.buildSparkles();
 
     // grounding light — soft elongated diamond under the text (replaces the old box)
     const ground = this.mk('ground', 10, 10, ov).addComponent(Graphics);
@@ -488,6 +497,7 @@ export class CeremonyView extends Component {
     this.drawRays(12, 380, 0.7, rgb ? modeCol : undefined); // mode-coloured shafts
     tween(this.raysNode).by(6, { angle: 18 }).repeatForever().start();
     this.fireShock(280);
+    this.fireSparkleBurst(); // top-level candy glint spray on the unlock BANG
     this.fireDetonationFlash(0.6); // buy-confirm BANG — the purchase lands as impact
     tween(ov)
       .to(0.3, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
@@ -593,6 +603,73 @@ export class CeremonyView extends Component {
       .to(0.42, { scale: new Vec3(size / 78, size / 78, 1) }, { easing: 'expoOut' })
       .start();
     tween(op).to(0.12, { opacity: 255 }).to(0.42, { opacity: 0 }, { easing: 'quadOut' }).start();
+  }
+
+  /** Build the reusable candy-glint pool (18 tiny star-diamonds in white / candy
+   *  pink / gold). Created at boot so the relayer pass covers them; layer is also
+   *  set explicitly so a glint never falls onto the unrendered DEFAULT layer. */
+  private buildSparkles(): void {
+    const palette: [number, number, number][] = [
+      [255, 255, 255], // white-hot
+      [255, 158, 208], // candy pink
+      [255, 206, 71], // gold
+    ];
+    const diamond = (g: Graphics, r: number): void => {
+      g.moveTo(0, r);
+      g.lineTo(r, 0);
+      g.lineTo(0, -r);
+      g.lineTo(-r, 0);
+      g.close();
+      g.fill();
+    };
+    for (let i = 0; i < 18; i++) {
+      const n = this.mk('spk', 18, 18, this.sparkleRoot);
+      n.layer = this.sparkleRoot.layer;
+      const g = n.addComponent(Graphics);
+      const [cr, cg, cb] = palette[i % palette.length];
+      g.fillColor = new Color(cr, cg, cb, 64); // soft halo
+      diamond(g, 9);
+      g.fillColor = new Color(cr, cg, cb, 255); // bright core
+      diamond(g, 4.4);
+      const op = n.addComponent(UIOpacity);
+      op.opacity = 0;
+      n.active = false;
+      this.sparkles.push({ node: n, op });
+    }
+  }
+
+  /** One-shot candy sparkle burst — every pooled glint sprays outward from centre,
+   *  decelerating (expoOut) + scaling pop→settle + fading, then parks inactive. No
+   *  per-fire allocation; hides cleanly with the overlay and is killed in abort(). */
+  private fireSparkleBurst(): void {
+    const n = this.sparkles.length;
+    for (let i = 0; i < n; i++) {
+      const { node, op } = this.sparkles[i];
+      Tween.stopAllByTarget(node);
+      Tween.stopAllByTarget(op);
+      const a = (Math.PI * 2 * i) / n + (i % 2 ? 0.16 : -0.12);
+      const dist = 165 + (i % 5) * 42;
+      node.active = true;
+      node.setPosition(0, 0, 0);
+      node.setScale(0.2, 0.2, 1);
+      op.opacity = 255;
+      const tx = Math.cos(a) * dist;
+      const ty = Math.sin(a) * dist;
+      tween(node)
+        .to(0.12, { scale: new Vec3(1.15, 1.15, 1) }, { easing: 'backOut' })
+        .to(0.5, { scale: new Vec3(0.7, 0.7, 1) }, { easing: 'sineOut' })
+        .start();
+      tween(node)
+        .to(0.6, { position: new Vec3(tx, ty, 0) }, { easing: 'expoOut' })
+        .start();
+      tween(op)
+        .delay(0.22)
+        .to(0.42, { opacity: 0 }, { easing: 'quadIn' })
+        .call(() => {
+          if (node.isValid) node.active = false;
+        })
+        .start();
+    }
   }
 
   private hide(): void {
@@ -873,6 +950,12 @@ export class CeremonyView extends Component {
     if (this.overlay) Tween.stopAllByTarget(this.overlay);
     if (this.raysNode) Tween.stopAllByTarget(this.raysNode);
     if (this.shockNode) Tween.stopAllByTarget(this.shockNode);
+    // Kill any in-flight glints so a fast re-trigger starts from a clean spray.
+    for (const s of this.sparkles) {
+      Tween.stopAllByTarget(s.node);
+      Tween.stopAllByTarget(s.op);
+      if (s.node.isValid) s.node.active = false;
+    }
     // Kill any in-flight detonation flash so a fast-forward can't leave the
     // screen stuck mid-whiteout.
     if (this.flashOp) {

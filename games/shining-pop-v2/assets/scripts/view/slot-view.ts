@@ -888,6 +888,7 @@ export class SlotView extends Component {
     this.buildBackground();
     this.buildTitle();
     this.buildFrame();
+    this.buildCosmicShimmer(); // subtle deep-space twinkle inside the reel window
     this.buildReels();
     this.buildCinematicBloom(); // transient win bloom-flash (opacity 0 at rest)
 
@@ -1996,6 +1997,96 @@ export class SlotView extends Component {
       sg.fill();
     }
     void gap;
+  }
+
+  /** SUBTLE COSMIC SHIMMER (owner: reels → "galaxy portal", direction = *subtle
+   *  cosmic shimmer*, lowest-risk touch to the candy theme). A whisper of deep
+   *  space INSIDE the reel window, behind the symbols: a faint drifting nebula
+   *  wash + three phase-offset star layers that twinkle. No per-frame repaint —
+   *  the twinkle is breathing UIOpacity tweens at desynced periods (SY1), so the
+   *  cost is ~free and it never fights the candy art. reducedFx → static, dim. */
+  private buildCosmicShimmer(): void {
+    const { reelCenterY } = VIEW_CONFIG.layout;
+    const root = this.mkNode('cosmicShimmer', this.gw, this.gh, this.node);
+    root.setPosition(0, reelCenterY, 0);
+    const halfW = this.gw / 2 - 6;
+    const halfH = this.gh / 2 - 6;
+    const rng = createRng(20260615).next;
+    const star = (g: Graphics, x: number, y: number, r: number, c: Color): void => {
+      g.fillColor = c;
+      g.moveTo(x, y - r);
+      g.lineTo(x + r, y);
+      g.lineTo(x, y + r);
+      g.lineTo(x - r, y);
+      g.close();
+      g.fill();
+    };
+
+    // (a) NEBULA WASH — 3 large soft candy-cool diamond blobs, very low alpha, a
+    // single slow lateral drift. Reads as cosmic depth, never as a second bg.
+    const neb = this.mkNode('cosmicNebula', this.gw, this.gh, root);
+    const ng = neb.addComponent(Graphics);
+    (
+      [
+        [-halfW * 0.45, halfH * 0.3, 360, 260, 120, 170, 255, 13],
+        [halfW * 0.5, -halfH * 0.35, 320, 230, 190, 130, 220, 12],
+        [halfW * 0.1, halfH * 0.55, 300, 200, 120, 210, 255, 10],
+      ] as number[][]
+    ).forEach(([cx, cy, w, h, cr, cg, cb, ca]) => {
+      ng.fillColor = new Color(cr, cg, cb, ca);
+      ng.moveTo(cx, cy - h);
+      ng.lineTo(cx + w, cy);
+      ng.lineTo(cx, cy + h);
+      ng.lineTo(cx - w, cy);
+      ng.close();
+      ng.fill();
+    });
+    if (!this.reducedFx) {
+      tween(neb)
+        .to(7.5, { position: new Vec3(14, -8, 0) }, { easing: 'sineInOut' })
+        .to(7.5, { position: new Vec3(-12, 6, 0) }, { easing: 'sineInOut' })
+        .union()
+        .repeatForever()
+        .start();
+    }
+
+    // (b) STAR LAYERS — 3 desynced twinkle layers so some stars glow while others
+    // dim, with no per-frame work. Each is a cluster of tiny star-diamonds in
+    // cool white with the occasional candy-pink, breathing on its own clock.
+    const layerCfg: [number, number, number, number][] = [
+      // [starCount, dimAlpha, brightAlpha, periodS]
+      [10, 26, 150, 2.3],
+      [9, 20, 120, 3.1],
+      [8, 30, 170, 1.7],
+    ];
+    layerCfg.forEach(([n, dim, bright, period], li) => {
+      const layer = this.mkNode(`cosmicStars${li}`, this.gw, this.gh, root);
+      const sg = layer.addComponent(Graphics);
+      for (let i = 0; i < n; i++) {
+        const x = (rng() - 0.5) * 2 * halfW;
+        const y = (rng() - 0.5) * 2 * halfH;
+        const r = 2.2 + rng() * 2.6;
+        const pink = rng() > 0.78;
+        const c = pink
+          ? new Color(255, 158, 208, 255) // candy-pink sparkle
+          : new Color(232, 240, 255, 255); // cool starlight
+        star(sg, x, y, r, c);
+        // tiny cross-glint on the brightest stars
+        if (r > 4) star(sg, x, y, r * 1.9, new Color(c.r, c.g, c.b, 36));
+      }
+      const op = layer.addComponent(UIOpacity);
+      if (this.reducedFx) {
+        op.opacity = Math.round((dim + bright) / 2);
+      } else {
+        op.opacity = bright;
+        tween(op)
+          .to(period, { opacity: dim }, { easing: 'sineInOut' })
+          .to(period, { opacity: bright }, { easing: 'sineInOut' })
+          .union()
+          .repeatForever()
+          .start();
+      }
+    });
   }
 
   private buildReels(): void {
@@ -3600,20 +3691,34 @@ export class SlotView extends Component {
     const RED = new Color(255, 58, 74, 242);
     const SMOKE = new Color(247, 247, 250, 250);
     const DASH = 12;
-    const phase = this.reducedFx ? 0 : (this.uTime * 46) % (DASH * 2); // scroll
+    const t = this.reducedFx ? 0 : this.uTime;
+    const phase = (t * 46) % (DASH * 2); // dash scroll
+    // BREATHING BLOOM — a live "post-process" pulse on the halo width + intensity,
+    // so the glow reads as an HDR bloom that is alive, not a static stroke (WC5).
+    const pulse = this.reducedFx ? 1 : 1 + 0.16 * Math.sin(t * 3.0);
+    const stroke = (
+      pts: Vec3[],
+      cr: number,
+      cg: number,
+      cb: number,
+      ca: number,
+      w: number,
+    ): void => {
+      g.lineWidth = w;
+      g.strokeColor = new Color(cr, cg, cb, Math.max(0, Math.min(255, Math.round(ca))));
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.stroke();
+    };
     for (const pts of this.candyLinePts) {
-      // BLOOM underlay — stacked soft red/pink strokes (wide→narrow, low→higher a)
-      const glow = (cr: number, cg: number, cb: number, ca: number, w: number) => {
-        g.lineWidth = w;
-        g.strokeColor = new Color(cr, cg, cb, ca);
-        g.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
-        g.stroke();
-      };
-      glow(255, 72, 110, 24, 20);
-      glow(255, 96, 124, 48, 12);
-      glow(255, 162, 182, 80, 7);
-      // CANDY-CANE core — continuous DASH chunks coloured by global distance +
+      // (1) BLOOM HALO — wide gaussian-falloff red→pink glow that breathes. On the
+      // dark portal well stacked translucent passes read as additive HDR light;
+      // per slot-vfx-artist canon we keep this Graphics, not a fragile post shader.
+      stroke(pts, 255, 56, 92, 16 * pulse, 32 * pulse);
+      stroke(pts, 255, 76, 110, 28 * pulse, 22 * pulse);
+      stroke(pts, 255, 112, 142, 52, 14);
+      stroke(pts, 255, 172, 198, 94, 8);
+      // (2) CANDY-CANE core — continuous DASH chunks coloured by global distance +
       // phase so red/whitesmoke stripes flow seamlessly along the whole line.
       let accum = 0;
       for (let i = 1; i < pts.length; i++) {
@@ -3627,7 +3732,7 @@ export class SlotView extends Component {
         let d = 0;
         while (d < len) {
           const s1 = Math.min(len, d + DASH);
-          g.lineWidth = 5;
+          g.lineWidth = 5.5;
           g.strokeColor = Math.floor((accum + d + phase) / DASH) % 2 === 0 ? RED : SMOKE;
           g.moveTo(ax + ux * d, ay + uy * d);
           g.lineTo(ax + ux * s1, ay + uy * s1);
@@ -3636,6 +3741,10 @@ export class SlotView extends Component {
         }
         accum += len;
       }
+      // (3) WHITE-HOT FILAMENT — a thin blown-out core down the ribbon centre. This
+      // is the post-process bloom signature: a clipped-to-white highlight the glow
+      // bleeds out of. Pulses with the bloom so the whole line feels charged.
+      stroke(pts, 255, 252, 250, 170 + 50 * (pulse - 1) * 6, 1.9);
     }
   }
 
