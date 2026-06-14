@@ -18,3 +18,11 @@ packages/*/dist/
 # misc
 *.log
 .DS_Store
+
+# Secrets — never commit API keys / env files (ElevenLabs etc.)
+.env
+.env.*
+*.key
+*.secret
+.secrets/
+**/secrets/
