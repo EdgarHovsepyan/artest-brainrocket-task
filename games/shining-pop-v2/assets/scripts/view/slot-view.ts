@@ -3464,6 +3464,10 @@ export class SlotView extends Component {
       // player sees WHICH line paid and HOW MUCH (discernible outcome; matches the
       // Pixi fly-up). Shown even under reducedFx (it's information, not motion).
       this.showLineWinPops(result);
+      // Cinematic CANDY WIN LINE — the win PATH the owner asked for ("where is the
+      // win line??"), as a thin warm-gold thread (not the rejected magenta line or
+      // rainbow beam).
+      this.drawCandyWinLines(this.winLines);
       return;
     }
 
@@ -3483,6 +3487,84 @@ export class SlotView extends Component {
     this.revealIdx = 0;
     this.revealP = 0;
     this.schedule(this.tickReveal, 0);
+  }
+
+  private candySpark: Node | null = null;
+  private ensureCandySpark(): Node {
+    if (this.candySpark) return this.candySpark;
+    const n = this.mkNode('candySpark', 18, 18, this.winLineG!.node);
+    const g = n.addComponent(Graphics);
+    // bright filled gold diamond core (no ring/stroke — slot-vfx shape rule)
+    (
+      [
+        [10, 255, 245, 210, 90],
+        [6, 255, 255, 255, 235],
+      ] as number[][]
+    ).forEach(([r, cr, cg, cb, a]) => {
+      g.fillColor = new Color(cr, cg, cb, a);
+      g.moveTo(0, r);
+      g.lineTo(r, 0);
+      g.lineTo(0, -r);
+      g.lineTo(-r, 0);
+      g.close();
+      g.fill();
+    });
+    n.addComponent(UIOpacity);
+    this.candySpark = n;
+    return n;
+  }
+
+  /** Cinematic CANDY WIN LINE (cocos-aaa-visual-gate WL1) — a thin warm-GOLD path
+   *  traced along each winning line's cell centres with a soft glow underlay + a
+   *  bright leading SPARK that races L→R as if drawing the line. NOT the rejected
+   *  magenta polyline or the rainbow plasma beam — one elegant gold thread that
+   *  reads the win PATH. Pure Graphics + one pooled spark; cleared in clearWins. */
+  private drawCandyWinLines(lines: { lineIndex: number; count: number }[]): void {
+    const g = this.winLineG;
+    if (!g) return;
+    g.clear();
+    let longest: Vec3[] = [];
+    for (const { lineIndex, count } of lines) {
+      const rows = PAYLINES[lineIndex];
+      if (!rows) continue;
+      const pts: Vec3[] = [];
+      for (let reel = 0; reel < count; reel++) pts.push(this.cellCenter(reel, rows[reel]));
+      if (pts.length < 2) continue;
+      if (pts.length > longest.length) longest = pts;
+      // soft warm-gold glow underlay (wide, low alpha — reads as light, not a stroke)
+      g.lineWidth = 11;
+      g.strokeColor = new Color(255, 198, 96, 38);
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.stroke();
+      // crisp gold core
+      g.lineWidth = 3.5;
+      g.strokeColor = new Color(255, 228, 156, 235);
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
+      g.stroke();
+    }
+    // soft fade-in of the whole line layer (ease-out entrance — web-animations)
+    const op = g.node.getComponent(UIOpacity) ?? g.node.addComponent(UIOpacity);
+    Tween.stopAllByTarget(op);
+    op.opacity = 0;
+    tween(op).to(0.18, { opacity: 255 }, { easing: 'quadOut' }).start();
+    // leading SPARK races L→R along the longest line (the "draw" cue) — skipped
+    // under reducedFx (the static gold line is the information; the spark is motion).
+    if (longest.length >= 2 && !this.reducedFx) {
+      const spark = this.ensureCandySpark();
+      spark.active = true;
+      spark.setPosition(longest[0]);
+      const sop = spark.getComponent(UIOpacity)!;
+      Tween.stopAllByTarget(spark);
+      Tween.stopAllByTarget(sop);
+      sop.opacity = 255;
+      let chain = tween(spark);
+      for (let i = 1; i < longest.length; i++) {
+        chain = chain.to(0.085, { position: longest[i] }, { easing: 'sineInOut' });
+      }
+      chain.call(() => tween(sop).to(0.18, { opacity: 0 }, { easing: 'quadIn' }).start()).start();
+    }
   }
 
   clearWins(): void {
@@ -3509,6 +3591,18 @@ export class SlotView extends Component {
     this.lineWinPops.length = 0;
     this.winLines = [];
     this.winLineG?.clear();
+    // Candy win-line spark + the line layer's fade go inactive/reset on clear.
+    if (this.candySpark) {
+      Tween.stopAllByTarget(this.candySpark);
+      this.candySpark.active = false;
+    }
+    if (this.winLineG) {
+      const op = this.winLineG.node.getComponent(UIOpacity);
+      if (op) {
+        Tween.stopAllByTarget(op);
+        op.opacity = 255;
+      }
+    }
     this.reels.forEach((reel) => reel.clearHighlight());
   }
 

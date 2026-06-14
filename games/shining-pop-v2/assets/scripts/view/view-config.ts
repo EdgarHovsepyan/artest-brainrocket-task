@@ -253,7 +253,7 @@ export const VIEW_CONFIG = {
      *  Owner: "more bouncing, NOT model skewing or dancing" — so it's a clean ball-
      *  bounce, not the opposing-axis squash-and-stretch the parallel branch used
      *  (which reads as a skew). jelly = bounce amplitude; ms = one full cycle. */
-    winBounceLoop: { enabled: true, jelly: 0.11, ms: 300, heatTempo: 0.6 },
+    winBounceLoop: { enabled: true, jelly: 0.15, ms: 290, heatTempo: 0.6 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
