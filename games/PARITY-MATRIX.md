@@ -48,7 +48,7 @@ feature across the two engines so neither game silently lags — and so a
 | Reality check / compliance gates       |         ✅         |            ◐            | Pixi `COMPLY`/`rcModal`; Cocos `compliance` logic                        |
 | Keyboard shortcuts                     |         ✅         |           ✅            | Space / B / T / etc.                                                     |
 | Reduced-motion fallback                |         ✅         |           ✅            | Every VFX                                                                |
-| Build watermark in UI                  |         ◐          |            —            | Pixi shows `build NN` (cleanup pending)                                  |
+| Dev build stamp (prod-hidden)          |         ✅         |            —            | Pixi: localhost/file/?debug only — correctly hidden in prod (not a bug)  |
 | **Engineering**                        |                    |                         |                                                                          |
 | Pure core, no engine imports           |         ✅         |           ✅            | Cocos guarded by `architecture.test.ts`                                  |
 | Headless unit tests                    |         ◐          |           ✅            | Cocos 57 tests; Pixi via shared math-core                                |
@@ -63,7 +63,7 @@ feature across the two engines so neither game silently lags — and so a
 2. **"LINE n ×m" readout → both engines** (discernible outcome). _Wave 4_
 3. **Pixi THEME → lock to `design-tokens.json`** (finish the SoT). _Wave 2_
 4. **Multi-bus audio + dynamic music → Pixi parity.** _Wave 5_
-5. **Remove the Pixi build watermark from the live UI.** _P0 hygiene_
+5. **Pixi velocity motion blur → Cocos** (Cocos disabled it as "arrows"; revisit a subtle FS-only version). _P2_
 
 > Rule: a row is allowed to be ◐ only when the divergence is a **deliberate**
 > engine-appropriate choice (e.g., shaders vs. procedural Graphics). Accidental

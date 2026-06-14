@@ -40,3 +40,30 @@ for (const layer of ['logic', 'model']) {
     }
   });
 }
+
+// MVC dependency DIRECTION (Gregory + Nystrom): the dependency arrow points one
+// way only — controller -> view -> model -> logic. A lower layer importing a
+// higher one is a layering inversion (and a future circular-dependency / test
+// bug). Assert each forbidden upward edge stays absent.
+const importsFrom = (src: string, dir: string) =>
+  new RegExp(`from\\s+['"][^'"]*\\b${dir}\\/`).test(src);
+
+const FORBIDDEN: Array<[from: string, to: string[]]> = [
+  ['logic', ['model', 'view', 'controller']], // pure core depends on nothing above
+  ['model', ['view', 'controller']], // model is below the view
+  ['view', ['controller']], // view never reaches up to the controller
+];
+
+for (const [layer, forbidden] of FORBIDDEN) {
+  test(`layering: assets/scripts/${layer} never imports ${forbidden.join('/')} (one-way deps)`, () => {
+    for (const file of tsFiles(join(SCRIPTS, layer))) {
+      const src = readFileSync(file, 'utf8');
+      for (const up of forbidden) {
+        assert.ok(
+          !importsFrom(src, up),
+          `${file} imports '${up}/' — layering inversion (deps must flow controller→view→model→logic)`,
+        );
+      }
+    }
+  });
+}
