@@ -26,3 +26,6 @@ packages/*/dist/
 *.secret
 .secrets/
 **/secrets/
+
+# Generated demo bundle (assemble-demo.mjs) — Vercel builds it on deploy
+/public/

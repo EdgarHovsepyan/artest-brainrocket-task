@@ -26,6 +26,30 @@ designed, built and verified end-to-end by a single developer._
 | **[shining-pop](games/shining-pop)**       | PixiJS v8           | Vite · GSAP · Spine · Web Audio      | ~97 %   | flagship — submission-ready    |
 | **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC · 9 CCEffect shaders | ~97.5 % | parity port + shader VFX suite |
 
+## ▶ Live demo
+
+Both games are deployed from one static bundle behind a landing page — reviewers
+can play either without cloning or installing anything:
+
+|                                    | Play                                                  |
+| ---------------------------------- | ----------------------------------------------------- |
+| **Landing** (both games)           | `https://<your-vercel-app>.vercel.app/`               |
+| **shining-pop** · PixiJS v8        | `https://<your-vercel-app>.vercel.app/shining-pop`    |
+| **shining-pop-v2** · Cocos Creator | `https://<your-vercel-app>.vercel.app/shining-pop-v2` |
+
+> Replace `<your-vercel-app>` with the deployed URL. **Deploy in one step** — the
+> repo is Vercel-ready (`vercel.json` + `scripts/assemble-demo.mjs`):
+>
+> ```bash
+> npx vercel --prod          # or: import the GitHub repo at vercel.com/new
+> ```
+>
+> Vercel runs `assemble-demo.mjs`, which copies the two committed builds into
+> `/public` at clean paths (`/shining-pop`, `/shining-pop-v2`) behind an
+> expert landing page. Each game keeps its own directory root so its assets
+> resolve — verified booting at both subpaths. Works the same on Netlify /
+> GitHub Pages (point the host at the `public/` the script produces).
+
 ## Instant run — no toolchain needed
 
 Both playable builds ship in the repo. With Node ≥ 20 installed, run from the repo root:
