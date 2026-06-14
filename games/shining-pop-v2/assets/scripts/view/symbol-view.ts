@@ -252,6 +252,19 @@ export class SymbolView extends Component {
         .repeatForever()
         .start();
     }
+    // Playful celebration SHIMMY — a quick decaying angle wiggle on the win attack,
+    // heat-scaled (Wild shimmies hardest), layered ON TOP of the scale jelly for a
+    // gamified candy "dance". Angle is otherwise unused on the symbol (land = scale,
+    // shake = position) so it composes cleanly; clear() zeroes it.
+    const wig = Math.min(7, 5 * heat);
+    this.node.angle = 0;
+    tween(this.node)
+      .delay(delay)
+      .to(0.1, { angle: wig }, { easing: 'quadOut' })
+      .to(0.12, { angle: -wig * 0.7 }, { easing: 'quadInOut' })
+      .to(0.12, { angle: wig * 0.4 }, { easing: 'quadInOut' })
+      .to(0.12, { angle: 0 }, { easing: 'quadOut' })
+      .start();
     if (this.glow && this.glowOp) {
       Tween.stopAllByTarget(this.glow);
       Tween.stopAllByTarget(this.glowOp);
@@ -550,6 +563,7 @@ export class SymbolView extends Component {
   clear(): void {
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
+    this.node.angle = 0; // reset the win shimmy so a cleared symbol is never tilted
     this.setDimmed(false);
     if (this.glow) {
       Tween.stopAllByTarget(this.glow);

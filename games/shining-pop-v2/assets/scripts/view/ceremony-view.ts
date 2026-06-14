@@ -188,15 +188,27 @@ export class CeremonyView extends Component {
 
     this.overlay = ov;
 
-    // MAXIMUM-DRAMA detonation FLASH — a fullscreen warm-white sheet rendered
-    // ABOVE the overlay (added last). On the hit it punches to a tier-scaled
-    // peak (BIG = a soft lift, EPIC = a full white-out) over a few frames then
-    // fades, so the win is "revealed out of the blast". Skipped under reduced FX.
+    // DETONATION BLOOM — a RADIAL warm burst (bright core → fully transparent at
+    // the edges), NOT a fullscreen white sheet. It physically CANNOT "white-screen"
+    // the game: the corners always stay clear, so the hit reads as a warm BANG of
+    // light over the win, never a screen wipe (owner: "white screen when the win
+    // Spine shows" — the old solid 4000×4000 rect was the culprit). Stacked-alpha
+    // diamonds = the codebase's no-banding radial pattern (never a circle/ring).
     const flashNode = this.mk('detoFlash', 4000, 4000, this.node);
     const fg = flashNode.addComponent(Graphics);
-    fg.fillColor = new Color(255, 244, 214, 255); // warm white (a hair of gold)
-    fg.rect(-2000, -2000, 4000, 4000);
-    fg.fill();
+    const BLOOM = 22;
+    for (let i = BLOOM; i > 0; i--) {
+      const t = i / BLOOM; // 1 = outer (faint) → ~0 = core (bright)
+      const half = 120 + t * 1160; // core ~120px → outer ~1280px (edges stay clear)
+      const a = Math.round((1 - t) * (1 - t) * 60); // quadratic falloff to transparent
+      fg.fillColor = new Color(255, 244, 214, a); // warm white (a hair of gold)
+      fg.moveTo(0, half);
+      fg.lineTo(half, 0);
+      fg.lineTo(0, -half);
+      fg.lineTo(-half, 0);
+      fg.close();
+      fg.fill();
+    }
     this.flashOp = flashNode.addComponent(UIOpacity);
     this.flashOp.opacity = 0;
     flashNode.active = false;
