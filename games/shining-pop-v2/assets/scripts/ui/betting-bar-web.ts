@@ -1150,7 +1150,11 @@ export class BettingBarWeb extends Component {
   fit(viewW: number, viewH: number): number {
     // Slimmer surface → relax the height cap (was 0.34/300) and raise the abs cap
     // a touch since the bar is shorter; keeps it dense, not chunky.
-    const s = Math.min(viewW / W, 0.6, (viewH * 0.32) / H);
+    // Width-fit to 90% of the viewport (owner: "web platform, add a gap from the
+    // left/right sides") — the centred bar then sits inset from the screen edges
+    // with a symmetric ~5% margin each side, reading more compact + premium than a
+    // full-bleed bar. Still capped at 0.6 abs + ~32% of height.
+    const s = Math.min((viewW * 0.9) / W, 0.6, (viewH * 0.32) / H);
     this.node.setScale(s, s, 1);
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + H * s, 0));
     // Reels reserve just enough to clear the spin-ring TOP (design RING_TOP),
