@@ -205,8 +205,17 @@ export const VIEW_CONFIG = {
   win: {
     /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
      *  winning cells punch harder before settling into the jelly wobble. */
-    symbolPulseScale: 1.24,
+    // MERGE 2026-06-14 — reconciled with the parallel win-state branch: adopt the
+    // bolder attack scale + the config-driven wave stagger, but KEEP the owner-
+    // driven uniform bounce (their jelly squash-and-stretch is the "skewing/dancing"
+    // the owner rejected) and the per-symbol heat table.
+    symbolPulseScale: 1.3, // bolder punchy attack (PP-style hit); heat table amplifies it per symbol
     symbolPulseMs: 240, // snappier attack (was 420 = slow) — owner: "faster bouncing"
+    /** Per-reel L→R stagger (seconds) of the win-symbol highlight, so winners
+     *  "blink" on in a WAVE across the board rather than all at once — the eye
+     *  tracks the win building reel-by-reel. Config-driven (consumed by SlotView's
+     *  highlight loop; was a hardcoded 0.06). */
+    highlightWaveStagger: 0.085,
     /** PER-SYMBOL WIN IDENTITY — each symbol id celebrates at its OWN intensity
      *  (`heat`), so a WILD win EXPLODES while a low-pays win is a polite bump.
      *  heat scales the attack pop, the jelly amplitude AND the glow peak in
@@ -227,8 +236,8 @@ export const VIEW_CONFIG = {
     /** WIN BOUNCE — after the attack pop, winning symbols keep BOUNCING (a fast
      *  UNIFORM scale up↔down, both axes together) until the next spin clears them.
      *  Owner: "more bouncing, NOT model skewing or dancing" — so it's a clean ball-
-     *  bounce, not the old opposing-axis squash-and-stretch (which read as a skew).
-     *  jelly = bounce amplitude; ms = one full bounce cycle (snappy). */
+     *  bounce, not the opposing-axis squash-and-stretch the parallel branch used
+     *  (which reads as a skew). jelly = bounce amplitude; ms = one full cycle. */
     winBounceLoop: { enabled: true, jelly: 0.11, ms: 300 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
@@ -246,7 +255,7 @@ export const VIEW_CONFIG = {
      *  per winning cell; warm orange→gold, rise + fade. Bumped 6→9 so even a
      *  small win reads clearly (the embers + symbol glow are the only win cue
      *  now that lines are gone). */
-    fireEmbers: { perCell: 16, riseSpeed: 180, lifeMs: 820, spreadPx: 52 },
+    fireEmbers: { perCell: 22, riseSpeed: 180, lifeMs: 820, spreadPx: 58 },
 
     /** The OLD rectangular win-fire flame QUADS behind winning cells read as a
      *  "fire background box" (user-rejected). Fire is now painted PER-SYMBOL,
@@ -284,7 +293,9 @@ export const VIEW_CONFIG = {
     // owner (repeatedly): "effects on the bg/bounding box, need ONLY the symbol
     // effect, not the symbol bg". The win now reads PURELY from the on-silhouette
     // symbol-win shader (rim-light + glints + shimmer, alpha-clipped to the candy)
-    // + the symbol's own scale bounce. No square glow can paint the background.
+    // + the symbol-SHAPED additive halo (winHalo, USE_TEXTURE) + the scale bounce.
+    // No square glow can paint the background. (The parallel branch re-enabled this
+    // at scale 2.25 — that is the rejected box; intentionally kept OFF on merge.)
     burst: { enabled: false, intensity: 1.2, scale: 1.1 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
@@ -298,11 +309,11 @@ export const VIEW_CONFIG = {
      *  scale = overlay size vs the symbol (1.06 gives the rim a hair of room). */
     symbolFx: {
       enabled: true,
-      intensity: 1.35,
+      intensity: 1.45,
       rimWidth: 0.035,
-      sweepSpeed: 0.55,
-      envInMs: 220,
-      envHoldOpacity: 220,
+      sweepSpeed: 0.85,
+      envInMs: 160,
+      envHoldOpacity: 235,
       scale: 1.06,
     },
 
@@ -469,16 +480,18 @@ export const VIEW_CONFIG = {
 
   /** Win-burst shard particles. */
   particles: {
-    baseCount: 14,
+    baseCount: 18,
     perMultiple: 1.5,
-    maxCount: 56,
+    maxCount: 72,
 
     // ── Task 5.4: particle object pool (CC-2) ──────────────────────────────
     /** Ring of pre-built Graphics+UIOpacity shard Nodes. burst() borrows/returns
      *  instead of new/destroy. get() returns null if liveCount >= poolCap (drop
-     *  the spawn — never grow). prealloc on first burst (or onLoad). */
-    poolCap: 64,
-    prealloc: 48,
+     *  the spawn — never grow). prealloc on first burst (or onLoad). Ceiling
+     *  raised 64->96 so a rich win shows MORE simultaneous particles instead of
+     *  silently dropping spawns (counts above are useless without the headroom). */
+    poolCap: 96,
+    prealloc: 72,
 
     /** Epic-win coin geyser (CC-2 path B). count = ballistic coin nodes
      *  launched from a single point; spreadDeg = launch cone half-angle. */

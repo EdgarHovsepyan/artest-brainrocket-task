@@ -534,7 +534,12 @@ export class SlotController extends Component {
       // UKGC LDW rule: a return <= 1x total bet must NOT play triumphant audio.
       if (outcome.winCents > outcome.betCents) {
         const mult = outcome.winCents / outcome.betCents;
-        const tier = mult >= 50 ? 5 : mult >= 20 ? 4 : mult >= 8 ? 3 : mult >= 2 ? 2 : 1;
+        // Win-sting tier ALIGNED to the visual ceremony bands so sound + banner
+        // escalate together (slot-audio-sound: match the sting to the ceremony
+        // tier). Ceremony: BIG>=10, MEGA>=30, SUPER>=50, EPIC>=100. The 5 stings
+        // map small(<2) / nice(2-10) / big(BIG 10-30) / mega(MEGA 30-50) /
+        // epic(SUPER+EPIC 50+). Was 8/20/50 — misaligned with the 10/30 banners.
+        const tier = mult >= 50 ? 5 : mult >= 30 ? 4 : mult >= 10 ? 3 : mult >= 2 ? 2 : 1;
         this.view.audio.win(tier);
       }
     }
