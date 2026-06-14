@@ -925,7 +925,9 @@ export class SlotView extends Component {
       'u_intensity',
       VIEW_CONFIG.win.burst.intensity,
     );
-    this.getEffectMaterial('win-beam')?.setProperty('u_intensity', 1.15);
+    // Lifted 1.15→1.55 for more additive BLOOM on the win ribbon (owner: "more
+    // bloom effect"); the thinner beam (heightPx 36) keeps it from washing out.
+    this.getEffectMaterial('win-beam')?.setProperty('u_intensity', 1.55);
 
     // VFX layers above the reels/win-lines
     this.anticipation = this.mkNode('anticipation', 10, 10, this.node).addComponent(
@@ -1380,7 +1382,11 @@ export class SlotView extends Component {
    *  flowing energy ribbon, not jointed sticks. */
   private showWinBeams(lineWins: { lineIndex: number; count: number }[]): void {
     if (this.reducedFx) return;
-    // Core line — full payline, both strokes, regardless of shader support.
+    const cfg = VIEW_CONFIG.win.beams;
+    const staggerS = (cfg.revealStaggerMs ?? 0) / 1000;
+    // Core line — full payline, both strokes, regardless of shader support. It
+    // fades in over the same window the beams DRAW across, so the thin gold trace
+    // arrives WITH the progressive ribbon rather than snapping on instantly.
     const cg = this.winCoreG;
     if (cg) {
       cg.clear();
@@ -1400,7 +1406,6 @@ export class SlotView extends Component {
       }
     }
     if (!this.winBeams.length) return;
-    const cfg = VIEW_CONFIG.win.beams;
     let b = 0;
     for (const w of lineWins) {
       const pts = this.linePts(w);
@@ -1411,6 +1416,7 @@ export class SlotView extends Component {
         const dy = p1.y - p0.y;
         const len = Math.hypot(dx, dy);
         if (len < 1) continue;
+        const idx = b; // capture this segment's draw order for the stagger
         const n = this.winBeams[b++];
         // Overscan 22% so feathered ends overlap into a continuous ribbon.
         n.getComponent(UITransform)!.setContentSize(len * 1.22, cfg.heightPx);
@@ -1419,9 +1425,19 @@ export class SlotView extends Component {
         n.active = true;
         const op = n.getComponent(UIOpacity)!;
         Tween.stopAllByTarget(op);
+        Tween.stopAllByTarget(n);
         op.opacity = 0;
+        // PROGRESSIVE TRACE — segment idx lights `idx*staggerS` after the first,
+        // so the ribbon sweeps along the line head-to-tail (a tiny scale-pop on
+        // arrival sells the "drawing" energy without any rejected drawn geometry).
+        n.setScale(1, 0.7, 1);
         tween(op)
+          .delay(idx * staggerS)
           .to(cfg.fadeInMs / 1000, { opacity: cfg.holdOpacity })
+          .start();
+        tween(n)
+          .delay(idx * staggerS)
+          .to(cfg.fadeInMs / 1000, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
           .start();
       }
     }
@@ -1432,6 +1448,8 @@ export class SlotView extends Component {
     this.winBeams.forEach((n) => {
       const op = n.getComponent(UIOpacity);
       if (op) Tween.stopAllByTarget(op);
+      Tween.stopAllByTarget(n);
+      n.setScale(1, 1, 1);
       n.active = false;
     });
   }
