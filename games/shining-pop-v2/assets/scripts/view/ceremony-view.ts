@@ -24,6 +24,7 @@ import {
 import { resolveBigWinTier, VIEW_CONFIG } from './view-config';
 import { PAL } from './palette';
 import { applyFont } from './fonts';
+import { formatMoney } from '../logic/money';
 
 const { ccclass } = _decorator;
 
@@ -32,7 +33,9 @@ const CRYSTAL = new Color().fromHEX(PAL.valueText); // crystal white-pink amount
 const WARM = new Color(255, 196, 92, 255); // hot-gold the amount rolls THROUGH
 const TITLE = new Color().fromHEX(PAL.title); // soft-magenta header default
 // Non-finite guard: a bad count-up value renders 0.00, never "NaN"/"∞".
-const fmt = (cents: number) => ((Number.isFinite(cents) ? cents : 0) / 100).toFixed(2);
+// Win amount carries the CURRENCY symbol (owner: "add the currency in the win
+// cases") — was a bare "32.39", now "$32.39". Non-finite guarded to "$0.00".
+const fmt = (cents: number) => formatMoney((Number.isFinite(cents) ? cents : 0) / 100, 'USD');
 
 @ccclass('CeremonyView')
 export class CeremonyView extends Component {

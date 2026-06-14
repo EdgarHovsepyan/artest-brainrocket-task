@@ -169,9 +169,11 @@ export class SymbolView extends Component {
     const frame = this.frames[id] ?? null;
     if (this.sprite) this.sprite.spriteFrame = frame;
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
-    // High-value symbols (wild + H1..H4 = ids 0..4) carry more visual "weight" —
-    // they breathe a touch deeper, the textbook AAA cue that they matter more.
-    this.idleAmp = id <= 4 ? 0.03 : 0.018;
+    // High-value symbols (H1..H4 = ids 1..4) carry more visual "weight" — they
+    // breathe a touch deeper. The WILD (id 0) is held STILL (idleAmp 0): owner
+    // "wild always bouncing, not cool — hide this effect". The gingerbread's
+    // asymmetric art made the idle breathe read as a constant bounce.
+    this.idleAmp = id === SYMBOLS.WILD ? 0 : id <= 4 ? 0.03 : 0.018;
     // WILD + SCATTER stay full size; every other symbol renders 15% smaller so
     // it sits inside its cell instead of overflowing into the neighbour.
     this.artBaseScale = FULL_SIZE_IDS.has(id) ? 1 : SYMBOL_SHRINK;

@@ -651,7 +651,9 @@ export class BettingBarWeb extends Component {
       const d = Math.abs(i - this.activeIdx);
       const k = Math.min(d, last);
       const on = d === 0;
-      c.color = col(on ? C.dark : C.value);
+      // Active bet amount = WHITESMOKE (owner: dark text on the pink pill read as a
+      // colour bug / hard to read). Inactive cells keep the standard value colour.
+      c.color = on ? col('#f5f5f5') : col(C.value);
       c.node.setScale(scales[k]!, scales[k]!, 1);
       const op = c.node.getComponent(UIOpacity) ?? c.node.addComponent(UIOpacity);
       op.opacity = ops[k]!;

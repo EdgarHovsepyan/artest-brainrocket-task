@@ -327,7 +327,9 @@ export class BuyBonusModal extends Component {
     this.buyOp = buy.addComponent(UIOpacity);
     const bg = buy.addComponent(Graphics);
     this.candyPanel(bg, 220, 56, 28, C.buy, C.buyHi, C.buyHi, 2);
-    this.buyLabel = this.text(buy, 'BUY', 0, 2, 18, C.dark, true);
+    // WHITESMOKE buy/cost text (owner: same dark-text colour bug as the carousel
+    // active bet — "BUY $X" / "NEED $X" reads cleaner in whitesmoke on the candy btn).
+    this.buyLabel = this.text(buy, 'BUY', 0, 2, 18, '#f5f5f5', true);
     this.pressFx(buy, [buy], () => {
       // Unaffordable tier: refuse with a head-shake + 'buy:blocked' (host shows
       // the friendly notice) instead of a dead click or a doomed buy intent.

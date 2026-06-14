@@ -2850,16 +2850,37 @@ export class SlotView extends Component {
   /** Reusable panel OPEN transition — pop-scale + fade in (backOut). Cancels any
    *  in-flight close tween (Tween.stopAllByTarget also kills the pending
    *  deactivate .call), so open-after-close never leaves a panel hidden. */
+  /** Largest uniform scale at which `node` (a panel) fits inside ~92% of the
+   *  visible viewport in BOTH axes — so info/settings/etc. are never cropped on a
+   *  short (laptop landscape) or narrow screen (owner: "info + settings cropped
+   *  from top and bottom on my laptop"). 1 when the panel already fits. */
+  private panelFitScale(node: Node): number {
+    const ui = node.getComponent(UITransform);
+    if (!ui || ui.height <= 0 || ui.width <= 0) return 1;
+    const vis = view.getVisibleSize();
+    const sy = Math.abs(this.node.scale.y) || 1;
+    const sx = Math.abs(this.node.scale.x) || 1;
+    const kH = (vis.height * 0.92) / (ui.height * sy);
+    const kW = (vis.width * 0.94) / (ui.width * sx);
+    return Math.min(1, kH, kW);
+  }
+
   private popOpen(node: Node | null): void {
     if (!node) return;
     const op = node.getComponent(UIOpacity) ?? node.addComponent(UIOpacity);
     Tween.stopAllByTarget(node);
     Tween.stopAllByTarget(op);
     node.active = true;
-    node.setScale(0.86, 0.86, 1);
+    // Re-centre on the VIEWPORT centre (Canvas world 0) + scale to fit so the panel
+    // is never clipped top/bottom on short screens. this.node's parent is the
+    // centred Canvas, so the viewport centre in local space is -pos.y/scale.y.
+    const k = this.panelFitScale(node);
+    const sy = this.node.scale.y || 1;
+    node.setPosition(node.position.x, -this.node.position.y / sy, 0);
+    node.setScale(0.86 * k, 0.86 * k, 1);
     op.opacity = 0;
     tween(node)
-      .to(0.2, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .to(0.2, { scale: new Vec3(k, k, 1) }, { easing: 'backOut' })
       .start();
     tween(op).to(0.16, { opacity: 255 }).start();
   }
