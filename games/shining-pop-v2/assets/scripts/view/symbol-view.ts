@@ -56,6 +56,9 @@ export class SymbolView extends Component {
   // Win-VFX layers (slot-vfx artist): built lazily on first win, killed in clear.
   private sheen: Node | null = null;
   private sparkles: Node[] = [];
+  // CUTE REWARD POP — little candy STARS that burst outward off a winning symbol
+  // (the gamified "yay!" pop), pooled + re-popped on a gentle loop.
+  private starPops: Node[] = [];
   // CINEMA WAVE — shader rim-light/sweep overlay (symbol-win.effect). Built lazily
   // on the first shader-backed win; samples THIS symbol's own alpha. The shared
   // material's u_time is advanced globally by SlotView; this node only owns its
@@ -351,6 +354,9 @@ export class SymbolView extends Component {
         this.playSheen(delay);
         this.playSparkles(delay);
       }
+      // CUTE REWARD POP — a ring of candy stars bursts off the winning candy (the
+      // gamified "yay!" beat the owner asked for), heat-scaled per symbol.
+      this.playStarPop(delay, heat);
     }
   }
 
@@ -497,6 +503,87 @@ export class SymbolView extends Component {
     });
   }
 
+  /** CUTE REWARD POP — a ring of little candy STARS bursts outward off the winning
+   *  symbol on land (the gamified "yay!" beat), then re-pops on a gentle loop. Pooled
+   *  (built once, reused every win), warm candy colours, spins as it flies, and
+   *  heat-scaled so a Wild win pops wider. Pure Graphics stars — alpha is the star
+   *  shape itself, so it's never a box. Killed in stopWinFx. */
+  private playStarPop(delay: number, heat: number): void {
+    const N = 6;
+    if (this.starPops.length === 0) {
+      const candy = [
+        new Color(255, 214, 96, 255), // gold
+        new Color(255, 150, 205, 255), // pink
+        new Color(255, 255, 255, 255), // white
+        new Color(150, 240, 220, 255), // mint
+      ];
+      for (let i = 0; i < N; i++) {
+        const n = new Node('winStar');
+        n.layer = this.node.layer;
+        n.addComponent(UITransform).setContentSize(20, 20);
+        const g = n.addComponent(Graphics);
+        g.fillColor = candy[i % candy.length];
+        const R = 9,
+          r = 3.7;
+        for (let k = 0; k < 10; k++) {
+          const rad = k % 2 === 0 ? R : r;
+          const a = Math.PI / 2 + (k * Math.PI) / 5;
+          const x = Math.cos(a) * rad,
+            y = Math.sin(a) * rad;
+          if (k === 0) g.moveTo(x, y);
+          else g.lineTo(x, y);
+        }
+        g.close();
+        g.fill();
+        n.addComponent(UIOpacity).opacity = 0;
+        this.node.addChild(n); // above the art → reads as a pop off the candy
+        this.starPops.push(n);
+      }
+    }
+    const spread = this.size * (0.58 + 0.3 * (heat - 1)); // Wild pops wider
+    this.starPops.forEach((n, i) => {
+      const op = n.getComponent(UIOpacity)!;
+      Tween.stopAllByTarget(op);
+      Tween.stopAllByTarget(n);
+      const ang = (i / N) * Math.PI * 2 + (i % 2 ? 0.42 : -0.34);
+      const tx = Math.cos(ang) * spread,
+        ty = Math.sin(ang) * spread;
+      op.opacity = 0;
+      n.setPosition(0, 0, 0);
+      n.setScale(0.2, 0.2, 1);
+      n.angle = 0;
+      tween(op)
+        .delay(delay + i * 0.04)
+        .to(0.16, { opacity: 245 })
+        .to(0.34, { opacity: 0 })
+        .delay(0.95)
+        .union()
+        .repeatForever()
+        .start();
+      tween(n)
+        .delay(delay + i * 0.04)
+        .to(
+          0.16,
+          { position: new Vec3(tx * 0.6, ty * 0.6, 0), scale: new Vec3(1.15, 1.15, 1), angle: 35 },
+          { easing: 'backOut' },
+        )
+        .to(
+          0.34,
+          { position: new Vec3(tx, ty, 0), scale: new Vec3(0.45, 0.45, 1), angle: 80 },
+          { easing: 'quadOut' },
+        )
+        .call(() => {
+          n.setPosition(0, 0, 0);
+          n.setScale(0.2, 0.2, 1);
+          n.angle = 0;
+        })
+        .delay(0.95)
+        .union()
+        .repeatForever()
+        .start();
+    });
+  }
+
   /** Kill the looping win layers (called from clear on the next spin). */
   private stopWinFx(): void {
     if (this.halo && this.haloOp) {
@@ -519,6 +606,14 @@ export class SymbolView extends Component {
       }
     }
     this.sparkles.forEach((n) => {
+      Tween.stopAllByTarget(n);
+      const op = n.getComponent(UIOpacity);
+      if (op) {
+        Tween.stopAllByTarget(op);
+        op.opacity = 0;
+      }
+    });
+    this.starPops.forEach((n) => {
       Tween.stopAllByTarget(n);
       const op = n.getComponent(UIOpacity);
       if (op) {
