@@ -11302,10 +11302,14 @@
             s.y=(k-0.5)*CELL + reels[r].offset + hop;
             s.alpha=1;
           } else {
-            // LOSER — dim harder so the winners clearly dominate the board (the
-            // "win focus" read). Keep renderReels' enveloped idle breathing so the
-            // symbol stays alive and the win⇄idle state change is still smooth.
-            s.alpha=0.26;
+            // LOSER — ease the dim IN (breathe, not cut) so the win-focus reads
+            // as the board "settling back" behind the winners, not a hard snap
+            // (Sylvester: savour breathes / Swink: no linear cuts). ~160ms ramp
+            // 1.0→0.26; reduced-motion lands instantly. Keep renderReels'
+            // enveloped idle breathing so the symbol stays alive across the
+            // win⇄idle state change.
+            const dimP = reducedHl ? 1 : Math.min(1, Math.max(0, (now - revealT0) / 160));
+            s.alpha = 1 - (1 - 0.26) * dimP;
           }
         } else {
           s.alpha=1;

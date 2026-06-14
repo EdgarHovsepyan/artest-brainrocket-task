@@ -188,7 +188,7 @@ export const VIEW_CONFIG = {
   win: {
     /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
      *  winning cells punch harder before settling into the jelly wobble. */
-    symbolPulseScale: 1.24,
+    symbolPulseScale: 1.26,
     symbolPulseMs: 420,
     /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
      *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
@@ -255,11 +255,11 @@ export const VIEW_CONFIG = {
      *  scale = overlay size vs the symbol (1.06 gives the rim a hair of room). */
     symbolFx: {
       enabled: true,
-      intensity: 1.35,
+      intensity: 1.45,
       rimWidth: 0.035,
-      sweepSpeed: 0.55,
+      sweepSpeed: 0.85,
       envInMs: 220,
-      envHoldOpacity: 220,
+      envHoldOpacity: 235,
       scale: 1.06,
     },
 
