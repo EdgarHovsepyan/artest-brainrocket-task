@@ -534,8 +534,12 @@ export const VIEW_CONFIG = {
    *  reducedFx. Deeper layers (the painting) move most; the vignette never moves. */
   world: {
     parallax: {
-      spinLeanPx: 16, // peak downward lean of the deepest layer while spinning
-      winPulsePx: 12, // upward breathe of the deepest layer on a win (decays)
+      // DISABLED 2026-06-15 (owner: "why bg is moving on every click? pls fix") —
+      // the bg lean-on-spin / breathe-on-win read as the background JUMPING every
+      // click, not as depth. Zeroed so the painted world stays rock-steady. (The
+      // depth-container plumbing stays; set these >0 to re-enable a subtle drift.)
+      spinLeanPx: 0, // was 16 — no downward lean on spin
+      winPulsePx: 0, // was 12 — no breathe on win
       leanLerp: 5, // spin-lean ease rate (× dt)
       pulseDecay: 2.0, // win-pulse decay rate (× dt)
     },

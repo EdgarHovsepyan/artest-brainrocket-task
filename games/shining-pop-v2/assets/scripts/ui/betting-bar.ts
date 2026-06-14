@@ -49,6 +49,9 @@ const VOL = { x0: 408, w: 100, y: 452 }; // volume-slider track geometry (design
 // the reels show through / sit above the bar; the board reserves the band below
 // it (mobile parity with the web bar's CROP/RING_TOP fitBottom contract).
 const BAND_TOP = 196;
+// Max fraction of the viewport HEIGHT the opaque control band may occupy — the bar
+// scales down past this so it never dominates the screen (owner: "compact, 40% max").
+const COMPACT_MAX_FRAC = 0.4;
 
 /** Device bottom safe-area (iOS home indicator / Android nav bar) in COCOS view
  *  px. Reads the CSS env() via a hidden probe and converts CSS-px → view-px with
@@ -297,7 +300,7 @@ export class BettingBarMobile extends Component {
     // Opaque ONLY from BAND_TOP down — the reels show through / sit above the
     // transparent upper region (was a full-surface fill that covered the board).
     this.rr(g, 0, BAND_TOP, W, H - BAND_TOP, 0);
-    g.fillColor = col(C.stage);
+    g.fillColor = col(C.stage, 0.9); // slightly translucent deck (owner: less opaque bg)
     g.fill();
     this.rr(g, 0, 300, W, 384, 0);
     g.fillColor = col('#000000', 0.12);
@@ -818,10 +821,20 @@ export class BettingBarMobile extends Component {
   fit(viewW: number, viewH: number): number {
     // Parent is the Canvas root — origin at SCREEN CENTRE. Anchor (0,1): the node
     // origin is its top-left corner.
-    const s = Math.min(viewW / W, viewH / H);
+    let s = Math.min(viewW / W, viewH / H);
+    // COMPACT CAP (2026-06-15, owner: "betting panel too tall, 40% max, more
+    // compact"). The opaque control band must never exceed COMPACT_MAX_FRAC of the
+    // viewport height. On wide/near-square aspects the width-fit blew the band up to
+    // ~70% of the screen; capping `s` shrinks the WHOLE bar so it (a) stays ≤40%
+    // tall and (b) becomes narrower than the screen → natural left/right side gaps.
+    // Tall phones already sit near the cap, so they barely change (stay ~full-width).
+    const maxBand = COMPACT_MAX_FRAC * viewH;
+    const bandPx = (H - BAND_TOP) * s;
+    if (bandPx > maxBand) s *= maxBand / bandPx;
     const safe = safeAreaBottomCocos(viewH);
     this.node.setScale(s, s, 1);
-    // Bottom edge sits `safe` px above the screen bottom; centred horizontally.
+    // Bottom edge sits `safe` px above the screen bottom; centred horizontally
+    // (centred → the gap from the screen edges is symmetric when s shrinks the bar).
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + safe + H * s, 0));
     return safe + (H - BAND_TOP) * s;
   }
