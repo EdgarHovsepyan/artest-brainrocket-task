@@ -274,7 +274,13 @@ export const VIEW_CONFIG = {
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    burst: { enabled: true, intensity: 1.32, scale: 2.05 },
+    // scale TRIMMED 2.05→1.45: at 2.05 the soft-burst was ~2× the symbol (≈197px
+    // on a ~100px cell), so it spilled across the cell BACKGROUND and read as a
+    // glowing BOX behind the art (owner: "win works on the bg/bounding box, not on
+    // the symbol"). 1.45 keeps it a tight halo that HUGS the symbol silhouette, so
+    // the win reads from the candy itself (the on-silhouette symbol-win shader),
+    // not a square on the background. intensity lifted to keep the punch.
+    burst: { enabled: true, intensity: 1.45, scale: 1.45 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the

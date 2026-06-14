@@ -218,23 +218,30 @@ export class SymbolView extends Component {
     // so a Wild win EXPLODES and a low-pays win is a polite bump (heat 1.0 = the
     // old uniform behaviour). Drives the pop, the jelly amplitude AND the glow.
     const heat = VIEW_CONFIG.win.symbolProfiles[this._currentId]?.heat ?? 1.0;
+    // WILD HERO ZOOM — the brand symbol (id 0, the gingerbread hero) doesn't just
+    // pop, it ZOOMS IN and STAYS enlarged through its win (owner: "zoom effects on
+    // the wild scale"). The attack settles to `zoom` (not 1.0) and the jelly
+    // oscillates around it, so the Wild reads bigger/forward the whole celebration.
+    // Modest 1.08 sustain so it never collides hard with neighbours.
+    const zoom = this._currentId === 0 ? 1.08 : 1.0;
     const half = symbolPulseMs / 2 / 1000; // ms → s, two halves
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
-    const pop = 1 + (symbolPulseScale - 1 + 0.12) * heat; // attack overshoot, heat-scaled
+    const pop = (1 + (symbolPulseScale - 1 + 0.12) * heat) * zoom; // attack overshoot
     const bnc = VIEW_CONFIG.win.winBounceLoop;
     // JELLY wobble: wide-and-short ↔ narrow-and-tall (axes in opposition) — the
-    // candy "yummy" squash-and-stretch, not a uniform scale pulse. heat-scaled.
+    // candy "yummy" squash-and-stretch, not a uniform scale pulse. heat-scaled,
+    // and centred on `zoom` so the Wild holds its enlarged hero size.
     const j = bnc.jelly * heat;
-    const squash = new Vec3(1 + j * 0.9, 1 - j, 1);
-    const stretch = new Vec3(1 - j * 0.8, 1 + j, 1);
+    const squash = new Vec3((1 + j * 0.9) * zoom, (1 - j) * zoom, 1);
+    const stretch = new Vec3((1 - j * 0.8) * zoom, (1 + j) * zoom, 1);
     const bhalf = bnc.ms / 2 / 1000;
-    // ATTACK (once): overshoot pop → settle. Then a CONTINUOUS bounce loop so the
-    // winning symbol stays alive/celebrating until clear (user: "bouncing looping").
+    // ATTACK (once): overshoot pop → settle to the hero size. Then a CONTINUOUS
+    // bounce loop so the winning symbol stays alive/celebrating until clear.
     tween(this.node)
       .delay(delay)
       .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
-      .to(half, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
+      .to(half, { scale: new Vec3(zoom, zoom, 1) }, { easing: 'quadIn' })
       .start();
     if (bnc.enabled) {
       tween(this.node)
