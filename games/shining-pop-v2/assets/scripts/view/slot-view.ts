@@ -3297,6 +3297,14 @@ export class SlotView extends Component {
     for (let r = 0; r < 3; r++) for (const id of grid[r]) if (id === SYMBOLS.WILD) earlyWilds++;
     const antic = earlyWilds >= minEarlyWilds && !this.reducedFx;
     const turbo = speedMul <= VIEW_CONFIG.turbo.turbo;
+    // Accelerating stop-cadence + per-reel gap FLOOR (kills the turbo "slab stop").
+    // cadence = cumulative stagger units per reel (reducedFx → flat linear); the
+    // floor keeps the L→R cascade readable even when turbo crushes the spacing.
+    const cadence = this.reducedFx ? [0, 1, 2, 3, 4] : VIEW_CONFIG.spin.stopCadence;
+    const minGapMs =
+      VIEW_CONFIG.spin.stopMinGapMs[
+        speedMul <= VIEW_CONFIG.turbo.max ? 'max' : turbo ? 'turbo' : 'off'
+      ];
 
     this.audio.spinStart();
     this.audio.startRush();
@@ -3305,7 +3313,14 @@ export class SlotView extends Component {
     this.playReelPortalEntry();
     await Promise.all(
       this.reels.map((reel, i) => {
-        let dur = (minSpinMs + i * reelStopStaggerMs) / 1000;
+        // Floored, cadence-shaped cumulative stop offset (real ms), converted back
+        // to a pre-speedMul spin time so spinTo's `× speedMul` lands it on target.
+        let cumGapMs = 0;
+        for (let k = 1; k <= i; k++) {
+          const dUnits = (cadence[k] ?? k) - (cadence[k - 1] ?? k - 1);
+          cumGapMs += Math.max(dUnits * reelStopStaggerMs * speedMul, minGapMs);
+        }
+        let dur = minSpinMs / 1000 + cumGapMs / 1000 / speedMul;
         if (antic && i >= 3) {
           dur += extraSeconds;
           // 2026-06-11 — aura geometry gated. The drag-time alone carries the
@@ -3330,6 +3345,9 @@ export class SlotView extends Component {
           });
           if (wildRows.length) {
             reel.flashWilds(wildRows);
+            // Heavy-landing RECOIL — fired in the SAME tick as the reel-stop audio
+            // transient (above) so the "thunk" is frame-locked to the sound.
+            reel.recoil(VIEW_CONFIG.spin.bounce.wildRecoilScale);
             this.audio.wildLand();
           }
           if (i >= 3) this.anticipation.clear();
@@ -3355,6 +3373,18 @@ export class SlotView extends Component {
     const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
     const waveStagger = VIEW_CONFIG.win.highlightWaveStagger;
     this.reels.forEach((reel, i) => reel.highlight(byReel[i] ?? [], i * waveStagger, rich, winMat));
+    // Win-wave AUDIO arpeggio — a rising-pitch tick per WINNING reel as the L→R
+    // highlight wave sweeps across, so the (previously silent) blink-wave becomes a
+    // building arpeggio that resolves into the win sting. Pitch climbs with the
+    // winning-reel order; capped to winning reels (a 1-reel win = one tick). Motion
+    // reinforcement, not information → skipped under reducedFx.
+    if (!this.reducedFx && totalCells > 0) {
+      const winningReels = this.reels.map((_, i) => i).filter((i) => (byReel[i]?.length ?? 0) > 0);
+      winningReels.forEach((reelIdx, order) => {
+        const progress = winningReels.length > 1 ? order / (winningReels.length - 1) : 0;
+        this.scheduleOnce(() => this.audio.countTick(progress), reelIdx * waveStagger);
+      });
+    }
     // One global u_time stepper drives symbol-win + soft-burst + win-beam in sync.
     // The burst shows on EVERY win (it replaced the always-on glow), so schedule
     // whenever any shader-backed win layer can be visible.

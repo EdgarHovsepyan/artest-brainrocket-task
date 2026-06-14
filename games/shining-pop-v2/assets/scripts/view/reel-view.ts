@@ -315,6 +315,21 @@ export class ReelView extends Component {
     rows.forEach((row, i) => this.cells[row]?.flashWildLand(i * 0.04));
   }
 
+  /** Heavy-landing RECOIL — a brief UNIFORM scale "thunk" on the WHOLE strip when a
+   *  heavy symbol lands, beat-locked to the reel-stop transient. Uniform (both axes
+   *  together) so it reads as weight/impact, never the rejected per-cell squash or
+   *  skew. reducedMotion skips it (the clean dead-stop reads fine without it). */
+  recoil(amp = 1.04): void {
+    const strip = this.strip;
+    if (!strip || this.reducedMotion || amp <= 1) return;
+    Tween.stopAllByTarget(strip);
+    strip.setScale(1, 1, 1);
+    tween(strip)
+      .to(0.05, { scale: new Vec3(amp, amp, 1) }, { easing: 'quadOut' })
+      .to(0.14, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .start();
+  }
+
   clearHighlight(): void {
     this.cells.forEach((c) => c.clear());
   }

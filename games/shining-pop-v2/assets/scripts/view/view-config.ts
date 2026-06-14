@@ -115,6 +115,17 @@ export const VIEW_CONFIG = {
     minSpinMs: 440,
     /** Stagger between consecutive reel stops (ms). Left-to-right. shining OFF≈88. */
     reelStopStaggerMs: 88,
+    /** Per-reel CUMULATIVE stop position (in reelStopStaggerMs units): the reels
+     *  stop on an ACCELERATING cadence (mid gaps shrink) then HANG a beat before
+     *  the LAST reel, instead of a mechanical linear 0,1,2,3,4 stagger — the
+     *  "breath before the final reel" every premium slot has. One entry per reel.
+     *  reducedFx falls back to a flat linear cadence (no breath shaping). */
+    stopCadence: [0, 1.0, 1.85, 2.6, 3.9],
+    /** Floor (ms) on the gap between consecutive reel STOPS, per turbo level. Turbo
+     *  multiplies the whole spin by the turbo scalar (~0.16 at MAX), which collapses
+     *  the 88ms L→R stagger to ~14ms — a "slab stop" where all reels land at once.
+     *  This floor keeps the left-to-right cascade READABLE even at max speed. */
+    stopMinGapMs: { off: 0, turbo: 34, max: 22 },
     /** Trapezoidal velocity-curve accel/decel fractions. shining a=0.10 / d=0.34. */
     accelFraction: 0.1,
     decelFraction: 0.34,
@@ -198,6 +209,10 @@ export const VIEW_CONFIG = {
       weight: 1.08,
       speed: 1,
       elasticity: 1.1,
+      /** Heavy-landing RECOIL — peak UNIFORM scale "thunk" on the whole strip when a
+       *  WILD lands on that reel, beat-locked to the reel-stop audio transient. 1.0
+       *  disables it; uniform both-axes so it never reads as squash/skew. */
+      wildRecoilScale: 1.045,
     },
   },
 
@@ -238,7 +253,7 @@ export const VIEW_CONFIG = {
      *  Owner: "more bouncing, NOT model skewing or dancing" — so it's a clean ball-
      *  bounce, not the opposing-axis squash-and-stretch the parallel branch used
      *  (which reads as a skew). jelly = bounce amplitude; ms = one full cycle. */
-    winBounceLoop: { enabled: true, jelly: 0.11, ms: 300 },
+    winBounceLoop: { enabled: true, jelly: 0.11, ms: 300, heatTempo: 0.6 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */

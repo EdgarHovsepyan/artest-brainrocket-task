@@ -275,6 +275,13 @@ export class SymbolView extends Component {
     const bUp = new Vec3(zoom * (1 + j), zoom * (1 + j), 1); // bounce peak (uniform)
     const bDn = new Vec3(zoom, zoom, 1); // base
     const bhalf = bnc.ms / 2 / 1000;
+    // HEAT-PACED BEAT — hotter symbols don't only pulse LOUDER (amplitude rides
+    // `heat` above), they breathe SLOWER too: the cinematic "weight" cue (a Wild
+    // rolls, an L5 ticks). Scales the LOOP cycle only — the attack pop stays snappy
+    // (<250ms feedback). heatTempo 0 = the previous uniform tempo for every symbol.
+    const beatScale = 1 + (heat - 1) * (bnc.heatTempo ?? 0);
+    const bhalfBeat = bhalf * beatScale;
+    const haloHalf = half * beatScale; // halo breathe shares the heat tempo
     // ATTACK (once): a snappy overshoot pop → settle. Then a CONTINUOUS fast bounce
     // (backOut up, quadIn down) so the winning symbol keeps bouncing until clear.
     tween(this.node)
@@ -285,8 +292,8 @@ export class SymbolView extends Component {
     if (bnc.enabled) {
       tween(this.node)
         .delay(delay + half * 2) // begin after the attack lands
-        .to(bhalf, { scale: bUp }, { easing: 'backOut' }) // pop UP
-        .to(bhalf, { scale: bDn }, { easing: 'quadIn' }) // settle DOWN
+        .to(bhalfBeat, { scale: bUp }, { easing: 'backOut' }) // pop UP
+        .to(bhalfBeat, { scale: bDn }, { easing: 'quadIn' }) // settle DOWN
         .union()
         .repeatForever()
         .start();
@@ -315,15 +322,15 @@ export class SymbolView extends Component {
       const haloPeak = Math.min(210, Math.round(135 * heat));
       tween(this.haloOp)
         .delay(delay)
-        .to(half, { opacity: haloPeak }, { easing: 'sineOut' })
-        .to(half, { opacity: Math.round(haloPeak * 0.42) }, { easing: 'sineIn' })
+        .to(haloHalf, { opacity: haloPeak }, { easing: 'sineOut' })
+        .to(haloHalf, { opacity: Math.round(haloPeak * 0.42) }, { easing: 'sineIn' })
         .union()
         .repeatForever()
         .start();
       tween(this.halo)
         .delay(delay)
-        .to(half, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'sineInOut' })
-        .to(half, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'sineInOut' })
+        .to(haloHalf, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'sineInOut' })
+        .to(haloHalf, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'sineInOut' })
         .union()
         .repeatForever()
         .start();
@@ -335,6 +342,11 @@ export class SymbolView extends Component {
       // winMat = null in those cases).
       if (winMat && VIEW_CONFIG.win.symbolFx.enabled) {
         this.playWinShader(delay, winMat);
+        // The shader overlay replaces only the diagonal SHEEN. The corner-twinkle
+        // sparkles are an ADDITIVE "candy catches the light" layer that should fire
+        // on EVERY rich win — they were previously else-only, so a normal (material-
+        // on) win silently lost them. Pooled + killed in stopWinFx.
+        this.playSparkles(delay);
       } else {
         this.playSheen(delay);
         this.playSparkles(delay);
