@@ -522,19 +522,32 @@ export class SymbolView extends Component {
         n.layer = this.node.layer;
         n.addComponent(UITransform).setContentSize(20, 20);
         const g = n.addComponent(Graphics);
-        g.fillColor = candy[i % candy.length];
-        const R = 9,
-          r = 3.7;
-        for (let k = 0; k < 10; k++) {
-          const rad = k % 2 === 0 ? R : r;
-          const a = Math.PI / 2 + (k * Math.PI) / 5;
-          const x = Math.cos(a) * rad,
-            y = Math.sin(a) * rad;
-          if (k === 0) g.moveTo(x, y);
-          else g.lineTo(x, y);
+        // Alternate cute STARS (gold/white/mint) and pink HEARTS — the "cute" brief
+        // (Jelly-Hop sparkles + Shy-&-Hearts) adapted: each winning candy pops a
+        // little confetti of stars AND hearts.
+        if (i % 2 === 1) {
+          const h = 9;
+          g.fillColor = new Color(255, 138, 196, 255); // candy pink heart
+          g.moveTo(0, h * 0.32);
+          g.bezierCurveTo(h * 0.55, h * 0.95, h * 1.05, h * 0.1, 0, -h * 0.7);
+          g.bezierCurveTo(-h * 1.05, h * 0.1, -h * 0.55, h * 0.95, 0, h * 0.32);
+          g.close();
+          g.fill();
+        } else {
+          g.fillColor = candy[i % candy.length];
+          const R = 9,
+            r = 3.7;
+          for (let k = 0; k < 10; k++) {
+            const rad = k % 2 === 0 ? R : r;
+            const a = Math.PI / 2 + (k * Math.PI) / 5;
+            const x = Math.cos(a) * rad,
+              y = Math.sin(a) * rad;
+            if (k === 0) g.moveTo(x, y);
+            else g.lineTo(x, y);
+          }
+          g.close();
+          g.fill();
         }
-        g.close();
-        g.fill();
         n.addComponent(UIOpacity).opacity = 0;
         this.node.addChild(n); // above the art → reads as a pop off the candy
         this.starPops.push(n);
