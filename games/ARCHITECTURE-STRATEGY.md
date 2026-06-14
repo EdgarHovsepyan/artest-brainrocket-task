@@ -100,3 +100,47 @@ A single sentence: **a strictly-layered, data-driven architecture (Gregory) whos
 - **Decide the disclosable economy dials:** WILD STRIKE scaling (`maxMultiplier`), strike-in-bonus, buy-EV target. _(Sellers)_
 
 > Guiding invariant for both engines: **the pure core decides _what_ happens; the view decides _how it feels_; never mix the two.**
+
+---
+
+## Integration Waves — the rollout plan
+
+Sequenced so each wave de-risks the next. Foundation first (can't regress what's
+guarded), then shared contracts, then feel, then the ambitious systems.
+
+### Wave 1 — Foundation & guardrails _(no rebuild needed; verifiable in CI)_
+
+- ✅ **CI pipeline** (`.github/workflows/ci.yml`): lint · format · build+tests · **RTP sim** on every push — the tools-pipeline gate. _(Gregory, Sellers)_
+- ✅ **Prettier scope fixed** (generated `build-templates` ignored) so the format gate is honest.
+- ⏭ **Architectural boundary lint rule:** forbid `cc` / `pixi.js` imports under `logic/` & `model/`. _(Gregory)_
+- ⏭ **`view-config` numeric snapshot test** so a careless knob edit is caught. _(Nystrom/Sylvester)_
+- **Exit criteria:** CI green; the pure core can't import an engine; economy re-certified automatically.
+
+### Wave 2 — Shared contracts (the two engines speak one language)
+
+- **Design-token source of truth** (JSON) → generates Cocos `palette.ts` + Pixi `THEME`. _(Gregory)_
+- **Ceremony beat-timeline schema** in `view-config` (hush→detonation→climax→savour as data). _(Sylvester)_
+- **Parity matrix** doc: every feature × engine (done / partial / n-a). _(Koster)_
+- **Exit criteria:** a colour/beat change lands in one place and both engines inherit it.
+
+### Wave 3 — State & flow hardening
+
+- **Explicit `FlowState` machine** (idle→spinning→resolving→bonus) with a transition table, both engines. _(Nystrom)_
+- **Dirty-flag the HUD push** (`syncDeliveredBar`/`setBalance` repaint on change only). _(Nystrom)_
+- **Exit criteria:** no illegal transition / double-fire; steadier frame time on low-end mobile.
+
+### Wave 4 — Game feel & meaning at the surface
+
+- **Feel budget:** <100ms ack on every control; ≥3 juice layers per win; unified press-physics. _(Swink)_
+- **"LINE n ×m" win label + win readability cycle** — make every outcome discernible. _(Salen/Zimmerman)_
+- **Thumb-zone + first-spin warmth + orientation transition.** _(Rogers)_
+- **Exit criteria:** a new player understands every win; controls feel instant.
+
+### Wave 5 — Systems & ambition (the award reel)
+
+- **Economy dials review:** WILD STRIKE `maxMultiplier` scaling, strike-in-bonus, buy-EV target — each re-sim'd + disclosed. _(Sellers)_
+- **Dynamic music intensity** (stem layering on win/bonus). _(Sylvester/Swink)_
+- **Signature max-win "moment"** + cinematic camera push-in. _(Schell/Sylvester)_
+- **Exit criteria:** a screenshot-worthy big win; a provably tuned, disclosable economy.
+
+**Cross-cutting cadence:** every wave ships in P0→P3 slices, **Pixi-verified → Cocos-ported**, each increment backed by a Playwright before/after. _(Schreier)_
