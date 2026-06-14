@@ -360,7 +360,13 @@ export class CeremonyView extends Component {
       }
       // bigger wins savour longer — duration tracks the extended intensity.
       // Task 5.1 — pass tier.textPopScale so the heartbeat scales per tier.
-      this.countUp(winCents, 0.8 + 1.0 * tx, tier.textPopScale);
+      // beat 3 — climax: count-up rolls longer for bigger wins (base + perTx·tx).
+      const beats = VIEW_CONFIG.ceremony.beats;
+      this.countUp(
+        winCents,
+        (beats.climaxBaseMs + beats.climaxPerTxMs * tx) / 1000,
+        tier.textPopScale,
+      );
     };
 
     // beat 1 — micro-silence: dim, hold, then detonate. 2026-06-11 — the `dim`
@@ -369,15 +375,19 @@ export class CeremonyView extends Component {
     // scales the edge darkness via boardDimAlpha (BIG/MEGA subtle, SUPER/EPIC
     // a touch deeper) but NEVER blacks the centre. Peak opacity capped at 200
     // (vignette stroke alphas are already low, so this reads as a soft frame).
-    const msec = VIEW_CONFIG.ceremony.microSilenceMs / 1000;
+    const beats = VIEW_CONFIG.ceremony.beats;
     const savourAlpha = reduced ? 80 : Math.round(150 + 105 * tier.boardDimAlpha);
     tween(this.dim)
-      .to(msec, { opacity: reduced ? 120 : 200 })
-      .call(reveal)
-      .to(0.5, { opacity: savourAlpha })
+      .to(beats.hushMs / 1000, { opacity: reduced ? 120 : 200 }) // beat 1 — hush
+      .call(reveal) // beat 2 — detonation (flash/shock fire inside reveal)
+      .to(beats.savourDimMs / 1000, { opacity: savourAlpha }) // beat 4 — savour settle
       .start();
 
-    this.scheduleOnce(() => this.hide(), (VIEW_CONFIG.ceremony.holdMs + 1100 * tx) / 1000);
+    // beat 4 — hold the triumphant pose, longer for bigger wins, then exit.
+    this.scheduleOnce(
+      () => this.hide(),
+      (beats.savourHoldBaseMs + beats.savourHoldPerTxMs * tx) / 1000,
+    );
     return true;
   }
 
@@ -446,9 +456,10 @@ export class CeremonyView extends Component {
     this.flashNode.active = true;
     this.flashOp.opacity = 0;
     const peak = Math.round(110 + 145 * Math.min(1, intensity)); // BIG ~110 → EPIC 255
+    const beats = VIEW_CONFIG.ceremony.beats; // beat 2 — detonation timings
     tween(this.flashOp)
-      .to(0.05, { opacity: peak }, { easing: 'quadOut' }) // punch ON (~3 frames)
-      .to(0.34, { opacity: 0 }, { easing: 'quadIn' }) // bloom OUT, reveal the win
+      .to(beats.detonationFlashInMs / 1000, { opacity: peak }, { easing: 'quadOut' }) // punch ON
+      .to(beats.detonationFlashOutMs / 1000, { opacity: 0 }, { easing: 'quadIn' }) // bloom OUT, reveal
       .call(() => {
         if (this.flashNode && this.flashNode.isValid) this.flashNode.active = false;
       })

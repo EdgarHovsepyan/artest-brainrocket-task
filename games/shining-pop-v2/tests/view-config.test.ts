@@ -39,6 +39,22 @@ test('count-up durations + pops are sane', () => {
   assert.ok(c.landingPopScale > 0);
 });
 
+test('big-win ceremony beat-timeline (Sylvester) is well-formed', () => {
+  const b = VIEW_CONFIG.ceremony.beats;
+  // every beat duration is a positive number of milliseconds
+  for (const [k, v] of Object.entries(b)) {
+    assert.equal(typeof v, 'number', `beats.${k} must be a number`);
+    assert.ok(v > 0, `beats.${k} must be > 0 ms`);
+  }
+  // the detonation flash must punch ON faster than it blooms OUT (a "bang")
+  assert.ok(
+    b.detonationFlashInMs < b.detonationFlashOutMs,
+    'detonation flash must punch in faster than it fades',
+  );
+  // bigger wins savour longer: per-tx scaling is real (positive)
+  assert.ok(b.climaxPerTxMs > 0 && b.savourHoldPerTxMs > 0);
+});
+
 test('win-focus + win-line beams stay within valid ranges', () => {
   assert.ok(
     VIEW_CONFIG.win.loserDimOpacity >= 0 && VIEW_CONFIG.win.loserDimOpacity <= 255,

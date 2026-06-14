@@ -329,11 +329,25 @@ export const VIEW_CONFIG = {
      *  The BIG tier floor stays 15 (resolveBigWinTier), so 10–15x shows a light
      *  ceremony without a named tier banner — graceful escalation. */
     showMinMultiple: 10,
-    /** How long the overlay holds before auto-dismiss (ms). */
-    holdMs: 2000,
-    /** "Held breath" dim before a BIG+ detonation (ms). Lengthened 200→260 for a
-     *  more cinematic hush — the silence makes the detonation hit harder. */
-    microSilenceMs: 260,
+    /** Sylvester — the big win as a 4-beat scripted STORY, expressed as DATA.
+     *  Every duration the ceremony's emotional pacing depends on lives here, so
+     *  the whole arc is one tunable, test-guarded artifact (wired into
+     *  ceremony-view show() + fireDetonationFlash()). Beats run in order:
+     *    1 hush       — held breath before the bang
+     *    2 detonation — flash punch ON, then bloom OUT (the win is revealed)
+     *    3 climax     — count-up roll (longer for bigger wins: base + perTx*tx)
+     *    4 savour     — settle the vignette, hold, then exit
+     *  Replaces the former flat `holdMs` / `microSilenceMs` scalars. */
+    beats: {
+      hushMs: 260,
+      detonationFlashInMs: 50,
+      detonationFlashOutMs: 340,
+      climaxBaseMs: 800,
+      climaxPerTxMs: 1000,
+      savourDimMs: 500,
+      savourHoldBaseMs: 2000,
+      savourHoldPerTxMs: 1100,
+    },
     /** Task 5.MATRIX — 4-tier ceremony re-band (presentation only — math unchanged).
      *  Tiers by win/TOTAL-bet multiple, high → low. First match wins. Per-tier knobs:
      *  - shakeAmp ........ board kick amplitude in px (capped at *1.8 inside the view)
