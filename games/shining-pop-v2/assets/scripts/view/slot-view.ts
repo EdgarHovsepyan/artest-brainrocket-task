@@ -186,11 +186,17 @@ export class SlotView extends Component {
   // True while a bonus/free-spin feature is running — moves the logo to the
   // reels-left, vertically-centred spot (per fit()).
   private inBonus = false;
-  // Authored free-spins background Spine (Cupids-Crush, lazy-loaded on first
-  // bonus enter — the 2.2 MB webp shouldn't bloat boot).
+  // Authored free-spins background Spine (Cupids-Crush). PRELOADED at boot now
+  // (see loadAssets) — the build() lazy load is a warm cache hit, so the first
+  // bonus enters with ZERO load hitch and a bad skeleton surfaces on the loader,
+  // not mid-feature.
   private fsBg: sp.Skeleton | null = null;
   private fsBgOp: UIOpacity | null = null;
   private fsBgLoading = false;
+  // Every authored Spine skeleton, warmed into the asset cache at boot so no
+  // feature/ceremony ever loads (and possibly fails) mid-round. Holding the
+  // refs here also pins them against auto-release.
+  private preloadedSpines: Record<string, sp.SkeletonData> = {};
   // Transient cinematic win bloom-flash — opacity 0 at REST (never covers the
   // board), flares warm on the big-win detonation frame, then decays.
   private cineBloomOp: UIOpacity | null = null;
@@ -331,6 +337,24 @@ export class SlotView extends Component {
                 this.effectMaterials[key] = null;
               }
             }
+            res();
+          }),
+        ),
+      );
+    });
+    // SPINE PRELOAD — warm every authored skeleton into the asset cache while the
+    // loader is still up, so the first bonus (free-spins world) and the first big
+    // win (ceremony callout) play with ZERO load hitch and a corrupt/missing
+    // skeleton fails HERE, never mid-feature. resources.load caches by path, so
+    // the later lazy loads (build()'s fs-bg; ceremony-view's win callout) become
+    // instant cache hits without those call sites changing. Failures are logged
+    // and tolerated — each consumer keeps its procedural/tween fallback.
+    ['spine/cupid-fs-bg/cupid_freespins_background', 'spine/cupid-wf/cupid-wf'].forEach((path) => {
+      jobs.push(
+        new Promise<void>((res) =>
+          resources.load(path, sp.SkeletonData, (err, data) => {
+            if (!err && data) this.preloadedSpines[path] = data;
+            else console.warn('[spine] preload failed (fallback will run):', path, err);
             res();
           }),
         ),
@@ -519,7 +543,7 @@ export class SlotView extends Component {
     if (!this.bonusHud) {
       const hud = this.mkNode('bonus_hud', 540, 80, this.node);
       hud.setPosition(0, 388, 0);
-      this.surfChrome(hud, 540, 76, 0);
+      this.glassCounterChrome(hud, 540, 76);
       this.mkLabel('FREE SPINS', -120, 14, 13, MUTED, hud);
       this.bonusHudSpins = this.mkLabel('1 / 8', -120, -14, 22, ACID, hud, true);
       this.mkLabel('TOTAL WIN', 130, 14, 13, MUTED, hud);
@@ -688,6 +712,36 @@ export class SlotView extends Component {
       g.lineTo(w / 2 - 18, h / 2 - titleDivAt);
       g.stroke();
     }
+    return g;
+  }
+
+  /** GLASS counter plate — a deliberately TRANSLUCENT surface for the free-spins
+   *  HUD so the live bonus world reads THROUGH it (the solid modal `surfChrome`
+   *  blocked the reels behind the counter). A faint frosted fill + a top sheen
+   *  highlight + the brand pink rim — a floating glass tag, not an opaque card. */
+  private glassCounterChrome(parent: Node, w: number, h: number): Graphics {
+    const g = parent.addComponent(Graphics);
+    // Frosted body — low alpha so the candy world shows behind it.
+    g.fillColor = new Color(22, 13, 46, 120);
+    g.roundRect(-w / 2, -h / 2, w, h, 16);
+    g.fill();
+    // Upper sheen — a brighter glass band across the top third.
+    g.fillColor = new Color(255, 255, 255, 16);
+    g.roundRect(-w / 2 + 3, h / 2 - h * 0.42, w - 6, h * 0.36, 13);
+    g.fill();
+    // Soft outer pink halo + crisp inner rim (matches the modal brand language).
+    g.lineWidth = 6;
+    g.strokeColor = new Color(255, 0, 127, 42);
+    g.roundRect(-w / 2 - 1, -h / 2 - 1, w + 2, h + 2, 17);
+    g.stroke();
+    g.lineWidth = 2;
+    g.strokeColor = new Color(255, 90, 156, 210);
+    g.roundRect(-w / 2, -h / 2, w, h, 16);
+    g.stroke();
+    g.lineWidth = 1;
+    g.strokeColor = new Color(191, 232, 255, 40);
+    g.roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 13);
+    g.stroke();
     return g;
   }
 

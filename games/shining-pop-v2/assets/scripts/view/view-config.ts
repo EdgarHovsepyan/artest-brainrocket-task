@@ -40,8 +40,11 @@ export const VIEW_CONFIG = {
     boardBottomGapPx: 22,
     /** bg base-fill + bg_art scaled by this factor so the painted bg always
      *  bleeds past 16:9, 21:9, 9:16, 9:21 — kills the #0a0610 letterbox band
-     *  without touching the engine cover. */
-    bgCoverOverscan: 1.15,
+     *  without touching the engine cover. Trimmed 1.15→1.06 (owner: "bg too big,
+     *  not containing the fill image") so the painting zooms in LESS and more of
+     *  the candy world is visible inside the viewport; 6% still safely bleeds
+     *  past every target ratio so no letterbox returns. */
+    bgCoverOverscan: 1.06,
 
     // ── Task 1.2: reels re-center + edge feather ────────────────────────────
     /** Stacked-alpha dark feather over top/bottom of the GRAPHICS_RECT mask
