@@ -214,14 +214,18 @@ export class SymbolView extends Component {
   playWin(delay = 0, rich = true, winMat: Material | null = null): void {
     this.ensureBurst();
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
+    // PER-SYMBOL WIN IDENTITY — scale the whole celebration by this symbol's heat
+    // so a Wild win EXPLODES and a low-pays win is a polite bump (heat 1.0 = the
+    // old uniform behaviour). Drives the pop, the jelly amplitude AND the glow.
+    const heat = VIEW_CONFIG.win.symbolProfiles[this._currentId]?.heat ?? 1.0;
     const half = symbolPulseMs / 2 / 1000; // ms → s, two halves
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
-    const pop = symbolPulseScale + 0.12; // first beat overshoots → the win has an attack
+    const pop = 1 + (symbolPulseScale - 1 + 0.12) * heat; // attack overshoot, heat-scaled
     const bnc = VIEW_CONFIG.win.winBounceLoop;
     // JELLY wobble: wide-and-short ↔ narrow-and-tall (axes in opposition) — the
-    // candy "yummy" squash-and-stretch, not a uniform scale pulse.
-    const j = bnc.jelly;
+    // candy "yummy" squash-and-stretch, not a uniform scale pulse. heat-scaled.
+    const j = bnc.jelly * heat;
     const squash = new Vec3(1 + j * 0.9, 1 - j, 1);
     const stretch = new Vec3(1 - j * 0.8, 1 + j, 1);
     const bhalf = bnc.ms / 2 / 1000;
@@ -248,16 +252,20 @@ export class SymbolView extends Component {
       this.glowOp.opacity = 0;
       // SHINING loop: the warm radial glow breathes behind the symbol FOREVER
       // (was repeat(3)) — pairs with the shader rim/sweep for a sustained shine.
+      // Peak brightness + breathe scale ride this symbol's heat (Wild burns
+      // brightest, lows are subtle) so the glow carries the per-symbol identity.
+      const glowPeak = Math.min(255, Math.round(200 * heat));
+      const glowScale = 1 + 0.35 * heat;
       tween(this.glowOp)
         .delay(delay)
-        .to(half, { opacity: 200 })
-        .to(half, { opacity: 70 })
+        .to(half, { opacity: glowPeak })
+        .to(half, { opacity: Math.round(70 * heat) })
         .union()
         .repeatForever()
         .start();
       tween(this.glow)
         .delay(delay)
-        .to(half, { scale: new Vec3(1.35, 1.35, 1) }, { easing: 'quadOut' })
+        .to(half, { scale: new Vec3(glowScale, glowScale, 1) }, { easing: 'quadOut' })
         .to(half, { scale: new Vec3(0.95, 0.95, 1) }, { easing: 'quadIn' })
         .union()
         .repeatForever()

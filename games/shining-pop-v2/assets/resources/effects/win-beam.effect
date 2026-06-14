@@ -1,8 +1,9 @@
 // CINEMA WAVE — win-line ENERGY BEAM. An additive ribbon sprite stretched
 // between consecutive winning-cell centres: flowing fbm plasma scrolls along the
 // beam, soft ribbon-core falloff (no hard stroke), ends feathered (no caps).
-// Warm ember->gold ramp only — NEVER magenta geometry. The svarka/plasma read
-// comes from the noise flow + additive blend, not from a drawn line.
+// Candy-pink additive ramp ("our palette"). This is a SOFT additive bloom ribbon
+// from the noise flow + additive blend — NEVER a drawn/hard magenta line (that
+// stroke geometry was the rejected look; this glow is not that).
 // Branchless (step/smoothstep/mix). Honors vfx.materialsEnabled (null material →
 // the win presentation simply has no beams; embers + symbol fire still carry it).
 
@@ -112,9 +113,12 @@ CCProgram sprite-fs %{
     float pulse = exp(-pow((pk - 0.5) * 6.0, 2.0));
     body *= 0.85 + 0.9 * pulse;
 
-    // Ember -> gold ramp; the hottest filaments and the pulse go white-gold.
-    vec3 colr = mix(vec3(1.0, 0.42, 0.08), vec3(1.0, 0.94, 0.7), n * yf);
-    colr = mix(colr, vec3(1.0, 0.98, 0.88), pulse * 0.55);
+    // Candy ramp (owner "our palette"): deep rose filaments -> bright candy-pink
+    // -> white-pink crest on the hottest filaments + travelling pulse. This is the
+    // ADDITIVE bloom ribbon (soft glow), NOT a drawn stroke — the rejected look
+    // was hard magenta GEOMETRY, which this never paints.
+    vec3 colr = mix(vec3(1.0, 0.30, 0.60), vec3(1.0, 0.74, 0.88), n * yf);
+    colr = mix(colr, vec3(1.0, 0.95, 0.98), pulse * 0.6);
     float outA = clamp(body * 1.35, 0.0, 1.0) * u_intensity * color.a;
 
     vec4 o = vec4(colr * (0.6 + 0.8 * body) , outA);

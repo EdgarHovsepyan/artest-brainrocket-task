@@ -201,6 +201,23 @@ export const VIEW_CONFIG = {
     /** Pulse scale applied to winning symbols. */
     symbolPulseScale: 1.18,
     symbolPulseMs: 420,
+    /** PER-SYMBOL WIN IDENTITY — each symbol id celebrates at its OWN intensity
+     *  (`heat`), so a WILD win EXPLODES while a low-pays win is a polite bump.
+     *  heat scales the attack pop, the jelly amplitude AND the glow peak in
+     *  symbol-view.playWin. 1.0 = the previous uniform behaviour; tiers track the
+     *  paytable (Wild > H1..H4 > L1..L5). Unlisted ids fall back to base 1.0. */
+    symbolProfiles: {
+      0: { heat: 1.35 }, // WILD — hottest (gingerbread hero)
+      1: { heat: 1.22 }, // H1 (top candy gem)
+      2: { heat: 1.15 }, // H2
+      3: { heat: 1.08 }, // H3
+      4: { heat: 1.03 }, // H4
+      5: { heat: 0.95 }, // L1
+      6: { heat: 0.92 }, // L2
+      7: { heat: 0.9 }, // L3
+      8: { heat: 0.88 }, // L4
+      9: { heat: 0.86 }, // L5
+    } as Record<number, { heat: number }>,
     /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
      *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
      *  until the next spin clears them — the modern candy-slot "yummy" feel, not

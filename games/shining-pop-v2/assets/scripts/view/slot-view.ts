@@ -1394,8 +1394,11 @@ export class SlotView extends Component {
         const pts = this.linePts(w);
         if (pts.length < 2) continue;
         for (const [width, color] of [
-          [3, new Color(255, 214, 140, 235)],
-          [1.2, new Color(255, 248, 230, 255)],
+          // Neutral pink-white hairline — the elegant "the line itself" read that
+          // harmonises with the candy-pink bloom WITHOUT being a saturated magenta
+          // drawn stroke (that geometry was the rejected look).
+          [3, new Color(255, 224, 240, 220)],
+          [1.2, new Color(255, 250, 252, 255)],
         ] as [number, Color][]) {
           cg.lineWidth = width;
           cg.strokeColor = color;
