@@ -122,44 +122,57 @@ CCProgram sprite-fs %{
       a = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
     #endif
 
-    // One heartbeat the whole highlight pulses on.
-    float pulse = 0.55 + 0.45 * sin(u_time * 5.0);
+    // PER-SYMBOL PHASE — color.rg carries a stable random seed per symbol (the
+    // consumer never tints with color.rgb). phA/phB desync every time-based term
+    // so each candy animates on its OWN clock — the grid reads lively per-symbol,
+    // not one synchronised diagonal sweep across the whole board.
+    float phA = color.r * 6.2831;
+    float phB = color.g;
+
+    // One heartbeat the highlight pulses on (per-symbol phase).
+    float pulse = 0.55 + 0.45 * sin(u_time * 5.0 + phA);
 
     // === IRIDESCENT SHIMMER (hero): rainbow ribbons flowing across the candy ===
-    float band = 0.5 + 0.5 * sin((uv0.x - uv0.y) * 7.0 - u_time * 2.2);
+    float band = 0.5 + 0.5 * sin((uv0.x - uv0.y) * 7.0 - u_time * 2.2 + phA);
     band = pow(band, 2.5); // tighten to bright ribbons, not a flat wash
-    vec3 irid = hue(fract((uv0.x + uv0.y) * 0.6 + u_time * 0.25));
+    vec3 irid = hue(fract((uv0.x + uv0.y) * 0.6 + u_time * 0.25 + phB));
     vec3 shimmerCol = mix(vec3(1.0), irid, 0.8); // white-cored rainbow
     float shimmer = band * a * u_shimmer * (0.6 + 0.4 * pulse);
 
-    // === STAR GLINT: a 4-point sparkle wandering the surface, twinkling ===
-    vec2 gp = uv0 - vec2(0.5 + 0.26 * sin(u_time * 0.7), 0.55 + 0.22 * cos(u_time * 0.9));
-    float cross = max(exp(-abs(gp.x) * 55.0), exp(-abs(gp.y) * 55.0));
-    float glint = cross * exp(-dot(gp, gp) * 22.0) * (0.35 + 0.65 * pow(pulse, 3.0)) * a;
+    // === STAR GLINTS (cute hero): two 4-point sparkles wandering the candy,
+    //     each on its own wander + twinkle so it reads playful, not mechanical ===
+    vec2 g1 = uv0 - vec2(0.5 + 0.26 * sin(u_time * 0.7 + phA), 0.55 + 0.22 * cos(u_time * 0.9 + phA));
+    float c1 = max(exp(-abs(g1.x) * 55.0), exp(-abs(g1.y) * 55.0)) * exp(-dot(g1, g1) * 22.0);
+    vec2 g2 = uv0 - vec2(0.5 + 0.30 * cos(u_time * 0.5 + phA * 1.7), 0.5 + 0.28 * sin(u_time * 0.8 + phA * 1.3));
+    float c2 = max(exp(-abs(g2.x) * 60.0), exp(-abs(g2.y) * 60.0)) * exp(-dot(g2, g2) * 26.0);
+    float tw1 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(u_time * 9.0 + phA), 3.0);
+    float tw2 = 0.30 + 0.70 * pow(0.5 + 0.5 * sin(u_time * 7.0 + phA + 2.1), 3.0);
+    float glint = (c1 * tw1 + c2 * tw2) * a;
 
-    // === POWER RIM: thick pulsing silhouette light ===
+    // === SOFT RIM: silhouette light hugging the candy shape (pulsing) ===
     float lo = 0.5 - u_rimWidth * 10.0;
     float rim = smoothstep(lo, 0.5, a) * (1.0 - smoothstep(0.5, 0.97, a));
     rim = pow(clamp(rim, 0.0, 1.0), 0.6) * (0.7 + 0.55 * pulse);
-    vec3 rimCol = mix(vec3(1.0, 0.55, 0.15), vec3(1.0, 0.95, 0.78), 0.5 + 0.5 * sin(u_time * 3.0));
+    vec3 rimCol = mix(vec3(1.0, 0.55, 0.15), vec3(1.0, 0.95, 0.78), 0.5 + 0.5 * sin(u_time * 3.0 + phA));
 
     // === FIRE (warm base lick) ===
-    float ft = u_time * 1.6;
+    float ft = u_time * 1.6 + phA;
     vec2 np = vec2(uv0.x * 3.0 + sin(uv0.y * 6.0 + ft) * 0.16, uv0.y * 3.2 - ft * 1.25);
     float flame = pow(fbm(np) * pow(smoothstep(0.72, 0.0, uv0.y), 1.5), 1.5) * a;
     vec3 fireCol = fireRamp(clamp(flame, 0.0, 1.0));
-    float fireA = clamp(flame, 0.0, 1.0) * 0.5 * u_fireAmt;
+    float fireA = clamp(flame, 0.0, 1.0) * 0.45 * u_fireAmt;
 
-    // === SPECULAR SWEEP across the glossy face ===
+    // === SPECULAR SWEEP — now a SUPPORTING glint, per-symbol phase, soft + faint
+    //     (the old strong synchronised diagonal read as a basic full-board sheen) ===
     float diag = (uv0.x + (1.0 - uv0.y)) * 0.5;
-    float sweep = (1.0 - smoothstep(0.0, 0.13, abs(diag - fract(u_time * u_sweepSpeed)))) * a;
+    float sweep = (1.0 - smoothstep(0.0, 0.18, abs(diag - fract(u_time * u_sweepSpeed + phB)))) * a;
 
     vec3 rgb = fireCol * fireA
              + rimCol * rim
              + shimmerCol * shimmer * 0.85
-             + vec3(1.0) * glint * 1.25
-             + vec3(1.0, 0.98, 0.92) * sweep * 0.7;
-    float outA = clamp(fireA + rim + shimmer * 0.78 + glint * 1.05 + sweep * 0.7, 0.0, 1.0)
+             + vec3(1.0) * glint * 1.5
+             + vec3(1.0, 0.98, 0.92) * sweep * 0.32;
+    float outA = clamp(fireA + rim + shimmer * 0.78 + glint * 1.3 + sweep * 0.32, 0.0, 1.0)
                * u_intensity * color.a;
 
     vec4 col = vec4(rgb, outA);

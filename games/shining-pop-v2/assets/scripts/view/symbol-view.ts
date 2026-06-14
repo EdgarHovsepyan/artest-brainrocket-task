@@ -293,6 +293,17 @@ export class SymbolView extends Component {
       const sp = n.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.type = Sprite.Type.SIMPLE;
+      // PER-SYMBOL PHASE — a stable random seed in color.rg (the symbol-win
+      // shader reads it as an animation phase offset; it never tints with
+      // color.rgb, only color.a carries the opacity envelope). This desyncs the
+      // shimmer/sweep/sparkle so the grid reads as lively per-symbol candy, NOT
+      // one synchronised diagonal flash across the whole board.
+      sp.color = new Color(
+        Math.floor(Math.random() * 256),
+        Math.floor(Math.random() * 256),
+        255,
+        255,
+      );
       this.winOverlay = n;
       this.winOverlaySp = sp;
       this.winOverlayOp = n.addComponent(UIOpacity);
