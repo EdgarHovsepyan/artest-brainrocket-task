@@ -187,12 +187,17 @@ export const VIEW_CONFIG = {
      *  on the SECOND segment's .call so the squash coincides with rest. Designers
      *  tune weight/elasticity/speed live; reducedMotion disables the bounce. */
     bounce: {
-      overtravelFrac: 0.08,
-      bounceMs: 190,
+      // Bouncier DROP (owner: "bouncing on the drop case"; Swink land-weight #61).
+      // Boosted the UNIFIED strip over-travel — overshoot = CELL * overtravelFrac *
+      // elasticity, so 0.08→0.12 + elasticity 1→1.1 ≈ 65% more dip-and-spring, plus
+      // a touch more settle weight. This stays the ONE source of impact (no rejected
+      // per-cell wobble); reducedMotion still disables it.
+      overtravelFrac: 0.12,
+      bounceMs: 200,
       easing: 'backOut',
-      weight: 1,
+      weight: 1.08,
       speed: 1,
-      elasticity: 1,
+      elasticity: 1.1,
     },
   },
 
