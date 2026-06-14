@@ -189,7 +189,9 @@ export const VIEW_CONFIG = {
     /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
      *  winning cells punch harder before settling into the jelly wobble. */
     symbolPulseScale: 1.3,
-    symbolPulseMs: 420,
+    /** Attack-pop duration. Snappier (was 420) for a punchy Pragmatic-Play-style
+     *  hit — the win SNAPS in, then settles into the jelly wobble. */
+    symbolPulseMs: 330,
     /** Per-reel L→R stagger (seconds) of the win-symbol highlight, so winners
      *  "blink" on in a WAVE across the board rather than all at once — the eye
      *  tracks the win building reel-by-reel. Was a hardcoded 0.06 in slot-view;
@@ -200,7 +202,7 @@ export const VIEW_CONFIG = {
      *  until the next spin clears them — the modern candy-slot "yummy" feel, not
      *  a uniform scale pulse. jelly = axis amplitude; ms = one full wobble cycle.
      *  The shader rim/sweep shine loops alongside (SlotView's u_time). */
-    winBounceLoop: { enabled: true, jelly: 0.14, ms: 520 },
+    winBounceLoop: { enabled: true, jelly: 0.14, ms: 470 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
@@ -263,7 +265,7 @@ export const VIEW_CONFIG = {
       intensity: 1.45,
       rimWidth: 0.035,
       sweepSpeed: 0.85,
-      envInMs: 220,
+      envInMs: 160,
       envHoldOpacity: 235,
       scale: 1.06,
     },
