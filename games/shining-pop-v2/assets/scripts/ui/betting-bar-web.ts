@@ -19,6 +19,8 @@ import {
   EventTouch,
   Graphics,
   Label,
+  LabelOutline,
+  LabelShadow,
   Mask,
   Node,
   resources,
@@ -28,9 +30,11 @@ import {
   Tween,
   UIOpacity,
   UITransform,
+  Vec2,
   Vec3,
 } from 'cc';
 import { applyFont } from '../view/fonts';
+import { formatMoney } from '../logic/money';
 import { VIEW_CONFIG } from '../view/view-config';
 const { ccclass } = _decorator;
 
@@ -121,6 +125,9 @@ let __touchDetected = false;
 @ccclass('BettingBarWeb')
 export class BettingBarWeb extends Component {
   private events = new EventTarget();
+  // Display currency for every money readout (symbol-prefixed via formatMoney).
+  // setCurrency() updates it; defaults to USD so the bar reads correctly pre-init.
+  private currency = 'USD';
   private balValue!: Label;
   private balCur!: Label;
   private lastWinValue!: Label;
@@ -182,8 +189,14 @@ export class BettingBarWeb extends Component {
     }
 
     this.buildAccount();
-    this.buildBanner(500, 320, 'LAST WIN', (l) => (this.lastWinValue = l));
-    this.buildBanner(840, 240, 'TOTAL BET', (l) => (this.totalBetValue = l));
+    this.buildBanner(500, 320, 'LAST WIN', (l) => {
+      this.lastWinValue = l;
+      this.make3D(l);
+    });
+    this.buildBanner(840, 240, 'TOTAL BET', (l) => {
+      this.totalBetValue = l;
+      this.make3D(l);
+    });
     this.relayoutBanners();
     this.buildCarousel();
     this.buildRightCluster();
@@ -486,6 +499,7 @@ export class BettingBarWeb extends Component {
 
     this.lbl('BALANCE', 232, 167, 17, C.label);
     this.balValue = this.lbl('0.00', 232, 195, 28, C.value);
+    this.make3D(this.balValue);
     this.balCur = this.lbl('USD', 330, 200, 16, C.cur, false);
   }
 
@@ -1112,9 +1126,10 @@ export class BettingBarWeb extends Component {
   }
 
   private fmt(n: number): string {
-    // Non-finite guard: a bad value renders as a clean 0.00, never "NaN"/"∞".
-    const v = Number.isFinite(n) ? n : 0;
-    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Currency-aware: symbol-prefixed amount (e.g. "$1.00"), per-currency decimals,
+    // non-finite guarded to a clean "$0.00" (never "NaN"/"∞"). maxChars compacts
+    // huge balances to K/M/B so the value never escapes the bar slot.
+    return formatMoney(Number.isFinite(n) ? n : 0, this.currency, 9);
   }
   /** HU2 odometer driven by the COMPONENT SCHEDULER (Cocos tween on a plain
    *  object does not tick in this runtime — only Node tweens do — so the value
@@ -1167,7 +1182,25 @@ export class BettingBarWeb extends Component {
     this.balReady = true;
   }
   setCurrency(c: string): void {
-    this.balCur.string = c;
+    this.currency = c;
+    // The symbol now rides on every amount (formatMoney), so the separate ISO
+    // code beside the balance is redundant — clear it for the clean expert look
+    // ("$100.00", not "$100.00 USD"). Re-render the balance through the new symbol.
+    this.balCur.string = '';
+    this.renderBalance(this.counters.bal.shown);
+  }
+
+  /** Faux-3D money text: a hard drop-shadow (extrude depth) + a dark glyph outline
+   *  (crisp candy edge). Lifts the flat value labels off the bar so wins read as
+   *  chunky/tactile, not printed — the owner's "win text more 3D" ask. */
+  private make3D(l: Label): void {
+    const ls = l.node.addComponent(LabelShadow);
+    ls.color = col('#180527', 0.9);
+    ls.offset = new Vec2(0, Math.round(-3 * FS));
+    ls.blur = 2;
+    const lo = l.node.addComponent(LabelOutline);
+    lo.color = col('#2d0b40');
+    lo.width = Math.max(1, Math.round(2 * FS));
   }
   setLastWin(n: number): void {
     // Classic 0 -> win tick: reset the shown value so it always counts up.
@@ -1226,6 +1259,7 @@ export class BettingBarWeb extends Component {
       this.cells = [];
       vals.forEach((v, i) => {
         const t = this.lbl(this.carFmt(v), 0, 0, 27, C.value, true, this.track);
+        this.make3D(t);
         t.horizontalAlign = Label.HorizontalAlign.CENTER;
         t.node.getComponent(UITransform)!.setAnchorPoint(0.5, 0.5);
         t.node.setPosition(i * this.CELLW + this.CELLW / 2, -30, 0);

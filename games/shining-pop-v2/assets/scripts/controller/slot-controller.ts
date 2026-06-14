@@ -221,6 +221,8 @@ export class SlotController extends Component {
       // skips (-> black screen). Force the built tree onto UI_2D so it draws.
       this.relayerUI(barNode);
       this.fitBar();
+      // Currency first so the very first balance/bet render carries the symbol.
+      this.bar.setCurrency('USD');
       this.syncHud();
       this.bar.setLastWin(0);
       this.bar.setTurbo(this.turboMode);
@@ -264,7 +266,7 @@ export class SlotController extends Component {
       (this.bar as BettingBarWeb).setBetLevels(
         BET_LEVELS_CENTS.slice(),
         BET_LEVELS_CENTS.indexOf(snapBet(this.model.bet)),
-        (cents) => (cents / 100).toFixed(2),
+        (cents) => formatMoney(cents / 100, 'USD'),
       );
     }
   }

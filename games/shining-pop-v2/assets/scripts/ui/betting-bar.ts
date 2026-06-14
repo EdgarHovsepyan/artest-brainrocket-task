@@ -22,12 +22,15 @@ import {
   Node,
   Graphics,
   Label,
+  LabelOutline,
+  LabelShadow,
   Color,
   resources,
   Sprite,
   SpriteFrame,
   UITransform,
   UIOpacity,
+  Vec2,
   Vec3,
   EventTarget,
   EventTouch,
@@ -35,6 +38,7 @@ import {
   Tween,
 } from 'cc';
 import { applyFont } from '../view/fonts';
+import { formatMoney } from '../logic/money';
 import { VIEW_CONFIG } from '../view/view-config';
 const { ccclass } = _decorator;
 
@@ -97,6 +101,8 @@ export class BettingBarMobile extends Component {
   private events = new EventTarget();
   private g!: Graphics; // static decoration layer
   private labels: Record<string, Label> = {};
+  // Display currency for every money readout (symbol-prefixed via formatMoney).
+  private currency = 'USD';
 
   // stateful element handles
   private spinGroup!: Node; // dim target for setAffordable
@@ -688,9 +694,24 @@ export class BettingBarMobile extends Component {
     lab.color = col(color);
     lab.isBold = true;
     applyFont(lab, color === C.value ? 'display' : 'body');
+    // Faux-3D on every MONEY value (balance/win/bet): a hard drop-shadow extrude
+    // + dark glyph outline so wins read chunky/tactile, not flat-printed.
+    if (color === C.value) this.make3D(lab);
     n.setPosition(new Vec3(x, this.Y(y), 0));
     this.labels[name] = lab;
     return lab;
+  }
+
+  /** Drop-shadow (depth) + dark outline (crisp candy edge) — mobile-bar parity
+   *  with the web bar's make3D. */
+  private make3D(l: Label): void {
+    const ls = l.node.addComponent(LabelShadow);
+    ls.color = col('#180527', 0.9);
+    ls.offset = new Vec2(0, -2);
+    ls.blur = 2;
+    const lo = l.node.addComponent(LabelOutline);
+    lo.color = col('#2d0b40');
+    lo.width = 2;
   }
   private makeLabels(): void {
     this.mkLabel('lastWinLabel', 100, 233, 13, C.label, 0.5).string = 'LAST WIN';
@@ -751,11 +772,11 @@ export class BettingBarMobile extends Component {
     return safe + (H - BAND_TOP) * s;
   }
   private fmt(n: number): string {
-    // Money renders with EXACTLY two decimals everywhere (approval gate N3/N4:
-    // "1,000" and "1000.5" style drift is a reviewer flag). Non-finite guard:
-    // a bad value renders as a clean 0.00, never "NaN"/"∞" on a money surface.
-    const v = Number.isFinite(n) ? n : 0;
-    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Currency-aware money render: symbol-prefixed ("$1.00"), per-currency decimals,
+    // non-finite guarded to "$0.00". maxChars compacts huge values to K/M/B so the
+    // amount never escapes its (already shrink-to-fit) slot. (Approval gate N3/N4:
+    // consistent decimals, no scientific-notation drift — formatMoney enforces both.)
+    return formatMoney(Number.isFinite(n) ? n : 0, this.currency, 9);
   }
   /** Shrink a value label so a long currency amount never escapes its slot
    *  (mobile parity with the web bar's relayoutBanners shrink-to-fit). The
@@ -776,7 +797,10 @@ export class BettingBarMobile extends Component {
     this.fitValue('balValue', 84); // stop before the USD chip at x196
   }
   setCurrency(c: string): void {
-    this.labels['balCur'].string = c;
+    this.currency = c;
+    // Symbol now rides on every amount, so the separate ISO chip beside the
+    // balance is redundant — clear it for the clean "$100.00" expert look.
+    this.labels['balCur'].string = '';
   }
   setLastWin(n: number): void {
     this.labels['lastWinValue'].string = this.fmt(n);

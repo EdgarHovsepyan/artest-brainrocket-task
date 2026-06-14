@@ -26,6 +26,7 @@ import {
   view,
 } from 'cc';
 import { BONUS_MODES, BonusMode, GRID, PAYLINES, SYMBOLS } from '../logic/game-config';
+import { formatMoney } from '../logic/money';
 import {
   CONTROLS_LINES,
   FEATURES_LINES,
@@ -90,8 +91,10 @@ const SYM_RES = [
   'sym_l5_10',
 ];
 
-// Non-finite guard: a bad value renders 0.00, never "NaN"/"∞" on the win ticker.
-const fmt = (cents: number) => ((Number.isFinite(cents) ? cents : 0) / 100).toFixed(2);
+// Non-finite guard: a bad value renders $0.00, never "NaN"/"∞" on the win ticker.
+// Currency-prefixed for the desktop in-canvas HUD (externalControls=false path);
+// the web bar formats its own readouts. USD display currency.
+const fmt = (cents: number) => formatMoney((Number.isFinite(cents) ? cents : 0) / 100, 'USD');
 
 interface DeckButton {
   node: Node;
