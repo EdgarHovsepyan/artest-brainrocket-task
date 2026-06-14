@@ -206,7 +206,7 @@ export const VIEW_CONFIG = {
     /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
      *  winning cells punch harder before settling into the jelly wobble. */
     symbolPulseScale: 1.24,
-    symbolPulseMs: 420,
+    symbolPulseMs: 240, // snappier attack (was 420 = slow) — owner: "faster bouncing"
     /** PER-SYMBOL WIN IDENTITY — each symbol id celebrates at its OWN intensity
      *  (`heat`), so a WILD win EXPLODES while a low-pays win is a polite bump.
      *  heat scales the attack pop, the jelly amplitude AND the glow peak in
@@ -224,12 +224,12 @@ export const VIEW_CONFIG = {
       8: { heat: 0.88 }, // L4
       9: { heat: 0.86 }, // L5
     } as Record<number, { heat: number }>,
-    /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
-     *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
-     *  until the next spin clears them — the modern candy-slot "yummy" feel, not
-     *  a uniform scale pulse. jelly = axis amplitude; ms = one full wobble cycle.
-     *  The shader rim/sweep shine loops alongside (SlotView's u_time). */
-    winBounceLoop: { enabled: true, jelly: 0.1, ms: 520 },
+    /** WIN BOUNCE — after the attack pop, winning symbols keep BOUNCING (a fast
+     *  UNIFORM scale up↔down, both axes together) until the next spin clears them.
+     *  Owner: "more bouncing, NOT model skewing or dancing" — so it's a clean ball-
+     *  bounce, not the old opposing-axis squash-and-stretch (which read as a skew).
+     *  jelly = bounce amplitude; ms = one full bounce cycle (snappy). */
+    winBounceLoop: { enabled: true, jelly: 0.11, ms: 300 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
@@ -279,13 +279,13 @@ export const VIEW_CONFIG = {
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    // scale TRIMMED 2.05→1.45: at 2.05 the soft-burst was ~2× the symbol (≈197px
-    // on a ~100px cell), so it spilled across the cell BACKGROUND and read as a
-    // glowing BOX behind the art (owner: "win works on the bg/bounding box, not on
-    // the symbol"). 1.45 keeps it a tight halo that HUGS the symbol silhouette, so
-    // the win reads from the candy itself (the on-silhouette symbol-win shader),
-    // not a square on the background. intensity lifted to keep the punch.
-    burst: { enabled: true, intensity: 1.45, scale: 1.45 },
+    // DISABLED 2026-06-14: the soft-burst glow is drawn on a WHITE SQUARE frame, so
+    // at ANY size it renders as a glowing BOX behind the symbol filling the cell —
+    // owner (repeatedly): "effects on the bg/bounding box, need ONLY the symbol
+    // effect, not the symbol bg". The win now reads PURELY from the on-silhouette
+    // symbol-win shader (rim-light + glints + shimmer, alpha-clipped to the candy)
+    // + the symbol's own scale bounce. No square glow can paint the background.
+    burst: { enabled: false, intensity: 1.2, scale: 1.1 },
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the

@@ -141,6 +141,11 @@ export class SymbolView extends Component {
       gg.fill();
     }
     glowNode.setScale(0.8, 0.8, 1);
+    // Behind-symbol glow node is DORMANT by default — owner: "only the symbol
+    // effect, not the symbol bg". It renders nothing (inactive) so a win shows
+    // zero glow behind the candy; the on-symbol symbol-win shader carries the
+    // shine. (Kept buildable in case a future per-mode moment opts back in.)
+    glowNode.active = false;
     this.glow = glowNode;
     this.glowOp = glowNode.addComponent(UIOpacity);
     this.glowOp.opacity = 0;
@@ -229,15 +234,15 @@ export class SymbolView extends Component {
     this.node.setScale(1, 1, 1);
     const pop = (1 + (symbolPulseScale - 1 + 0.12) * heat) * zoom; // attack overshoot
     const bnc = VIEW_CONFIG.win.winBounceLoop;
-    // JELLY wobble: wide-and-short ↔ narrow-and-tall (axes in opposition) — the
-    // candy "yummy" squash-and-stretch, not a uniform scale pulse. heat-scaled,
-    // and centred on `zoom` so the Wild holds its enlarged hero size.
+    // FAST UNIFORM BOUNCE — both axes together (a ball-bounce), NOT the old opposing-
+    // axis squash-and-stretch (owner: "more bouncing, not model skewing or dancing").
+    // heat-scaled amplitude, centred on `zoom` so the Wild stays the enlarged hero.
     const j = bnc.jelly * heat;
-    const squash = new Vec3((1 + j * 0.9) * zoom, (1 - j) * zoom, 1);
-    const stretch = new Vec3((1 - j * 0.8) * zoom, (1 + j) * zoom, 1);
+    const bUp = new Vec3(zoom * (1 + j), zoom * (1 + j), 1); // bounce peak (uniform)
+    const bDn = new Vec3(zoom, zoom, 1); // base
     const bhalf = bnc.ms / 2 / 1000;
-    // ATTACK (once): overshoot pop → settle to the hero size. Then a CONTINUOUS
-    // bounce loop so the winning symbol stays alive/celebrating until clear.
+    // ATTACK (once): a snappy overshoot pop → settle. Then a CONTINUOUS fast bounce
+    // (backOut up, quadIn down) so the winning symbol keeps bouncing until clear.
     tween(this.node)
       .delay(delay)
       .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
@@ -246,50 +251,21 @@ export class SymbolView extends Component {
     if (bnc.enabled) {
       tween(this.node)
         .delay(delay + half * 2) // begin after the attack lands
-        .to(bhalf, { scale: squash }, { easing: 'sineInOut' })
-        .to(bhalf, { scale: stretch }, { easing: 'sineInOut' })
+        .to(bhalf, { scale: bUp }, { easing: 'backOut' }) // pop UP
+        .to(bhalf, { scale: bDn }, { easing: 'quadIn' }) // settle DOWN
         .union()
         .repeatForever()
         .start();
     }
-    // Playful celebration SHIMMY — a quick decaying angle wiggle on the win attack,
-    // heat-scaled (Wild shimmies hardest), layered ON TOP of the scale jelly for a
-    // gamified candy "dance". Angle is otherwise unused on the symbol (land = scale,
-    // shake = position) so it composes cleanly; clear() zeroes it.
-    const wig = Math.min(7, 5 * heat);
-    this.node.angle = 0;
-    tween(this.node)
-      .delay(delay)
-      .to(0.1, { angle: wig }, { easing: 'quadOut' })
-      .to(0.12, { angle: -wig * 0.7 }, { easing: 'quadInOut' })
-      .to(0.12, { angle: wig * 0.4 }, { easing: 'quadInOut' })
-      .to(0.12, { angle: 0 }, { easing: 'quadOut' })
-      .start();
+    // NO behind-symbol glow on a win — the win now reads PURELY from the ON-SYMBOL
+    // shader (rim-light + glints + shimmer, alpha-clipped to the candy) + the scale
+    // bounce (owner: "only the symbol effect, not the symbol bg / bounding box").
+    // Park the glow node invisible; lock/wild-land still use it for their moments.
     if (this.glow && this.glowOp) {
       Tween.stopAllByTarget(this.glow);
       Tween.stopAllByTarget(this.glowOp);
-      this.glow.setScale(0.8, 0.8, 1);
       this.glowOp.opacity = 0;
-      // SHINING loop: the warm radial glow breathes behind the symbol FOREVER
-      // (was repeat(3)) — pairs with the shader rim/sweep for a sustained shine.
-      // Peak brightness + breathe scale ride this symbol's heat (Wild burns
-      // brightest, lows are subtle) so the glow carries the per-symbol identity.
-      const glowPeak = Math.min(255, Math.round(200 * heat));
-      const glowScale = 1 + 0.35 * heat;
-      tween(this.glowOp)
-        .delay(delay)
-        .to(half, { opacity: glowPeak })
-        .to(half, { opacity: Math.round(70 * heat) })
-        .union()
-        .repeatForever()
-        .start();
-      tween(this.glow)
-        .delay(delay)
-        .to(half, { scale: new Vec3(glowScale, glowScale, 1) }, { easing: 'quadOut' })
-        .to(half, { scale: new Vec3(0.95, 0.95, 1) }, { easing: 'quadIn' })
-        .union()
-        .repeatForever()
-        .start();
+      this.glow.setScale(0.8, 0.8, 1);
     }
     if (rich) {
       // CINEMA WAVE — prefer the shader rim-light/sweep overlay; the Graphics
