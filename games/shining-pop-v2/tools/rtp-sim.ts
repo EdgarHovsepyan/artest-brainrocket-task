@@ -7,6 +7,7 @@
 
 import { createRng } from '../assets/scripts/logic/rng';
 import { spin, REEL_STRIPS, wildStrikeMultiplier } from '../assets/scripts/logic/spin-engine';
+import { runScatterFreeSpins } from '../assets/scripts/logic/bonus-engine';
 import { SETTINGS, SYMBOL_NAMES } from '../assets/scripts/logic/game-config';
 
 const spins = Number(process.argv[2] ?? 2_000_000);
@@ -17,6 +18,9 @@ const rng = createRng(seed);
 let totalBet = 0;
 let totalWin = 0;
 let baseWin = 0;
+let scatterWin = 0;
+let fsWin = 0;
+let scatterTriggers = 0;
 let hits = 0;
 let strikes = 0;
 let best = 0;
@@ -25,11 +29,18 @@ const bySymbol = new Map<number, number>();
 for (let i = 0; i < spins; i++) {
   const r = spin(rng);
   const mult = wildStrikeMultiplier(r.grid);
-  const win = r.totalPayout * mult;
+  let win = r.totalPayout * mult + r.scatterPay; // scatter pay is flat (no strike)
+  scatterWin += r.scatterPay;
+  if (r.freeSpins > 0) {
+    scatterTriggers++;
+    const fs = runScatterFreeSpins(rng, r.freeSpins);
+    win += fs.totalPayout;
+    fsWin += fs.totalPayout;
+  }
   totalBet += linesPerSpin;
   baseWin += r.totalPayout;
   totalWin += win;
-  if (r.totalPayout > 0) hits++;
+  if (r.totalPayout > 0 || r.scatterPay > 0) hits++;
   if (mult > 1) strikes++;
   if (win > best) best = win;
   for (const w of r.lineWins) {
@@ -45,9 +56,16 @@ console.log(`Spins:        ${spins.toLocaleString()}`);
 console.log(`Reel lengths: ${REEL_STRIPS.map((s) => s.length).join(', ')}`);
 console.log(`Bet/spin:     ${linesPerSpin} (line-bet units)`);
 console.log('-'.repeat(46));
-console.log(`RTP (w/ WS):  ${(rtp * 100).toFixed(3)} %`);
+console.log(`RTP (total):  ${(rtp * 100).toFixed(3)} %`);
 console.log(`  ├─ base:    ${((baseWin / totalBet) * 100).toFixed(3)} %`);
-console.log(`  └─ strike:  ${(((totalWin - baseWin) / totalBet) * 100).toFixed(3)} %`);
+console.log(
+  `  ├─ strike:  ${(((totalWin - baseWin - scatterWin - fsWin) / totalBet) * 100).toFixed(3)} %`,
+);
+console.log(`  ├─ scatter: ${((scatterWin / totalBet) * 100).toFixed(3)} %`);
+console.log(`  └─ freespin:${((fsWin / totalBet) * 100).toFixed(3)} %`);
+console.log(
+  `Scatter trig: ${((scatterTriggers / spins) * 100).toFixed(3)} %  (1 in ${Math.round(spins / Math.max(1, scatterTriggers)).toLocaleString()})`,
+);
 console.log(`Strike freq:  ${((strikes / spins) * 100).toFixed(3)} %`);
 console.log(`Hit freq:     ${(hitFreq * 100).toFixed(2)} %`);
 console.log(

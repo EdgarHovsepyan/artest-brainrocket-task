@@ -3,7 +3,7 @@
 // WILD STRIKE base feature and Buy-Feature free spins.
 
 import { BONUS_MODES, BonusMode, SETTINGS } from '../logic/game-config';
-import { BonusResult, runFreeSpins } from '../logic/bonus-engine';
+import { BonusResult, runFreeSpins, runScatterFreeSpins } from '../logic/bonus-engine';
 import { createRng, Rng } from '../logic/rng';
 import { spin as engineSpin, wildStrikeMultiplier } from '../logic/spin-engine';
 import { SpinResult } from '../logic/types';
@@ -15,6 +15,11 @@ export interface SpinOutcome {
   betCents: number;
   winCents: number;
   balanceCents: number;
+  /** Scatter-triggered free-spins result (null = no scatter trigger this spin).
+   *  Its win is already folded into winCents; the View plays the steps back. */
+  freeSpins: BonusResult | null;
+  /** Flat scatter pay credited this spin, in cents (0 = none). */
+  scatterCents: number;
 }
 
 export interface BonusOutcome {
@@ -66,7 +71,17 @@ export class SlotModel {
     const result = engineSpin(this.rng);
     const wildStrike = wildStrikeMultiplier(result.grid);
     const lineBetCents = this.betCents / SETTINGS.activeLines;
-    const winCents = Math.round(result.totalPayout * wildStrike * lineBetCents);
+    let winCents = Math.round(result.totalPayout * wildStrike * lineBetCents);
+    // SCATTER pay — flat, NOT multiplied by WILD STRIKE.
+    const scatterCents = Math.round(result.scatterPay * lineBetCents);
+    winCents += scatterCents;
+    // SCATTER-triggered free spins — reuse the buy-feature engine. The win is
+    // folded into winCents now; the View plays the steps back after the reveal.
+    let freeSpins: BonusResult | null = null;
+    if (result.freeSpins > 0) {
+      freeSpins = runScatterFreeSpins(this.rng, result.freeSpins);
+      winCents += Math.round(freeSpins.totalPayout * lineBetCents);
+    }
     this.balanceCents += winCents;
     return {
       result,
@@ -74,6 +89,8 @@ export class SlotModel {
       betCents: this.betCents,
       winCents,
       balanceCents: this.balanceCents,
+      freeSpins,
+      scatterCents,
     };
   }
 

@@ -1,11 +1,24 @@
 // Pure spin engine: builds reel strips, spins, and evaluates line wins.
 // NO Cocos imports — fully testable and RTP-simulatable outside the editor.
 
-import { GRID, PAYLINES, PAYTABLE, REEL_WEIGHTS, SYMBOLS, WILD_STRIKE } from './game-config';
+import {
+  FREE_SPINS_AWARD,
+  GRID,
+  PAYLINES,
+  PAYTABLE,
+  REEL_WEIGHTS,
+  SCATTER,
+  SCATTER_MIN,
+  SCATTER_PAY,
+  SETTINGS,
+  SYMBOLS,
+  WILD_STRIKE,
+} from './game-config';
 import { Rng } from './rng';
 import { Grid, LineWin, SpinResult, SymbolId } from './types';
 
 const WILD = SYMBOLS.WILD;
+const SCAT = SCATTER;
 
 /**
  * Expand a reel's symbol-weight map into a concrete strip, spreading each
@@ -79,9 +92,12 @@ export function evaluateLine(lineSymbols: SymbolId[]): LineEval | null {
 
   const candidates: LineEval[] = [];
 
+  // The SCATTER is NOT a line symbol: it never anchors a run and never substitutes,
+  // so it can't be the line's base (and, being neither base nor WILD, it naturally
+  // BREAKS any run it sits in — the left-aligned rule then kills lines it blocks).
   let base: SymbolId = -1;
   for (const s of lineSymbols) {
-    if (s !== WILD) {
+    if (s !== WILD && s !== SCAT) {
       base = s;
       break;
     }
@@ -100,7 +116,18 @@ export function evaluateLine(lineSymbols: SymbolId[]): LineEval | null {
   return best;
 }
 
-/** Evaluate all paylines on a grid. */
+/** Count SCATTER symbols anywhere on the grid. */
+export function countScatters(grid: Grid): number {
+  let n = 0;
+  for (let reel = 0; reel < grid.length; reel++) {
+    for (let row = 0; row < grid[reel].length; row++) {
+      if (grid[reel][row] === SCAT) n++;
+    }
+  }
+  return n;
+}
+
+/** Evaluate all paylines on a grid + the scatter pay / free-spins trigger. */
 export function evaluateSpin(grid: Grid): SpinResult {
   const lineWins: LineWin[] = [];
   let totalPayout = 0;
@@ -113,7 +140,14 @@ export function evaluateSpin(grid: Grid): SpinResult {
       totalPayout += win.payout;
     }
   }
-  return { grid, lineWins, totalPayout };
+  // SCATTER pay (anywhere) — flat, NOT multiplied by WILD STRIKE or by paylines.
+  // SCATTER_PAY is in total-bet multiples; convert to line-bet units (× active
+  // lines) so it composes with the line `totalPayout`, which is in line-bet units.
+  const scatters = countScatters(grid);
+  const tier = Math.min(scatters, 5);
+  const scatterPay = scatters >= SCATTER_MIN ? (SCATTER_PAY[tier] ?? 0) * SETTINGS.activeLines : 0;
+  const freeSpins = scatters >= SCATTER_MIN ? (FREE_SPINS_AWARD[tier] ?? 0) : 0;
+  return { grid, lineWins, totalPayout, scatters, scatterPay, freeSpins };
 }
 
 /** Spin + evaluate in one call. */

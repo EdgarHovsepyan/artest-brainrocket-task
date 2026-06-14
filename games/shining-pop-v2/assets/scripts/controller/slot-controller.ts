@@ -527,6 +527,14 @@ export class SlotController extends Component {
 
     this.state = 'resolving';
     if (outcome.wildStrike > 1) this.view.setBanner(`WILD ×${outcome.wildStrike}`);
+    // SCATTER trigger — the rainbow-lollipop scatters paid + awarded free spins.
+    // The win (scatter pay + free-spin payouts) is already folded into winCents and
+    // credited; this labels the moment so it never reads as an unexplained jump.
+    // (Full step-by-step free-spins playback reuses the onBuy sequence — next pass.)
+    if (outcome.freeSpins) {
+      this.view.showFeatureUnlocked('FREE SPINS');
+      this.view.setBanner(`FREE SPINS ×${outcome.result.freeSpins}`);
+    }
     if (outcome.winCents > 0) {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
@@ -562,10 +570,10 @@ export class SlotController extends Component {
       }
       if (this.autoplay.active) {
         // Master-parity continuation: feature -> bigWin -> exhausted -> balance.
-        // Base game has no natural free-spin trigger (buy-only), so isFeature
-        // stays false until scatter wiring lands.
+        // A scatter free-spins trigger now counts as a feature for the autoplay
+        // stop-on-feature rule (the base game finally has a natural trigger).
         const verdict = evaluateContinuation(this.autoplay, {
-          isFeature: false,
+          isFeature: outcome.freeSpins != null,
           winCents: outcome.winCents,
           betCents: outcome.betCents,
           balanceCents: this.model.balance,

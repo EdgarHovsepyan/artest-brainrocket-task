@@ -74,6 +74,25 @@ function applyMechanic(grid: Grid, mode: BonusMode, rng: Rng, sticky: Set<string
   }
 }
 
+/**
+ * SCATTER-triggered free spins: N PLAIN base spins (no sticky mechanic). Kept plain
+ * so it is cheap + RTP-controllable — the scatter feature returns the base-RTP budget
+ * freed by making the lollipop a scatter, without the rich buy-feature value. Reuses
+ * spinGrid + evaluateSpin so free-spin wins follow the exact base-game maths. `mode`
+ * is tagged 'wilds' only to satisfy BonusResult; the View labels it "FREE SPINS".
+ */
+export function runScatterFreeSpins(rng: Rng, spins: number): BonusResult {
+  const steps: FreeSpinStep[] = [];
+  let totalPayout = 0;
+  for (let i = 0; i < spins; i++) {
+    const grid = spinGrid(rng);
+    const result = evaluateSpin(grid);
+    totalPayout += result.totalPayout;
+    steps.push({ grid, payout: result.totalPayout, sticky: [] });
+  }
+  return { mode: 'wilds', steps, totalPayout };
+}
+
 /** Run a full free-spins sequence for a mode. Deterministic given the RNG. */
 export function runFreeSpins(rng: Rng, mode: BonusMode, spins: number): BonusResult {
   const steps: FreeSpinStep[] = [];

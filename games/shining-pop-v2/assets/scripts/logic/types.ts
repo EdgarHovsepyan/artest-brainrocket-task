@@ -27,4 +27,11 @@ export interface SpinResult {
   lineWins: LineWin[];
   /** Sum of all line payouts, in line-bet multiples. */
   totalPayout: number;
+  /** SCATTER symbols anywhere on the grid this spin. */
+  scatters: number;
+  /** Flat scatter pay in line-bet multiples (0 below SCATTER_MIN). NOT
+   *  WILD-STRIKE-multiplied. */
+  scatterPay: number;
+  /** Free spins awarded by the scatters this spin (0 = no trigger). */
+  freeSpins: number;
 }

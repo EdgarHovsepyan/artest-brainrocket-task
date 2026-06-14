@@ -28,7 +28,7 @@ export const SYMBOL_NAMES: Record<SymbolId, string> = {
   5: 'L1',
   6: 'L2',
   7: 'L3',
-  8: 'L4',
+  8: 'Scat', // the rainbow-lollipop SCATTER (pays anywhere + triggers free spins)
   9: 'L5',
 };
 
@@ -78,17 +78,19 @@ export const PAYLINES: number[][] = [
  * counts EVENLY around the strip (see spin-engine.ts) — not in blocks — which is
  * what makes small wins land on many spins instead of clustering.
  *
- * At these weights: base lines ≈ 73% + WILD STRIKE ≈ 24% → RTP ≈ 97% at a ~22%
- * hit frequency (`npm run sim`). Wild density is the master lever — it drives both
- * base substitution AND the WILD STRIKE tail, so wilds are kept rare (3/strip).
- * The spec paytable is never touched — only these counts shape RTP.
+ * At these weights (2026-06-14, after the SCATTER feature): base lines ≈ 74.8% +
+ * WILD STRIKE ≈ 17.3% + SCATTER pay ≈ 2.4% + free spins ≈ 3.2% → RTP ≈ 97.8% at a
+ * ~25% hit frequency (`npm run sim`, 2M). The scatter (id 8) was carved out of the
+ * line symbols, so the strip was lengthened (low symbols padded) to dilute the base
+ * back down and the freed RTP returned through the scatter pay + free-spins trigger
+ * (1 in ~75). The spec paytable is never touched — only these counts shape RTP.
  */
 export const REEL_WEIGHTS: Record<SymbolId, number>[] = [
-  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 6, 6: 9, 7: 9, 8: 9, 9: 10 }, // reel 1
-  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 6, 6: 9, 7: 9, 8: 9, 9: 10 }, // reel 2
-  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 6, 6: 9, 7: 9, 8: 9, 9: 10 }, // reel 3
-  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 6, 6: 9, 7: 9, 8: 9, 9: 10 }, // reel 4
-  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 6, 6: 9, 7: 9, 8: 9, 9: 10 }, // reel 5
+  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 8, 6: 11, 7: 11, 8: 3, 9: 14 }, // reel 1
+  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 8, 6: 11, 7: 11, 8: 3, 9: 14 }, // reel 2
+  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 8, 6: 11, 7: 11, 8: 3, 9: 14 }, // reel 3
+  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 8, 6: 11, 7: 11, 8: 3, 9: 14 }, // reel 4
+  { 0: 3, 1: 5, 2: 6, 3: 8, 4: 8, 5: 8, 6: 11, 7: 11, 8: 3, 9: 14 }, // reel 5
 ];
 
 /** Tunable game settings (no magic numbers in engine code). */
@@ -123,3 +125,29 @@ export const BONUS_MODES: Record<BonusMode, { name: string; spins: number; cost:
   crowns: { name: 'STICKY CROWNS', spins: 8, cost: 96.99 },
   reels: { name: 'WILD REELS', spins: 8, cost: 33.64 },
 };
+
+/**
+ * SCATTER feature. The rainbow-lollipop (id 8, formerly the L4 line symbol) is a
+ * true SCATTER: it pays ANYWHERE on the grid (not on paylines) and, at SCATTER_MIN+,
+ * triggers a free-spins run. Its art literally says "SCATTER", so the symbol now
+ * matches its art (the previous bug: a SCATTER-labelled symbol that paid like a
+ * normal low line symbol, so players saw "scatters" that never did anything).
+ *
+ * RTP: id 8 was removed from line eligibility (it was ~5% base RTP), and that
+ * budget is returned via the scatter pay + the free-spins trigger. Reel weight for
+ * id 8 controls trigger frequency. Re-tuned + verified to ~97% via `npm run sim`.
+ * The scatter never substitutes and never forms a line (see spin-engine).
+ */
+export const SCATTER = 8;
+/** Minimum scatters anywhere on the 5×3 grid to pay + trigger free spins. */
+export const SCATTER_MIN = 3;
+/** Scatter pay by scatter count, in TOTAL-bet multiples (independent of WILD STRIKE
+ *  and of paylines — a flat scatter pay credited on top of any line win). */
+export const SCATTER_PAY: Record<number, number> = { 3: 1.5, 4: 6, 5: 30 };
+/** Free spins awarded by scatter count. Played out via runScatterFreeSpins (plain
+ *  base spins). Sized to the trigger frequency so the freed base-RTP budget returns
+ *  WITHOUT ballooning — re-tuned to ~97% via `npm run sim`. */
+export const FREE_SPINS_AWARD: Record<number, number> = { 3: 3, 4: 6, 5: 10 };
+/** The free-spins mechanic a scatter trigger plays. STICKY WILDS = the headline
+ *  feature, so scatters lead into the game's best free-spins mode. */
+export const SCATTER_FS_MODE: BonusMode = 'wilds';
