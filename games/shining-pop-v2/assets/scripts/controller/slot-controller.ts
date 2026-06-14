@@ -400,6 +400,11 @@ export class SlotController extends Component {
     return [t.off, t.turbo, t.max][this.turboMode];
   }
 
+  /** Turbo mode as the {off,turbo,max} config key — picks per-turbo timing tables. */
+  private turboKey(): 'off' | 'turbo' | 'max' {
+    return (['off', 'turbo', 'max'] as const)[this.turboMode];
+  }
+
   private applySetting(key: 'sound' | 'turboMode' | 'reducedFx', value: number | boolean): void {
     if (key === 'sound') {
       this.muted = !value;
@@ -497,7 +502,10 @@ export class SlotController extends Component {
     this.view.closeAutoplayPanel();
 
     this.canStop = false;
-    this.scheduleOnce(() => (this.canStop = true), 0.18);
+    this.scheduleOnce(
+      () => (this.canStop = true),
+      VIEW_CONFIG.spin.quickStopArmMs[this.turboKey()] / 1000,
+    );
 
     const outcome = this.model.play();
     this.view.setBalance(outcome.balanceCents);
@@ -553,7 +561,7 @@ export class SlotController extends Component {
           }, d / 1000);
         }
       }
-    }, 0.3);
+    }, VIEW_CONFIG.spin.settleMs[this.turboKey()] / 1000);
   }
 
   /** Buy a feature: play each free spin back, then credit + celebrate. */
@@ -593,7 +601,11 @@ export class SlotController extends Component {
     let runningPayout = 0;
     const totalSpins = outcome.bonus.steps.length;
     this.view.setBonusHud(0, totalSpins, 0);
-    const { deadPauseMs, winPauseMs, bigStepMultiple } = VIEW_CONFIG.bonus;
+    // Free-spin dwell scales with turbo so fast players can blitz a bought bonus.
+    const tk = this.turboKey();
+    const deadPauseMs = VIEW_CONFIG.bonus.deadPauseMs[tk];
+    const winPauseMs = VIEW_CONFIG.bonus.winPauseMs[tk];
+    const { bigStepMultiple } = VIEW_CONFIG.bonus;
     for (let i = 0; i < outcome.bonus.steps.length; i++) {
       const step = outcome.bonus.steps[i];
       this.view.clearWins();

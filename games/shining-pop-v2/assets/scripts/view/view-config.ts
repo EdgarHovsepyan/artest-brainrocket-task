@@ -120,6 +120,15 @@ export const VIEW_CONFIG = {
     decelFraction: 0.34,
     /** Squash applied to a reel's symbols on landing (the "thunk"). */
     landSquash: 0.9,
+    /** Post-resolve settle dwell before the round returns to idle / autoplay
+     *  re-spins, per turbo mode (ms). Was a flat 300 that DOMINATED MAX mode
+     *  (reels run ~0.16×) — owner: "no delays, fast playing". Now scales all the
+     *  way to idle so a fast round feels fast end-to-end. */
+    settleMs: { off: 300, turbo: 150, max: 80 },
+    /** Quick-stop arm delay (ms): a re-press before this is ignored so the SAME
+     *  tap can't both start and stop a spin. Scales with turbo (shorter spin →
+     *  arms sooner) so rapid multi-clicks chain stop→spin without dropping. */
+    quickStopArmMs: { off: 180, turbo: 110, max: 70 },
     /** Anticipatory wind-up kick before launch (OFF mode only). The launch
      *  anticipation is now POSITION-ONLY (a small up-kick before the down
      *  launch) — windupSquash 1.0 disables the Y-scale entirely so NO vertical
@@ -461,10 +470,12 @@ export const VIEW_CONFIG = {
     speedMul: 0.5,
     /** Pause between consecutive free spins (ms) — legacy flat fallback. */
     stepPauseMs: 200,
-    /** Dwell after a DEAD spin (ms) — keep the loop brisk. */
-    deadPauseMs: 170,
-    /** Dwell after a WINNING spin (ms) — savour the win before the next spin. */
-    winPauseMs: 560,
+    /** Dwell after a DEAD free spin (ms), per turbo mode — keep the loop brisk;
+     *  MAX is near-instant so fast players blitz a bought bonus. */
+    deadPauseMs: { off: 170, turbo: 90, max: 45 },
+    /** Dwell after a WINNING free spin (ms), per turbo mode — savour the win, but
+     *  turbo trims the savour so the bonus never drags for fast players. */
+    winPauseMs: { off: 560, turbo: 330, max: 190 },
     /** A single step paying >= this multiple of the TOTAL bet earns its own
      *  in-bonus money beat (banner + extra dwell). */
     bigStepMultiple: 8,
