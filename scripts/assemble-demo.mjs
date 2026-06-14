@@ -47,97 +47,195 @@ console.log(
 
 function LANDING() {
   return `<!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Shining Pop — Multi-Engine Slot Studio · ARTEST | BrainRocket</title>
-<meta name="description" content="Two production slot games on one provably-correct math core — PixiJS v8 and Cocos Creator 3.8.8. Play the demos." />
+<title>Shining Pop — two slot games, one math core · ARTEST | BrainRocket</title>
+<meta name="description" content="Two production slot games on one provably-correct math core — PixiJS v8 and Cocos Creator 3.8.8. Play both demos in the browser." />
+<meta name="theme-color" content="#0a0613" />
+<script>document.documentElement.className='js';</script>
 <style>
   :root{
-    --bg:#0b0617; --bg2:#150a2e; --ink:#fdeffb; --muted:#b79fd6;
-    --pink:#ff5a9c; --pinkHot:#ff007f; --gold:#ffc846; --mint:#7ef0c0; --violet:#b95cf0;
-    --card:#1a0f38; --line:rgba(255,120,200,.22);
+    --bg:#0a0613; --bg2:#160a30;
+    --ink:#fdeefb; --soft:#d9c2f1; --muted:#b49bd6;
+    --pink:#ff5fa1; --pink-deep:#e0247f; --gold:#ffce5e; --mint:#7ef0c0; --sky:#92cdff;
+    --surface:#180e36; --surface-2:#120925; --line:rgba(255,150,215,.16); --line-2:rgba(255,150,215,.30);
+    --shadow:48px 60px 120px -50px rgba(0,0,0,.85);
+    --z-glints:0; --z-content:2;
   }
-  *{box-sizing:border-box} html,body{margin:0}
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0}
+  html{-webkit-text-size-adjust:100%}
   body{
-    font:16px/1.5 ui-rounded,"Segoe UI",system-ui,sans-serif; color:var(--ink);
+    font:400 16px/1.55 ui-rounded,"Segoe UI",system-ui,-apple-system,sans-serif;
+    color:var(--ink); background:var(--bg); min-height:100svh; overflow-x:hidden;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  /* Ambient candy field — soft radial blooms, never stripes. */
+  .bg{position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
-      radial-gradient(1200px 700px at 20% -10%, #3a1450 0%, transparent 55%),
-      radial-gradient(1000px 600px at 100% 0%, #2a0f5a 0%, transparent 50%),
-      linear-gradient(180deg,var(--bg),var(--bg2));
-    min-height:100vh; -webkit-font-smoothing:antialiased;
+      radial-gradient(60rem 40rem at 16% -8%, #3a1556 0%, transparent 60%),
+      radial-gradient(52rem 38rem at 102% 4%, #2a1066 0%, transparent 55%),
+      radial-gradient(40rem 40rem at 50% 116%, #4a1a5e 0%, transparent 58%),
+      linear-gradient(180deg, var(--bg), var(--bg2) 70%, var(--bg));
   }
-  .wrap{max-width:1040px; margin:0 auto; padding:clamp(28px,6vw,72px) 22px 64px}
-  .kicker{letter-spacing:.32em; text-transform:uppercase; font-size:12px; color:var(--muted); font-weight:700}
-  h1{
-    font-size:clamp(34px,7vw,68px); line-height:1.02; margin:.18em 0 .1em; font-weight:800;
-    background:linear-gradient(92deg,var(--pink),var(--gold) 55%,var(--mint));
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-    text-shadow:0 2px 0 rgba(255,0,127,.12);
+  .glint{position:fixed; border-radius:50%; filter:blur(14px); opacity:.5; z-index:var(--z-glints); pointer-events:none; will-change:transform}
+
+  .wrap{position:relative; z-index:var(--z-content); max-width:1060px; margin:0 auto;
+    padding:clamp(30px,7vh,84px) 24px clamp(40px,8vh,80px); min-height:100svh;
+    display:flex; flex-direction:column; justify-content:center}
+
+  .kicker{display:inline-flex; align-items:center; gap:9px; align-self:flex-start;
+    font-size:12.5px; font-weight:700; letter-spacing:.02em; color:var(--soft);
+    padding:7px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.03)}
+  .kicker .dot{width:7px; height:7px; border-radius:50%; background:var(--mint); box-shadow:0 0 12px var(--mint)}
+
+  h1{margin:.34em 0 0; font-weight:800; letter-spacing:-0.035em; line-height:.98;
+    font-size:clamp(2.9rem,9vw,5.6rem); text-wrap:balance}
+  h1 .a{color:var(--pink)} h1 .b{color:var(--gold)}
+  h1 .b::after{content:"."; color:var(--mint)}
+
+  .lede{margin:1.05rem 0 0; max-width:54ch; font-size:clamp(1.02rem,2.3vw,1.28rem);
+    line-height:1.5; color:var(--soft); text-wrap:pretty}
+  .lede strong{color:var(--ink); font-weight:600}
+
+  .facts{display:flex; flex-wrap:wrap; gap:8px 10px; margin:1.4rem 0 0}
+  .fact{font-size:13px; color:var(--soft); padding:6px 12px; border:1px solid var(--line);
+    border-radius:999px; background:rgba(255,255,255,.025)}
+  .fact b{color:var(--ink); font-weight:650}
+
+  .grid{display:grid; gap:20px; grid-template-columns:1fr 1fr; margin:clamp(30px,5vh,46px) 0 0}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}}
+
+  .card{position:relative; display:flex; flex-direction:column; overflow:hidden;
+    border:1px solid var(--line); border-radius:16px; background:linear-gradient(180deg,var(--surface),var(--surface-2));
+    text-decoration:none; color:inherit; transition:transform .5s cubic-bezier(.16,1,.3,1), border-color .4s ease, box-shadow .5s ease}
+  .card:hover,.card:focus-visible{transform:translateY(-6px); border-color:var(--line-2);
+    box-shadow:var(--shadow); outline:none}
+  .card:focus-visible{box-shadow:var(--shadow), 0 0 0 3px var(--pink)}
+  .shot{aspect-ratio:16/10; background:#0d0722 center/cover no-repeat; overflow:hidden}
+  .shot::after{content:""; position:absolute; inset:0 0 auto; height:54%;
+    background:linear-gradient(180deg, rgba(10,6,19,.0), rgba(10,6,19,.0))}
+  .card .body{padding:18px 20px 20px; display:flex; flex-direction:column; gap:6px}
+  .badge{align-self:flex-start; font-size:11px; font-weight:750; letter-spacing:.04em;
+    text-transform:uppercase; padding:5px 10px; border-radius:8px; color:var(--ink); border:1px solid var(--line)}
+  .badge.px{background:rgba(255,95,161,.15); border-color:rgba(255,95,161,.32)}
+  .badge.cc{background:rgba(126,240,192,.13); border-color:rgba(126,240,192,.3)}
+  .card h2{margin:.5rem 0 .05rem; font-size:1.45rem; font-weight:750; letter-spacing:-0.01em}
+  .meta{margin:0; font-size:13.5px; color:var(--soft); line-height:1.45}
+  .play{margin-top:14px; align-self:flex-start; display:inline-flex; align-items:center; gap:9px;
+    font-weight:750; font-size:15px; color:#22030f; padding:11px 19px; border-radius:999px;
+    background:linear-gradient(96deg,var(--gold),var(--pink)); border:0;
+    transition:transform .18s cubic-bezier(.16,1,.3,1), filter .2s ease}
+  .card:hover .play{filter:brightness(1.06)}
+  .play .tri{font-size:12px}
+
+  footer{margin:clamp(28px,5vh,44px) 0 0; padding-top:18px; border-top:1px solid var(--line);
+    display:flex; flex-wrap:wrap; gap:6px 16px; justify-content:space-between; align-items:center;
+    font-size:13px; color:var(--muted)}
+  footer a{color:var(--mint); text-decoration:none; font-weight:600}
+  footer a:hover{text-decoration:underline}
+
+  /* Reveal: hidden ONLY when JS runs, so no-JS / headless still ships content visible. */
+  .js [data-reveal]{opacity:0}
+  @media (prefers-reduced-motion:reduce){
+    .js [data-reveal]{opacity:1 !important; transform:none !important}
+    .card{transition:none} .glint{display:none}
   }
-  .sub{color:var(--muted); max-width:62ch; font-size:clamp(15px,2.4vw,19px)}
-  .sub b{color:var(--ink)}
-  .grid{display:grid; gap:22px; grid-template-columns:1fr 1fr; margin:38px 0 8px}
-  @media (max-width:740px){.grid{grid-template-columns:1fr}}
-  .card{
-    position:relative; border:1px solid var(--line); border-radius:22px; overflow:hidden;
-    background:linear-gradient(180deg,var(--card),#120a2a); display:flex; flex-direction:column;
-    box-shadow:0 18px 50px -24px rgba(255,0,127,.5); transition:transform .18s ease, box-shadow .18s ease;
-  }
-  .card:hover{transform:translateY(-4px); box-shadow:0 26px 60px -22px rgba(255,0,127,.65)}
-  .shot{aspect-ratio:16/10; background:#0d0722 center/cover no-repeat; border-bottom:1px solid var(--line)}
-  .card .body{padding:20px 20px 22px}
-  .badge{display:inline-block; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-    padding:5px 10px; border-radius:999px; border:1px solid var(--line); color:var(--ink)}
-  .b-pixi{background:rgba(255,90,156,.16)} .b-cocos{background:rgba(126,240,192,.14)}
-  .card h2{margin:.5em 0 .15em; font-size:24px}
-  .meta{color:var(--muted); font-size:14px; margin:0 0 16px}
-  .play{
-    display:inline-flex; align-items:center; gap:9px; text-decoration:none; font-weight:800;
-    color:#1a0220; padding:12px 20px; border-radius:999px;
-    background:linear-gradient(92deg,var(--gold),var(--pink)); box-shadow:0 8px 22px -8px var(--pinkHot);
-  }
-  .play:active{transform:translateY(1px)}
-  .note{margin-top:34px; color:var(--muted); font-size:13.5px; border-top:1px solid var(--line); padding-top:20px}
-  .foot{margin-top:14px; color:var(--muted); font-size:13px}
-  a.q{color:var(--mint); text-decoration:none} a.q:hover{text-decoration:underline}
 </style>
 </head>
 <body>
+  <div class="bg" aria-hidden="true"></div>
+
   <main class="wrap">
-    <div class="kicker">ARTEST · BrainRocket</div>
-    <h1>Shining Pop</h1>
-    <p class="sub">A <b>multi-engine slot studio</b> — the same provably-correct, sim-anchored
-      math core rendered through <b>two</b> independent front ends. Built end-to-end by a single
-      developer. Tap a game to play the live demo.</p>
+    <span class="kicker" data-reveal><span class="dot"></span>ARTEST · BrainRocket</span>
+
+    <h1 data-reveal><span class="a">Shining</span> <span class="b">Pop</span></h1>
+
+    <p class="lede" data-reveal>Two production slot games running on <strong>one provably-correct,
+      sim-anchored math core</strong>. The same engine, rendered through two independent front
+      ends and built end to end by a single developer. Pick one and play.</p>
+
+    <div class="facts" data-reveal>
+      <span class="fact"><b>2</b> engines</span>
+      <span class="fact"><b>~97%</b> RTP, sim-anchored</span>
+      <span class="fact"><b>1</b> shared math core</span>
+      <span class="fact">browser, <b>no install</b></span>
+    </div>
 
     <section class="grid">
-      <article class="card">
+      <a class="card" data-reveal data-card href="shining-pop/">
         <div class="shot" style="background-image:url(media/pixi-board.png)"></div>
         <div class="body">
-          <span class="badge b-pixi">PixiJS v8 · flagship</span>
+          <span class="badge px">PixiJS v8 · flagship</span>
           <h2>shining-pop</h2>
-          <p class="meta">Vite · GSAP · Spine · Web Audio · ~97% RTP · 10 lines · WILD STRIKE</p>
-          <a class="play" href="shining-pop/">▶ Play demo</a>
+          <p class="meta">Vite single-file build · GSAP · Spine · Web Audio. 10 lines, WILD STRIKE.</p>
+          <span class="play"><span class="tri">▶</span> Play this game</span>
         </div>
-      </article>
-      <article class="card">
-        <div class="shot" style="background-image:url(media/cocos-desktop.png)"></div>
+      </a>
+
+      <a class="card" data-reveal data-card href="shining-pop-v2/">
+        <div class="shot" style="background-image:url(media/cocos-win.png)"></div>
         <div class="body">
-          <span class="badge b-cocos">Cocos Creator 3.8.8</span>
+          <span class="badge cc">Cocos Creator 3.8.8</span>
           <h2>shining-pop-v2</h2>
-          <p class="meta">Code-driven MVC · CCEffect shaders · Spine · ~97.5% RTP · candy VFX suite</p>
-          <a class="play" href="shining-pop-v2/">▶ Play demo</a>
+          <p class="meta">Code-driven MVC · CCEffect shaders · Spine · candy VFX, on-symbol wins.</p>
+          <span class="play"><span class="tri">▶</span> Play this game</span>
         </div>
-      </article>
+      </a>
     </section>
 
-    <p class="note">Demos run fully client-side — no install, no account. Best on a modern desktop or
-      mobile browser with WebGL. Source &amp; engineering notes:
-      <a class="q" href="https://github.com/EdgarHovsepyan/artest-brainrocket-task">github.com/EdgarHovsepyan/artest-brainrocket-task</a>.</p>
-    <p class="foot">© Edgar Hovsepyan — one engineer, two engines, one math core.</p>
+    <footer data-reveal>
+      <span>© Edgar Hovsepyan — one engineer, two engines, one math core.</span>
+      <a href="https://github.com/EdgarHovsepyan/artest-brainrocket-task">Source on GitHub</a>
+    </footer>
   </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+  <script>
+  (function(){
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!window.gsap || reduce) {
+      // No GSAP or reduced motion: ensure everything is simply visible.
+      document.querySelectorAll('[data-reveal]').forEach(function(el){ el.style.opacity=1; });
+      return;
+    }
+    var g = window.gsap;
+    // Clear the CSS hide FIRST so every from-tween captures opacity:1 as its END
+    // (a from-tween reads the element's current value as the target; if CSS still
+    // says 0 at build time, it animates 0->0 and the element never appears).
+    g.set('[data-reveal]', { opacity:1 });
+    // Entrance — staggered reveal, exponential ease-out, no bounce.
+    var tl = g.timeline({ defaults:{ ease:'expo.out' } });
+    tl.from('.kicker', { y:14, opacity:0, duration:.7 })
+      .from('h1 .a',   { y:24, opacity:0, duration:.9 }, '-=.45')
+      .from('h1 .b',   { y:24, opacity:0, duration:.9 }, '-=.78')
+      .from('.lede',   { y:18, opacity:0, duration:.8 }, '-=.55')
+      .from('.fact',   { y:12, opacity:0, duration:.6, stagger:.07 }, '-=.5')
+      .from('[data-card]', { y:34, opacity:0, scale:.97, duration:.85, stagger:.12 }, '-=.4')
+      .from('footer',  { y:10, opacity:0, duration:.55 }, '-=.25');
+
+    // Ambient candy glints — soft drifting blooms behind the content.
+    var palette = ['#ff5fa1','#ffce5e','#7ef0c0','#92cdff','#ff5fa1','#ffce5e'];
+    var W = window.innerWidth, H = window.innerHeight;
+    for (var i=0;i<6;i++){
+      var el = document.createElement('span');
+      el.className='glint';
+      var s = 90 + Math.random()*150;
+      el.style.width=el.style.height=s+'px';
+      el.style.background=palette[i];
+      el.style.left=(Math.random()*100)+'vw';
+      el.style.top=(Math.random()*100)+'vh';
+      document.body.appendChild(el);
+      g.to(el, {
+        x:'+='+((Math.random()-.5)*220), y:'+='+((Math.random()-.5)*180),
+        duration:9+Math.random()*8, ease:'sine.inOut', repeat:-1, yoyo:true
+      });
+      g.to(el, { opacity:.18+Math.random()*.35, duration:5+Math.random()*5, ease:'sine.inOut', repeat:-1, yoyo:true });
+    }
+  })();
+  </script>
 </body>
 </html>
 `;

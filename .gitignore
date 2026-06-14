@@ -29,3 +29,5 @@ packages/*/dist/
 
 # Generated demo bundle (assemble-demo.mjs) — Vercel builds it on deploy
 /public/
+
+.vercel
