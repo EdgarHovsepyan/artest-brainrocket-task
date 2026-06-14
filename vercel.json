@@ -3,5 +3,6 @@
   "buildCommand": "node scripts/assemble-demo.mjs",
   "outputDirectory": "public",
   "trailingSlash": true,
-  "framework": null
+  "framework": null,
+  "rewrites": [{ "source": "/spine/:path*", "destination": "/shining-pop/spine/:path*" }]
 }
