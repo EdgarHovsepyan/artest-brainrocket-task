@@ -144,6 +144,7 @@ export class BettingBarWeb extends Component {
   private spinStop!: Node;
   private spinOp!: UIOpacity;
   private spinRing!: Node;
+  private spinBody!: Node; // inner disc — idle breathe lives here (press scales the ring)
   private autoGlyph!: Node;
   private autoCount!: Label;
   private turboGlyphOp!: UIOpacity;
@@ -880,6 +881,7 @@ export class BettingBarWeb extends Component {
     //    no offset-disc banding/muddy crescents). A stepped colour lerp from a
     //    bright outer tint to a darker inner tint fakes a smooth 3D bevel.
     const bodyN = this.localNode(ring, 0, 0, R * 2, R * 2);
+    this.spinBody = bodyN;
     const rg = bodyN.addComponent(Graphics);
     const INNER = R * 0.74;
     const cHi = col(C.ringHi);
@@ -969,6 +971,29 @@ export class BettingBarWeb extends Component {
       },
       [ring],
     );
+    this.startSpinBreathe(); // CTA never looks dead at rest (roadmap P0 #4)
+  }
+
+  /** Idle "rest breathing" on the spin CTA — a slow 4s sine scale (1.0↔1.015) on
+   *  the inner disc so the primary control feels alive between spins. Runs on
+   *  spinBody (a child) so it composes with, never fights, the ring press-squash.
+   *  Paused while spinning. (Schell "Lens of the Toy": the base game should feel
+   *  alive to fidget with before any win.) */
+  private startSpinBreathe(): void {
+    if (!this.spinBody) return;
+    Tween.stopAllByTarget(this.spinBody);
+    this.spinBody.setScale(1, 1, 1);
+    tween(this.spinBody)
+      .to(2, { scale: new Vec3(1.015, 1.015, 1) }, { easing: 'sineInOut' })
+      .to(2, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+  }
+  private stopSpinBreathe(): void {
+    if (!this.spinBody) return;
+    Tween.stopAllByTarget(this.spinBody);
+    this.spinBody.setScale(1, 1, 1);
   }
 
   private buildVolumePanel(): void {
@@ -1306,6 +1331,9 @@ export class BettingBarWeb extends Component {
     if (on) this.volPanel.active = false;
     this.spinArrow.active = !on;
     this.spinStop.active = on;
+    // Rest-breathe only while idle — a spinning CTA is already alive.
+    if (on) this.stopSpinBreathe();
+    else this.startSpinBreathe();
   }
   setAutoplay(count: number | null): void {
     const active = count != null && count !== 0;

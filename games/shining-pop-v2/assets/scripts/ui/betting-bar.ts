@@ -107,6 +107,8 @@ export class BettingBarMobile extends Component {
   // stateful element handles
   private spinGroup!: Node; // dim target for setAffordable
   private spinArrow!: Node;
+  private spinHalo: Node | null = null; // centered breathing glow behind the spin CTA
+  private spinHaloOp: UIOpacity | null = null;
   private spinStop!: Node;
   private autoGlyph!: Node;
   private autoCount!: Label;
@@ -422,6 +424,57 @@ export class BettingBarMobile extends Component {
     stop.fill();
     this.spinStop = stop.node;
     this.spinStop.active = false;
+
+    // CTA "rest breathing" (roadmap P0 #4): a centered candy-pink glow that gently
+    // pulses behind the button so the primary control never looks dead at rest.
+    // A dedicated CENTRED node (anchor 0.5) is scaled in place — the bar's art is
+    // drawn at absolute coords with a top-left pivot, so scaling those would DRIFT
+    // the button, not breathe it. Sits behind the face; paused while spinning.
+    const halo = new Node('spinHalo');
+    halo.layer = this.node.layer;
+    this.spinGroup.addChild(halo);
+    const hui = halo.addComponent(UITransform);
+    hui.setAnchorPoint(0.5, 0.5);
+    hui.setContentSize(180, 180);
+    halo.setPosition(270, this.Y(392), 0);
+    halo.setSiblingIndex(0); // behind face / arrow / stop
+    const hg = halo.addComponent(Graphics);
+    hg.fillColor = col(C.edge, 0.5);
+    hg.circle(0, 0, 80);
+    hg.fill();
+    this.spinHaloOp = halo.addComponent(UIOpacity);
+    this.spinHaloOp.opacity = 0;
+    this.spinHalo = halo;
+    this.startSpinBreathe();
+  }
+
+  /** Idle rest-breathe: a centred glow that scales 1.0↔1.10 + fades 40↔95 over a
+   *  slow ~3s sine so the spin CTA feels alive between spins. (Schell "Lens of the
+   *  Toy": the base game should feel alive to fidget with before any win.) */
+  private startSpinBreathe(): void {
+    if (!this.spinHalo || !this.spinHaloOp) return;
+    Tween.stopAllByTarget(this.spinHalo);
+    Tween.stopAllByTarget(this.spinHaloOp);
+    this.spinHalo.active = true;
+    this.spinHalo.setScale(1, 1, 1);
+    tween(this.spinHalo)
+      .to(1.5, { scale: new Vec3(1.1, 1.1, 1) }, { easing: 'sineInOut' })
+      .to(1.5, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+    tween(this.spinHaloOp)
+      .to(1.5, { opacity: 95 }, { easing: 'sineInOut' })
+      .to(1.5, { opacity: 40 }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+  }
+  private stopSpinBreathe(): void {
+    if (!this.spinHalo || !this.spinHaloOp) return;
+    Tween.stopAllByTarget(this.spinHalo);
+    Tween.stopAllByTarget(this.spinHaloOp);
+    this.spinHaloOp.opacity = 0;
   }
 
   // ── autoplay: triangle glyph + a count label (count shown while running). ──
@@ -842,6 +895,8 @@ export class BettingBarMobile extends Component {
   setSpinning(on: boolean): void {
     this.spinArrow.active = !on;
     this.spinStop.active = !!on;
+    if (on) this.stopSpinBreathe();
+    else this.startSpinBreathe();
   }
   setAutoplay(count: number | null): void {
     const active = count != null && count !== 0;
