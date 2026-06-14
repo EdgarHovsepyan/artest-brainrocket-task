@@ -132,13 +132,6 @@ CCProgram sprite-fs %{
     // One heartbeat the highlight pulses on (per-symbol phase).
     float pulse = 0.55 + 0.45 * sin(u_time * 5.0 + phA);
 
-    // === IRIDESCENT SHIMMER (hero): rainbow ribbons flowing across the candy ===
-    float band = 0.5 + 0.5 * sin((uv0.x - uv0.y) * 7.0 - u_time * 2.2 + phA);
-    band = pow(band, 2.5); // tighten to bright ribbons, not a flat wash
-    vec3 irid = hue(fract((uv0.x + uv0.y) * 0.6 + u_time * 0.25 + phB));
-    vec3 shimmerCol = mix(vec3(1.0), irid, 0.8); // white-cored rainbow
-    float shimmer = band * a * u_shimmer * (0.6 + 0.4 * pulse);
-
     // === STAR GLINTS (cute hero): two 4-point sparkles wandering the candy,
     //     each on its own wander + twinkle so it reads playful, not mechanical ===
     vec2 g1 = uv0 - vec2(0.5 + 0.26 * sin(u_time * 0.7 + phA), 0.55 + 0.22 * cos(u_time * 0.9 + phA));
@@ -149,31 +142,25 @@ CCProgram sprite-fs %{
     float tw2 = 0.30 + 0.70 * pow(0.5 + 0.5 * sin(u_time * 7.0 + phA + 2.1), 3.0);
     float glint = (c1 * tw1 + c2 * tw2) * a;
 
-    // === SOFT RIM: silhouette light hugging the candy shape (pulsing) ===
+    // === SOFT RIM: warm silhouette light hugging the candy shape (pulsing) ===
     float lo = 0.5 - u_rimWidth * 10.0;
     float rim = smoothstep(lo, 0.5, a) * (1.0 - smoothstep(0.5, 0.97, a));
     rim = pow(clamp(rim, 0.0, 1.0), 0.6) * (0.7 + 0.55 * pulse);
-    vec3 rimCol = mix(vec3(1.0, 0.55, 0.15), vec3(1.0, 0.95, 0.78), 0.5 + 0.5 * sin(u_time * 3.0 + phA));
+    vec3 rimCol = mix(vec3(1.0, 0.66, 0.34), vec3(1.0, 0.95, 0.82), 0.5 + 0.5 * sin(u_time * 3.0 + phA));
 
-    // === FIRE (warm base lick) ===
-    float ft = u_time * 1.6 + phA;
-    vec2 np = vec2(uv0.x * 3.0 + sin(uv0.y * 6.0 + ft) * 0.16, uv0.y * 3.2 - ft * 1.25);
-    float flame = pow(fbm(np) * pow(smoothstep(0.72, 0.0, uv0.y), 1.5), 1.5) * a;
-    vec3 fireCol = fireRamp(clamp(flame, 0.0, 1.0));
-    float fireA = clamp(flame, 0.0, 1.0) * 0.45 * u_fireAmt;
-
-    // === SPECULAR SWEEP — now a SUPPORTING glint, per-symbol phase, soft + faint
-    //     (the old strong synchronised diagonal read as a basic full-board sheen) ===
-    float diag = (uv0.x + (1.0 - uv0.y)) * 0.5;
-    float sweep = (1.0 - smoothstep(0.0, 0.18, abs(diag - fract(u_time * u_sweepSpeed + phB)))) * a;
-
-    vec3 rgb = fireCol * fireA
-             + rimCol * rim
-             + shimmerCol * shimmer * 0.85
-             + vec3(1.0) * glint * 1.5
-             + vec3(1.0, 0.98, 0.92) * sweep * 0.32;
-    float outA = clamp(fireA + rim + shimmer * 0.78 + glint * 1.3 + sweep * 0.32, 0.0, 1.0)
-               * u_intensity * color.a;
+    // === CUTE CANDY WIN (2026-06-15 RADICAL REDESIGN) ===
+    // The candy gently LIGHTS UP and SPARKLES: a soft warm inner glow + the warm
+    // silhouette rim + twinkling star glints. Deliberately DROPPED: the rainbow
+    // iridescent shimmer, the diagonal specular SWEEP, and the fire — those read as
+    // a techy laser / arcade sheen and the owner rejected them (repeatedly). Every
+    // term is alpha-clipped (× a), so the win lives ON the transparent candy, never
+    // on the rectangular cell box. Elegant + cute, not a light show.
+    float body = a * (0.16 + 0.13 * pulse);            // soft "it lit up" inner glow
+    vec3 warm = vec3(1.0, 0.93, 0.76);                 // candy-warm white (no rainbow)
+    vec3 rgb = warm * body
+             + rimCol * rim * 0.95
+             + vec3(1.0, 0.99, 0.95) * glint * 1.8;    // bright white twinkles
+    float outA = clamp(body + rim * 0.85 + glint * 1.5, 0.0, 1.0) * u_intensity * color.a;
 
     vec4 col = vec4(rgb, outA);
     ALPHA_TEST(col);

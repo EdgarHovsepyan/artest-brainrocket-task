@@ -288,8 +288,15 @@ export const VIEW_CONFIG = {
      *  DRAWS progressively along the line (owner "progressive line animation").
      *  heightPx 36 = COMPACT ribbon (owner "more compact"); intensity 1.55 = more
      *  bloom (owner "more bloom"); flowSpeed = charged-stream flow. */
+    // DISABLED 2026-06-15 (RADICAL WIN REDESIGN): the win-beam rendered a bright
+    // RAINBOW PLASMA BAND filling the winning ROW's cell boxes behind the symbols —
+    // a techy laser the owner rejected ("not on the box, diagonal shine, rainbow, I
+    // don't like this shit"). The win now reads PURELY ON the symbols: the cute
+    // symbol-win shader (soft body-glow + warm rim + twinkles), the symbol-shaped
+    // halo, the bouncy pop, the corner sparkles + the per-line ×N pops — no band,
+    // no laser, no rainbow, nothing on the cell box.
     beams: {
-      enabled: true,
+      enabled: false,
       heightPx: 36,
       maxSegments: 16,
       fadeInMs: 150,
