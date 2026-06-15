@@ -665,19 +665,28 @@ export class CeremonyView extends Component {
   };
 
   private landingPop(): void {
+    // Tier-scaled settle overshoot (Swink — sub-frame settle; Sylvester — bigger
+    // wins savour harder): the final lock punches by landingPopScale, amplified
+    // by the active tier's textPop, then springs back via backOut.
+    const { landingPopScale, landingPopMs } = VIEW_CONFIG.counter;
+    const over = 1 + landingPopScale * Math.max(1, this.currentTextPop);
+    const up = (landingPopMs / 1000) * 0.37;
+    const down = (landingPopMs / 1000) * 0.63;
+    const overV = new Vec3(over, over, 1);
+
     const n = this.amountLabel.node;
     n.setScale(1, 1, 1);
     tween(n)
-      .to(0.14, { scale: new Vec3(1.36, 1.36, 1) }, { easing: 'quadOut' })
-      .to(0.26, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .to(up, { scale: overV }, { easing: 'quadOut' })
+      .to(down, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .start();
 
     if (this.amountShadow) {
       const s = this.amountShadow.node;
       s.setScale(1, 1, 1);
       tween(s)
-        .to(0.14, { scale: new Vec3(1.36, 1.36, 1) }, { easing: 'quadOut' })
-        .to(0.26, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .to(up, { scale: overV.clone() }, { easing: 'quadOut' })
+        .to(down, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
         .start();
     }
 

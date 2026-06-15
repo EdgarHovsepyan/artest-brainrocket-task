@@ -166,6 +166,11 @@ export const VIEW_CONFIG = {
 
     winTilt: { enabled: true, deg: 13, ms: 540 },
 
+    // Per-tier halo warmth (Koster — tiers must be discriminable at a glance):
+    // premium symbols glow warm-gold, low symbols cool-blue. Tints stay near-white
+    // so the halo only warms/cools, never muddies. Lerped by the symbol's heat.
+    haloTint: { hot: '#fff0c8', cold: '#c8e1ff', hotHeat: 1.3, coldHeat: 0.9 },
+
     loserDimOpacity: 95,
 
     lineCycleSeconds: 0.85,

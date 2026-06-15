@@ -284,6 +284,12 @@ export class SymbolView extends Component {
     if (haloFrame) this.ensureHalo();
     if (haloFrame && this.halo && this.haloOp && this.haloSp) {
       this.haloSp.spriteFrame = haloFrame;
+      // Tier warmth: lerp the halo tint from cool (low symbols) to warm-gold
+      // (premiums) by heat, so a glance at the glow reads the symbol's value.
+      const ht = VIEW_CONFIG.win.haloTint;
+      const span = Math.max(0.0001, ht.hotHeat - ht.coldHeat);
+      const t = Math.min(1, Math.max(0, (heat - ht.coldHeat) / span));
+      this.haloSp.color = new Color().fromHEX(ht.cold).lerp(new Color().fromHEX(ht.hot), t);
       Tween.stopAllByTarget(this.halo);
       Tween.stopAllByTarget(this.haloOp);
       this.halo.active = true;

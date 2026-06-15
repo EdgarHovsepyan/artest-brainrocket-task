@@ -72,6 +72,15 @@ test('win-focus + win-line beams stay within valid ranges', () => {
   );
 });
 
+test('halo tint is a valid, correctly-oriented warm→cool ramp', () => {
+  const h = VIEW_CONFIG.win.haloTint;
+  assert.match(h.hot, /^#[0-9a-fA-F]{6}$/, 'hot tint must be a hex colour');
+  assert.match(h.cold, /^#[0-9a-fA-F]{6}$/, 'cold tint must be a hex colour');
+  // the heat ramp must be oriented hot > cold so the lerp span is positive;
+  // an inverted ramp would tint premium symbols cool and cheap ones warm.
+  assert.ok(h.hotHeat > h.coldHeat, 'haloTint.hotHeat must exceed coldHeat');
+});
+
 test('win anticipation dip is a brief, real squash (never inverted or sluggish)', () => {
   const a = VIEW_CONFIG.win.winAnticipation;
   // a dip must shrink the symbol (0 < dip < 1) so the pop reads as an impact;
