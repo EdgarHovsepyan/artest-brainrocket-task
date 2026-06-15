@@ -39,7 +39,7 @@ for (const g of GAMES) {
 }
 
 mkdirSync(path.join(OUT, 'media'), { recursive: true });
-for (const f of ['pixi-board.png', 'cocos-desktop.png', 'cocos-win.png']) {
+for (const f of ['pixi-board.png', 'cocos-desktop.png', 'pixi-desktop.png']) {
   const s = path.join(ROOT, 'docs/media', f);
   if (existsSync(s)) cpSync(s, path.join(OUT, 'media', f));
 }
@@ -181,7 +181,7 @@ function LANDING() {
       </a>
 
       <a class="card" data-reveal data-card href="shining-pop-v2/">
-        <div class="shot" style="background-image:url(media/cocos-win.png)"></div>
+        <div class="shot" style="background-image:url(media/cocos-desktop.png)"></div>
         <div class="body">
           <span class="badge cc">Cocos Creator 3.8.8</span>
           <h2>shining-pop-v2</h2>
