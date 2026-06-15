@@ -140,6 +140,11 @@ export const VIEW_CONFIG = {
     symbolPulseScale: 1.3,
     symbolPulseMs: 240,
 
+    // Anticipation before the win pop (Swink — game feel; Emil Kowalski — motion):
+    // a brief squash-down before the symbol springs up so the pop reads as an
+    // impact, not a teleport. Tiny + snappy so the win never feels sluggish.
+    winAnticipation: { enabled: true, dip: 0.9, ms: 80 },
+
     highlightWaveStagger: 0.085,
 
     symbolProfiles: {

@@ -72,6 +72,16 @@ test('win-focus + win-line beams stay within valid ranges', () => {
   );
 });
 
+test('win anticipation dip is a brief, real squash (never inverted or sluggish)', () => {
+  const a = VIEW_CONFIG.win.winAnticipation;
+  // a dip must shrink the symbol (0 < dip < 1) so the pop reads as an impact;
+  // dip >= 1 would be a no-op or a pre-pop grow, which defeats anticipation.
+  assert.ok(a.dip > 0 && a.dip < 1, 'anticipation dip must be a squash in (0,1)');
+  // the wind-up has to be snappy — a long dip stalls the win read.
+  assert.ok(a.ms > 0 && a.ms <= 160, 'anticipation must be a brisk (0,160] ms wind-up');
+  assert.equal(typeof a.enabled, 'boolean');
+});
+
 test('resolveBigWinTier maps win multiples to the right tier band', () => {
   assert.equal(resolveBigWinTier(0), null, 'no ceremony for a 0x win');
   assert.equal(resolveBigWinTier(9), null, 'below the BIG floor → no named tier');

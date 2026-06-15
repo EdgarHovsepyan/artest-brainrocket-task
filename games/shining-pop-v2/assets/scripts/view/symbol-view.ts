@@ -235,14 +235,24 @@ export class SymbolView extends Component {
     const bhalfBeat = bhalf * beatScale;
     const haloHalf = half * beatScale;
 
-    tween(this.node)
-      .delay(delay)
+    // Anticipation: a brief squash before the spring so the pop lands as an
+    // impact. Deeper on hotter symbols. Everything that should fire ON the pop
+    // (bounce, tilt, halo, sparkles) is shifted past the dip by `popStart`.
+    const ant = VIEW_CONFIG.win.winAnticipation;
+    const antDur = ant?.enabled ? ant.ms / 1000 : 0;
+    const antDip = ant?.enabled ? 1 - (1 - ant.dip) * heat : 1;
+    const popStart = delay + antDur;
+
+    const popTween = tween(this.node).delay(delay);
+    if (antDur > 0)
+      popTween.to(antDur, { scale: new Vec3(antDip, antDip, 1) }, { easing: 'quadOut' });
+    popTween
       .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
       .to(half, { scale: new Vec3(zoom, zoom, 1) }, { easing: 'quadIn' })
       .start();
     if (bnc.enabled) {
       tween(this.node)
-        .delay(delay + half * 2)
+        .delay(popStart + half * 2)
         .to(bhalfBeat, { scale: bUp }, { easing: 'backOut' })
         .to(bhalfBeat, { scale: bDn }, { easing: 'quadIn' })
         .union()
@@ -255,7 +265,7 @@ export class SymbolView extends Component {
       const td = tlt.ms / 1000;
       this.node.eulerAngles = new Vec3(0, 0, 0);
       tween(this.node)
-        .delay(delay + half * 2)
+        .delay(popStart + half * 2)
         .to(td, { eulerAngles: new Vec3(0, tlt.deg, 0) }, { easing: 'sineInOut' })
         .to(td, { eulerAngles: new Vec3(0, -tlt.deg, 0) }, { easing: 'sineInOut' })
         .union()
@@ -281,14 +291,14 @@ export class SymbolView extends Component {
       this.haloOp.opacity = 0;
       const haloPeak = Math.min(210, Math.round(135 * heat));
       tween(this.haloOp)
-        .delay(delay)
+        .delay(popStart)
         .to(haloHalf, { opacity: haloPeak }, { easing: 'sineOut' })
         .to(haloHalf, { opacity: Math.round(haloPeak * 0.42) }, { easing: 'sineIn' })
         .union()
         .repeatForever()
         .start();
       tween(this.halo)
-        .delay(delay)
+        .delay(popStart)
         .to(haloHalf, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'sineInOut' })
         .to(haloHalf, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'sineInOut' })
         .union()
@@ -297,14 +307,14 @@ export class SymbolView extends Component {
     }
     if (rich) {
       if (winMat && VIEW_CONFIG.win.symbolFx.enabled) {
-        this.playWinShader(delay, winMat);
+        this.playWinShader(popStart, winMat);
 
-        this.playSparkles(delay);
+        this.playSparkles(popStart);
       } else {
-        this.playSparkles(delay);
+        this.playSparkles(popStart);
       }
 
-      this.playStarPop(delay, heat);
+      this.playStarPop(popStart, heat);
     }
   }
 
