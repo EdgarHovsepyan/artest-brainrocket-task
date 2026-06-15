@@ -1,11 +1,4 @@
-/**
- * Spine pipeline PROOF — loads the knight scaffold (knight.json + knight.atlas +
- * placeholder knight.png) through the REAL @esotericsoftware/spine-pixi-v8 runtime
- * and plays its `idle` animation. This demonstrates end-to-end that pixi-spine runs
- * and shows animation in this project — with stand-in box art, before a real rig.
- *
- * Activated via ?spine=true (see src/main.ts). Not part of the game or the Stake build.
- */
+
 import { Application, Assets, Container } from 'pixi.js';
 import { Spine } from '@esotericsoftware/spine-pixi-v8';
 
@@ -29,23 +22,22 @@ import { Spine } from '@esotericsoftware/spine-pixi-v8';
   };
 
   try {
-    // 1. Register + load the rig files (atlas resolves knight.png relative to itself).
+    
     Assets.add({ alias: 'knightAtlas', src: '/spine/knight.atlas' });
     Assets.add({ alias: 'knightSkel',  src: '/spine/knight.json' });
     await Assets.load(['knightAtlas', 'knightSkel']);
 
-    // 2. Build the Spine object (shares SkeletonData; owns its own AnimationState).
+    
     const spine = new Spine({ skeleton: 'knightSkel', atlas: 'knightAtlas' });
     spine.state.data.defaultMix = 0.2;
-    spine.state.setAnimation(0, 'idle', true);   // looping idle (torso bob + head sway)
+    spine.state.setAnimation(0, 'idle', true);   
 
-    // 3. Centre + scale the rig (root sits at the figure's feet → anchor low).
+    
     const holder = new Container();
     holder.addChild(spine);
     app.stage.addChild(holder);
     const layout = () => {
-      // figure is ~260 skeleton-units tall, root at the feet → it rises upward.
-      // Fit the height to ~55% of the viewport and centre vertically.
+
       const FIG = 260;
       const fit = (Math.min(app.screen.width, app.screen.height) * 0.55) / FIG;
       holder.scale.set(fit);
