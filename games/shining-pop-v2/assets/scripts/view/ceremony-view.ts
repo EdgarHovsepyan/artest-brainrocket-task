@@ -202,7 +202,14 @@ export class CeremonyView extends Component {
     EPIC: -50,
   };
 
-  private static readonly USE_SPINE_BANNER = false;
+  // WIN CEREMONY = the authored Spine win-callout (Cupids-Crush 4.2), NOT the
+  // procedural rhombus/sunburst/sparkle graphics. DECISION (keep it): the flat
+  // geometric romb + hard vector rays read as dated/cheap and are intentionally
+  // OFF in-game. They remain in code ONLY as a safety fallback if the Spine asset
+  // fails to load at runtime (so the ceremony is never empty). To verify Spine is
+  // live: rebuild web-mobile, win 10x+, you should see the cupid-wf banner — if
+  // you instead see rays/shock, the Spine asset failed to load (debug the load).
+  private static readonly USE_SPINE_BANNER = true;
   private loadWinCallout(ov: Node): void {
     if (!CeremonyView.USE_SPINE_BANNER) return;
     resources.load('spine/cupid-wf/cupid-wf', sp.SkeletonData, (err, data) => {
