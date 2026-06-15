@@ -58,6 +58,9 @@ export class SlotController extends Component {
   private bar!: BettingBarMobile | BettingBarWeb;
   private barNode: Node | null = null;
   private barIsWeb: boolean | null = null;
+  // The intro is a full-screen gate built BEFORE the bar; the bar would otherwise
+  // render on top and poke through the intro on mobile. Keep it hidden until dismiss.
+  private introActive = true;
   private lifecycle: LifecycleHandle | null = null;
   private comply: ComplyRules = getComply();
   private session: SessionStats = newSession(0);
@@ -119,6 +122,8 @@ export class SlotController extends Component {
     });
 
     this.view.buildIntro(() => {
+      this.introActive = false;
+      if (this.barNode && this.barNode.isValid) this.barNode.active = true; // reveal the bar
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');
     });
@@ -180,6 +185,7 @@ export class SlotController extends Component {
       : barNode.addComponent(BettingBarMobile);
     this.barNode = barNode;
     this.barIsWeb = wantWeb;
+    if (this.introActive) barNode.active = false; // stay hidden behind the intro gate
     this.bar.on('spin', () => this.onSpinPressed());
     this.bar.on('bet:inc', () => this.changeBet(1));
     this.bar.on('bet:dec', () => this.changeBet(-1));

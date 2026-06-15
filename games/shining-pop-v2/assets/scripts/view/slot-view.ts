@@ -30,7 +30,6 @@ import {
   RTP_DISPLAY,
   RULES_LINES,
   SCATTER_LINES,
-  SCATTER_TEASER,
   VOLATILITY_DISPLAY,
 } from '../logic/info-content';
 import { createRng } from '../logic/rng';
@@ -2841,12 +2840,11 @@ export class SlotView extends Component {
       peek,
     );
 
-    this.mkLabel(SCATTER_TEASER, 0, -106, 12, new Color(191, 232, 255, 255), peek);
     tween(peekOp).delay(0.6).to(0.5, { opacity: 235 }).start();
 
     const vis = view.getVisibleSize();
 
-    const introS = Math.min(vis.width / 480, vis.height / 920, 1.3);
+    const introS = Math.min(vis.width / 480, vis.height / 880, 1.3);
     ov.setScale(introS, introS, 1);
     ov.setPosition(0, 0, 0);
     const raise = (): void => {

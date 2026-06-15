@@ -8530,7 +8530,7 @@
     const big = Math.min(W * 0.12, 104);
     const t1 = new PIXI.Text({ text: 'FREE SPINS', style: { fontFamily: THEME.type.familyDisplay, fontSize: big * 0.7, fill: 0xffe24a, align: 'center', stroke: { color: 0xd1356f, width: 7, join: 'round' } } });
     t1.anchor.set(0.5); t1.position.set(0, -big * 0.42); card.addChild(t1);
-    const t2 = new PIXI.Text({ text: '×' + (count || 10), style: { fontFamily: THEME.type.familyDisplay, fontSize: big, fill: 0xff7ad0, align: 'center', stroke: { color: 0xffffff, width: 8, join: 'round' } } });
+    const t2 = new PIXI.Text({ text: '×' + (Number.isFinite(+count) ? Math.trunc(+count) : 10), style: { fontFamily: THEME.type.familyDisplay, fontSize: big, fill: 0xff7ad0, align: 'center', stroke: { color: 0xffffff, width: 8, join: 'round' } } });
     t2.anchor.set(0.5); t2.position.set(0, big * 0.4); card.addChild(t2);
     const CAND = [0xff5ab0, 0x8be4ff, 0xffe24a, 0xb86fda, 0xffffff, 0xff7ad0];
     const N = _gpuWeak ? 18 : (H > W * 1.05 ? 26 : 42);
