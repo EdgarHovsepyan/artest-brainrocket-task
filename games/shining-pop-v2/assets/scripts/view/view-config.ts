@@ -175,7 +175,7 @@ export const VIEW_CONFIG = {
     // eyes, big grin, rosy cheeks). Drawn procedurally over the character's head.
     // offset/scale are tunable so the face can be nudged onto the art after a
     // Cocos rebuild. fitsCharacter at art-local coords; +Y is up toward the head.
-    wildHappyFace: { enabled: true, offsetYFrac: 0.17, scale: 1.0, fadeMs: 160 },
+    wildHappyFace: { enabled: true, offsetYFrac: 0.3, scale: 1.05, fadeMs: 160 },
 
     loserDimOpacity: 95,
 

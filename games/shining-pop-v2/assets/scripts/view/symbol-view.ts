@@ -258,6 +258,9 @@ export class SymbolView extends Component {
     if (this._currentId !== SYMBOLS.WILD) return;
     this.ensureHappyFace();
     if (!this.happyFace || !this.happyFaceOp) return;
+    // Render above the gingerbread sprite + fallback label (last sibling = top).
+    const hfParent = this.happyFace.parent;
+    if (hfParent) this.happyFace.setSiblingIndex(hfParent.children.length - 1);
     const ms = VIEW_CONFIG.win.wildHappyFace.fadeMs / 1000;
     Tween.stopAllByTarget(this.happyFaceOp);
     Tween.stopAllByTarget(this.happyFace);

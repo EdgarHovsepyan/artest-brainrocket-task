@@ -203,7 +203,14 @@ export class CeremonyView extends Component {
     EPIC: -50,
   };
 
-  private static readonly USE_SPINE_BANNER = false;
+  // WIN CEREMONY = the authored Spine win-callout (Cupids-Crush 4.2), NOT the
+  // procedural rhombus/sunburst/sparkle graphics. DECISION (keep it): the flat
+  // geometric romb + hard vector rays read as dated/cheap and are intentionally
+  // OFF in-game. They remain in code ONLY as a safety fallback if the Spine asset
+  // fails to load at runtime (so the ceremony is never empty). To verify Spine is
+  // live: rebuild web-mobile, win 10x+, you should see the cupid-wf banner — if
+  // you instead see rays/shock, the Spine asset failed to load (debug the load).
+  private static readonly USE_SPINE_BANNER = true;
   private loadWinCallout(ov: Node): void {
     if (!CeremonyView.USE_SPINE_BANNER) return;
     resources.load('spine/cupid-wf/cupid-wf', sp.SkeletonData, (err, data) => {
@@ -211,20 +218,27 @@ export class CeremonyView extends Component {
         console.warn('[spine] win-callout load failed; procedural fallback', err);
         return;
       }
-      const n = new Node('winCallout');
-      n.layer = ov.layer;
-      n.setPosition(0, 36, 0);
-      n.setScale(0.62, 0.62, 1);
-      const sk = n.addComponent(sp.Skeleton);
-      sk.skeletonData = data;
-      sk.premultipliedAlpha = true;
-      this.winSpineOp = n.addComponent(UIOpacity);
-      this.winSpineOp.opacity = 0;
-      n.active = false;
-      ov.addChild(n);
+      // Any failure here (bad skeleton, missing texture) must NOT crash the
+      // ceremony — leave winSpine null so show() uses the procedural fallback.
+      try {
+        const n = new Node('winCallout');
+        n.layer = ov.layer;
+        n.setPosition(0, 36, 0);
+        n.setScale(0.62, 0.62, 1);
+        const sk = n.addComponent(sp.Skeleton);
+        sk.skeletonData = data;
+        sk.premultipliedAlpha = true;
+        this.winSpineOp = n.addComponent(UIOpacity);
+        this.winSpineOp.opacity = 0;
+        n.active = false;
+        ov.addChild(n);
 
-      n.setSiblingIndex(this.numberGlow.node.getSiblingIndex());
-      this.winSpine = sk;
+        n.setSiblingIndex(this.numberGlow.node.getSiblingIndex());
+        this.winSpine = sk;
+      } catch (e) {
+        console.warn('[spine] win-callout setup failed; procedural fallback', e);
+        this.winSpine = null;
+      }
     });
   }
 
@@ -253,36 +267,44 @@ export class CeremonyView extends Component {
         .to(0.3, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
         .start();
 
-      const useSpine = !!this.winSpine && this.winSpine.isValid && !reduced;
+      let useSpine = !!this.winSpine && this.winSpine.isValid && !reduced;
       if (useSpine) {
-        const anim = CeremonyView.TIER_ANIM[tier.name] ?? 'normal-win';
-        const sk = this.winSpine!;
+        // A Spine playback failure must degrade to the procedural ceremony, not
+        // crash the win — flip useSpine so the !useSpine block below still fires.
+        try {
+          const anim = CeremonyView.TIER_ANIM[tier.name] ?? 'normal-win';
+          const sk = this.winSpine!;
 
-        if (this.winSpineOp) {
-          Tween.stopAllByTarget(this.winSpineOp);
-          this.winSpineOp.opacity = 255;
-        }
-        sk.setAnimation(0, `${anim}-start`, false);
-        sk.addAnimation(0, `${anim}-loop`, true, 0);
-        sk.updateAnimation(0);
-        sk.color = new Color(0, 0, 0, 0);
-        sk.node.active = true;
-        const fadeIn = { f: 0 };
-        Tween.stopAllByTarget(fadeIn);
-        tween(fadeIn)
-          .to(
-            0.24,
-            { f: 1 },
-            {
-              easing: 'quadOut',
-              onUpdate: () => {
-                if (!sk.isValid) return;
-                const v = Math.round(255 * fadeIn.f);
-                sk.color = new Color(v, v, v, v);
+          if (this.winSpineOp) {
+            Tween.stopAllByTarget(this.winSpineOp);
+            this.winSpineOp.opacity = 255;
+          }
+          sk.setAnimation(0, `${anim}-start`, false);
+          sk.addAnimation(0, `${anim}-loop`, true, 0);
+          sk.updateAnimation(0);
+          sk.color = new Color(0, 0, 0, 0);
+          sk.node.active = true;
+          const fadeIn = { f: 0 };
+          Tween.stopAllByTarget(fadeIn);
+          tween(fadeIn)
+            .to(
+              0.24,
+              { f: 1 },
+              {
+                easing: 'quadOut',
+                onUpdate: () => {
+                  if (!sk.isValid) return;
+                  const v = Math.round(255 * fadeIn.f);
+                  sk.color = new Color(v, v, v, v);
+                },
               },
-            },
-          )
-          .start();
+            )
+            .start();
+        } catch (e) {
+          console.warn('[spine] win playback failed; procedural fallback', e);
+          useSpine = false;
+          if (this.winSpine?.node?.isValid) this.winSpine.node.active = false;
+        }
       } else if (this.winSpine) {
         this.winSpine.node.active = false;
       }

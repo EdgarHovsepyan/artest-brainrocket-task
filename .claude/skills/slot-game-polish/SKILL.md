@@ -277,6 +277,7 @@ CI: `.github/workflows/ci.yml` runs lint · format · build+tests · RTP sim on 
 - **No engine import below the view** — or `architecture.test.ts` fails (by design).
 - **Pixi canvas letterboxes** (1200×675) — automate via keyboard, not pixel clicks on thin buttons.
 - **Commit subjects must be lowercase** and a conventional type, or commitlint rejects.
+- **DECISION — the Cocos win ceremony is the Spine win-callout, NOT procedural geometry.** `CeremonyView.USE_SPINE_BANNER = true`; the authored `cupid-wf` Spine (animations `big/mega/epic→SUPER/wicked→EPIC -win-start/-loop`) is the hero. The flat rhombus / hard vector sunburst / generic sparkle code stays ONLY as a fallback for when the Spine asset fails to load — do **not** re-enable it as the default; the geometric look was rejected as dated. If you see rays/shock in-game, the Spine failed to load (atlas refs `cupid-wf.webp`; all three of `.json/.atlas/.webp` must ship under `resources/spine/cupid-wf/`).
 
 ---
 
