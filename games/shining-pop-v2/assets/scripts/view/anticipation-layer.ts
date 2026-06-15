@@ -1,14 +1,3 @@
-// MVC — VIEW. Arcane column glow + jagged lightning over the reels that are still
-// to stop when an early-WILD anticipation is brewing. Task 5.2: rebuilt aura per
-// the ULTRACODE blueprint — stacked-alpha magenta column + boltCount jagged bolts
-// re-randomised every reStrikeMs on a schedule (ms-budget kept tight to stay 60
-// fps). Reduced-motion: column only, no lightning re-strikes.
-//
-// NOTE: shining-pop's math has no SCATTER symbol (PAYTABLE locked to WILD + H/L
-// tiers), so the trigger stays `minEarlyWilds`. The visual rebuild ships either
-// way; the blueprint's "retarget to scatter" is engine-impossible here without a
-// math change.
-
 import {
   _decorator,
   Color,
@@ -37,12 +26,9 @@ interface Glow {
 @ccclass('AnticipationLayer')
 export class AnticipationLayer extends Component {
   private glows: Glow[] = [];
-  /** Schedule key for the lightning re-strike loop — bound here so unschedule
-   *  matches the same reference. dt-accumulated against reStrikeMs. */
+
   private strikeAccum = 0;
 
-  /** Pulse a column centred at (x, y), `w`×`h` px, until cleared.
-   *  `reduced` skips the lightning + breathes only. */
   spawn(x: number, y: number, w: number, h: number, reduced = false): void {
     const cfg = VIEW_CONFIG.anticipation;
     const auraCol = new Color().fromHEX(cfg.auraColor);
@@ -51,9 +37,8 @@ export class AnticipationLayer extends Component {
     n.addComponent(UITransform).setContentSize(w, h);
     n.setPosition(x, y, 0);
     this.node.addChild(n);
-    n.layer = this.node.layer; // UI_2D so the 2D renderer draws it
+    n.layer = this.node.layer;
 
-    // Stacked-alpha magenta column — 4 inset rounded rects fake a soft falloff.
     const columnG = n.addComponent(Graphics);
     const fillTint = (alpha: number) => new Color(auraCol.r, auraCol.g, auraCol.b, alpha);
     columnG.fillColor = fillTint(20);
@@ -68,12 +53,7 @@ export class AnticipationLayer extends Component {
     columnG.fillColor = fillTint(70);
     columnG.roundRect(-w / 2 + 18, -h / 2 + 18, w - 36, h - 36, 5);
     columnG.fill();
-    // 2026-06-15 (owner: "no stroked boxes") — DROPPED the hard 3px stroked outline
-    // that boxed the column. The stacked-alpha fills (now 4 deep) give a soft glowing
-    // energy column whose edge dissolves, never an outlined box.
 
-    // Lightning bolt overlay — its own Graphics so we can clear+redraw without
-    // wiping the column. Sibling node so it inherits the same opacity envelope.
     const boltNode = new Node('antic_bolts');
     boltNode.addComponent(UITransform).setContentSize(w, h);
     n.addChild(boltNode);
@@ -91,7 +71,7 @@ export class AnticipationLayer extends Component {
 
     const g: Glow = { node: n, columnG, boltG, op, w, h, reduced };
     this.glows.push(g);
-    // Strike immediately on spawn (first impression matters) + schedule re-strikes.
+
     if (!reduced) {
       this.drawBolts(g);
       if (this.glows.length === 1) {
@@ -101,7 +81,6 @@ export class AnticipationLayer extends Component {
     }
   }
 
-  /** Per-frame: every reStrikeMs, randomly re-draw lightning bolts in every glow. */
   private tickStrike = (dt: number): void => {
     if (!this.glows.length) {
       this.unschedule(this.tickStrike);
@@ -122,7 +101,6 @@ export class AnticipationLayer extends Component {
     const { w, h } = g;
     g.boltG.clear();
     for (let i = 0; i < cfg.boltCount; i++) {
-      // Jagged downward zigzag spanning the column height; x jitters around 0.
       const startX = (Math.random() - 0.5) * w * 0.6;
       const startY = h / 2 - 4;
       const endY = -h / 2 + 4;
@@ -134,13 +112,13 @@ export class AnticipationLayer extends Component {
         const x = startX + (Math.random() - 0.5) * w * 0.45;
         pts.push({ x, y });
       }
-      // Outer halo stroke (wide, soft alpha)
+
       g.boltG.lineWidth = 6;
       g.boltG.strokeColor = haloCol;
       g.boltG.moveTo(pts[0].x, pts[0].y);
       for (let p = 1; p < pts.length; p++) g.boltG.lineTo(pts[p].x, pts[p].y);
       g.boltG.stroke();
-      // Inner hot stroke (thin, bright white)
+
       g.boltG.lineWidth = 2;
       g.boltG.strokeColor = boltCol;
       g.boltG.moveTo(pts[0].x, pts[0].y);

@@ -1,106 +1,53 @@
-// DATA-DRIVEN visual / animation config for the Cocos view layer.
-// ZERO HARDCODING: every size, timing and gain lives here and is read by the
-// view components. Designers tune this file, never the component code.
-
 export const VIEW_CONFIG = {
-  /** Master shader kill-switch — when false, every consumer skips customMaterial
-   *  and uses its Graphics fallback (low-end devices, shader-regression debugging).
-   *  Each FX *also* honors `reducedFx`. Set false to prove the game still reads. */
   vfx: { materialsEnabled: true },
 
-  /** Board layout (px). The view builds the whole scene from these numbers. */
   layout: {
-    /** Square symbol cell size. */
     cell: 96,
-    /** Symbol art fill fraction of the cell. Bumped 0.92→0.99 (2026-06-12) so
-     *  symbols fill nearly the whole cell — kills the big vertical gap the user
-     *  saw between rows (symbols read bigger + more compact). */
+
     symbolFill: 0.94,
-    /** Gap between cells (and between reels). Tightened 8→5 for a more compact
-     *  reel (less dead space between symbols vertically + horizontally). */
+
     gap: 5,
-    /** Vertical centre of the reel block, relative to the canvas centre. */
+
     reelCenterY: 90,
-    /** Logical design envelope used for the responsive contain-fit. */
+
     designWidth: 760,
     designHeight: 760,
-    /** Extra symbols stacked above the window so a reel can really scroll. */
+
     spinBuffer: 12,
 
-    // ── Task 1.1: viewport cover + boot mask ────────────────────────────────
-    /** Magic offsets promoted out of fit(): bezel headroom + bottom breathing.
-     *  contentTopPx tightened 410→372 (2026-06-11) so the content band is
-     *  shorter → the reels scale UP to fill more of the screen (user: "reels
-     *  need bigger"). The logo moves to the top-left shoulder in landscape so
-     *  it no longer needs the tall centre headroom. */
     contentTopPx: 372,
-    /** Landscape frame crown above the reels (the logo lives screen-relative
-     *  there, outside this band) — tight so the reels fill the height. */
+
     landscapeTopPadPx: 28,
     boardBottomGapPx: 22,
-    /** bg base-fill + bg_art scaled by this factor so the painted bg always
-     *  bleeds past 16:9, 21:9, 9:16, 9:21 — kills the #0a0610 letterbox band
-     *  without touching the engine cover. Trimmed 1.15→1.06 (owner: "bg too big,
-     *  not containing the fill image") so the painting zooms in LESS and more of
-     *  the candy world is visible inside the viewport; 6% still safely bleeds
-     *  past every target ratio so no letterbox returns. */
+
     bgCoverOverscan: 1.06,
 
-    // ── Task 1.2: reels re-center + edge feather ────────────────────────────
-    /** Stacked-alpha dark feather over top/bottom of the GRAPHICS_RECT mask
-     *  so symbols dissolve into the bezel instead of snapping at the mask edge. */
     windowFeatherPx: 18,
 
-    // ── Task 7.1: reels >=90% width portrait ────────────────────────────────
-    /** Portrait width fill ratio for fit(). Bumped 0.92→0.96 (2026-06-11) so the
-     *  reels are bigger and sit closer to the bar — reduces the empty band the
-     *  user saw between the reels and the betting controls in portrait. */
     portraitWidthFill: 0.99,
     landscapeWidthFill: 1.0,
 
-    // ── Task 1.3: logo top-left + Buy-FAB collision guard ───────────────────
-    /** Buy-FAB geometry + collision clamp. fabDockX(sign) docks at
-     *  sign*(frameHalfW + gapPx + size/2); clamps inner edge >= frameHalfW +
-     *  minClearancePx and outer edge <= screenHalfW/scale - edgePadPx. */
     fab: {
       sizePx: 100,
       gapPx: 14,
       minClearancePx: 14,
       edgePadPx: 12,
-      /** 2026-06-11 — match the PixiJS reference: the BUY BONUS badge sits on
-       *  the LEFT of the reels in landscape (dockSign -1), and in the bottom-
-       *  left deck in portrait (screen-relative fraction + a portrait scale so
-       *  it isn't blown up by the big portrait board scale). */
+
       landscapeDockSign: -1,
-      /** 0.12 clipped the badge's left edge on narrow phones — 0.16 clears it. */
+
       portraitScreenX: 0.16,
       portraitScreenY: 0.2,
-      /** Portrait badge width in CANVAS px — explicit because the FAB lives on
-       *  the canvas root (above the bar), where board-relative scales don't
-       *  apply. ~140 balances the spin ring; half the old oversized badge. */
+
       portraitWidthPx: 140,
-      /** Portrait dock: fraction of the control band's height (bottomInset) the
-       *  badge centre sits at — 0.6 ≈ level with the spin button, left side. */
+
       portraitBandFrac: 0.6,
-      /** Landscape shrink — the badge dominated the web layout at full size. */
+
       landscapeScale: 0.78,
     },
-    /** Logo placement. 2026-06-11 — landscape logo is now SCREEN-RELATIVE
-     *  (responsive): its centre lands at screen-fraction (landscapeScreenX,
-     *  landscapeScreenY) measured from bottom-left = (0,0), top-right = (1,1).
-     *  So x≈0.18 = left ~18% (left edge near 5%), y≈0.88 = top ~12% (top edge
-     *  near 1%) for the wide logo. In BONUS the logo slides to the reels-left,
-     *  vertically-centred (bonusScreenX/Y). fit() inverse-transforms these
-     *  through the board scale so they hold at any viewport. */
+
     logo: {
       topY: 322,
-      /** Anomaly fix (2026-06-13): at scale 0.52 / x0.18 the wordmark was 262px
-       *  wide centred at cx≈230, but the reels start at x≈219 (left margin only
-       *  ~219px) — so its right half spilled ~143px into reel_0 and, painting
-       *  BEHIND the reels (logo i<reels i), the "NING/OP" of SHINING POP was
-       *  occluded by the reel panel. Shrink to 0.40 (≈202px) and centre it in the
-       *  left margin (x0.085 → cx≈109, right edge ≈210 < 219) so it clears the
-       *  reels entirely — no overlap, so paint order no longer matters. */
+
       landscapeScale: 0.4,
       landscapeScreenX: 0.085,
       landscapeScreenY: 0.88,
@@ -109,81 +56,48 @@ export const VIEW_CONFIG = {
     },
   },
 
-  /** Reel spin animation — synced to shining-pop feel (ms). */
   spin: {
-    /** Minimum spin time before the first reel stops (ms). shining baseDur OFF≈440. */
     minSpinMs: 440,
-    /** Stagger between consecutive reel stops (ms). Left-to-right. shining OFF≈88. */
+
     reelStopStaggerMs: 88,
-    /** Per-reel CUMULATIVE stop position (in reelStopStaggerMs units): the reels
-     *  stop on an ACCELERATING cadence (mid gaps shrink) then HANG a beat before
-     *  the LAST reel, instead of a mechanical linear 0,1,2,3,4 stagger — the
-     *  "breath before the final reel" every premium slot has. One entry per reel.
-     *  reducedFx falls back to a flat linear cadence (no breath shaping). */
+
     stopCadence: [0, 1.0, 1.85, 2.6, 3.9],
-    /** Floor (ms) on the gap between consecutive reel STOPS, per turbo level. Turbo
-     *  multiplies the whole spin by the turbo scalar (~0.16 at MAX), which collapses
-     *  the 88ms L→R stagger to ~14ms — a "slab stop" where all reels land at once.
-     *  This floor keeps the left-to-right cascade READABLE even at max speed. */
+
     stopMinGapMs: { off: 0, turbo: 34, max: 22 },
-    /** Trapezoidal velocity-curve accel/decel fractions. shining a=0.10 / d=0.34. */
+
     accelFraction: 0.1,
     decelFraction: 0.34,
-    /** Squash applied to a reel's symbols on landing (the "thunk"). */
+
     landSquash: 0.9,
-    /** Post-resolve settle dwell before the round returns to idle / autoplay
-     *  re-spins, per turbo mode (ms). Was a flat 300 that DOMINATED MAX mode
-     *  (reels run ~0.16×) — owner: "no delays, fast playing". Now scales all the
-     *  way to idle so a fast round feels fast end-to-end. */
+
     settleMs: { off: 300, turbo: 150, max: 80 },
-    /** Quick-stop arm delay (ms): a re-press before this is ignored so the SAME
-     *  tap can't both start and stop a spin. Scales with turbo (shorter spin →
-     *  arms sooner) so rapid multi-clicks chain stop→spin without dropping. */
+
     quickStopArmMs: { off: 180, turbo: 110, max: 70 },
-    /** Wind-up DISABLED 2026-06-15 (owner: reels "slow / not snappy"). The 120ms
-     *  up-drift before launch (OFF mode only) made the reel hesitate/drift UP
-     *  before spinning — a sluggish start, and it diverged from the now-default
-     *  TURBO launch which has none. 0 = snap straight into the spin, both modes. */
+
     windupMs: 0,
-    windupAmpFrac: 0.85, // × CELL × 0.15 multiplier in reel-view.spinTo()
-    windupSquash: 1.0, // 1.0 = no Y squash (position kick carries the wind-up)
-    /** Velocity-coupled vertical motion-blur streak. DISABLED 2026-06-11:
-     *  `enabled:false` kills the strip Y-stretch entirely. ANY vertical
-     *  stretch on the symbols during the spin read as "vertical arrows /
-     *  lines" (user-rejected, repeatedly). The reel reads fast from the
-     *  scroll speed alone — it does NOT need a stretch cue. Do not re-enable
-     *  without a fundamentally different (non-stretch) speed treatment. */
+    windupAmpFrac: 0.85,
+    windupSquash: 1.0,
+
     blur: {
       enabled: false,
-      triggerSpd: 0.12, // cells/frame before blur engages
-      span: 0.25, // (spd-trigger)/span → 0..1
-      strengthYFrac: 0.03, // × CELL — inert while enabled:false
-      strengthXFrac: 0.012, // × CELL
+      triggerSpd: 0.12,
+      span: 0.25,
+      strengthYFrac: 0.03,
+      strengthXFrac: 0.012,
       rampInDecay: 0.5,
       rampOutDecay: 0.18,
     },
-    /** Click-to-stop / force-stop cascade. */
+
     quickStop: {
       staggerMs: 8,
       minMs: 55,
       maxMs: 100,
     },
 
-    // ── Task 6.1: pre-spin interpolation mask (already glitch-free; named) ──
-    /** Window of frames after spinTo() during which the cell sprite must NOT
-     *  flip to the result frame (pendingFinal + 'launching' blur gate). Was a
-     *  hardcoded 50ms in reel-view; promoted so QA can extend if a snap shows. */
     preSpinMaskMs: 50,
-    /** Optional cross-fade target for window cells during the mask window.
-     *  255 = no fade (current behavior); lower = brief dim → settle. */
+
     preSpinFadeToAlpha: 255,
 
-    // ── Task 4.2: reel portal warp + grid merge ────────────────────────────
-    /** Portal glow at spin entry (launch) + exit (settle). DISABLED 2026-06-11:
-     *  the magenta sprite bands docked at reel top/bottom read as "arrow lines
-     *  on the symbols" (user-rejected). `enabled:false` skips both the build and
-     *  the fire so they never render. Re-enable only with a redesigned look that
-     *  doesn't dock a hard band across the reel edges. */
     portal: {
       enabled: false,
       entryMs: 180,
@@ -192,128 +106,54 @@ export const VIEW_CONFIG = {
       fringeColor: '#ff5ab0',
     },
 
-    // ── Task 6.2: elastic over-travel bounce (THE missing feel piece) ──────
-    /** Split-stop physics. Strip overshoots by overtravelFrac * CELL * elasticity,
-     *  then settles to 0 with `easing` over bounceMs * weight. `settle()` fires
-     *  on the SECOND segment's .call so the squash coincides with rest. Designers
-     *  tune weight/elasticity/speed live; reducedMotion disables the bounce. */
     bounce: {
-      // 2026-06-15 SMOOTH-SETTLE (owner: reels "glitchy, not smooth"). The big
-      // overshoot (12.7px) meant the strip decelerated to a FULL STOP at the dip
-      // then got yanked back by backOut — a velocity discontinuity the eye read as
-      // a wobble/glitch. Halved the dip (overtravelFrac 0.12→0.07, elasticity
-      // 1.1→1.0 → ~6.7px) and snappier recovery (200→170) so it still BOUNCES on
-      // the drop (owner wants that) but lands clean, not janky.
       overtravelFrac: 0.07,
       bounceMs: 170,
       easing: 'backOut',
       weight: 1.05,
       speed: 1,
       elasticity: 1.0,
-      /** Heavy-landing RECOIL — peak UNIFORM scale "thunk" on the whole strip when a
-       *  WILD lands on that reel, beat-locked to the reel-stop audio transient. 1.0
-       *  disables it; uniform both-axes so it never reads as squash/skew. */
+
       wildRecoilScale: 1.045,
     },
   },
 
-  /** Winning-line presentation. */
   win: {
-    /** Pulse scale applied to winning symbols. Bolder attack (was 1.18) so the
-     *  winning cells punch harder before settling into the jelly wobble. */
-    // MERGE 2026-06-14 — reconciled with the parallel win-state branch: adopt the
-    // bolder attack scale + the config-driven wave stagger, but KEEP the owner-
-    // driven uniform bounce (their jelly squash-and-stretch is the "skewing/dancing"
-    // the owner rejected) and the per-symbol heat table.
-    symbolPulseScale: 1.3, // bolder punchy attack (PP-style hit); heat table amplifies it per symbol
-    symbolPulseMs: 240, // snappier attack (was 420 = slow) — owner: "faster bouncing"
-    /** Per-reel L→R stagger (seconds) of the win-symbol highlight, so winners
-     *  "blink" on in a WAVE across the board rather than all at once — the eye
-     *  tracks the win building reel-by-reel. Config-driven (consumed by SlotView's
-     *  highlight loop; was a hardcoded 0.06). */
+    symbolPulseScale: 1.3,
+    symbolPulseMs: 240,
+
     highlightWaveStagger: 0.085,
-    /** PER-SYMBOL WIN IDENTITY — each symbol id celebrates at its OWN intensity
-     *  (`heat`), so a WILD win EXPLODES while a low-pays win is a polite bump.
-     *  heat scales the attack pop, the jelly amplitude AND the glow peak in
-     *  symbol-view.playWin. 1.0 = the previous uniform behaviour; tiers track the
-     *  paytable (Wild > H1..H4 > L1..L5). Unlisted ids fall back to base 1.0. */
+
     symbolProfiles: {
-      0: { heat: 1.35 }, // WILD — hottest (gingerbread hero)
-      1: { heat: 1.22 }, // H1 (top candy gem)
-      2: { heat: 1.15 }, // H2
-      3: { heat: 1.08 }, // H3
-      4: { heat: 1.03 }, // H4
-      5: { heat: 0.95 }, // L1
-      6: { heat: 0.92 }, // L2
-      7: { heat: 0.9 }, // L3
-      8: { heat: 0.88 }, // L4
-      9: { heat: 0.86 }, // L5
+      0: { heat: 1.35 },
+      1: { heat: 1.22 },
+      2: { heat: 1.15 },
+      3: { heat: 1.08 },
+      4: { heat: 1.03 },
+      5: { heat: 0.95 },
+      6: { heat: 0.92 },
+      7: { heat: 0.9 },
+      8: { heat: 0.88 },
+      9: { heat: 0.86 },
     } as Record<number, { heat: number }>,
-    /** WIN BOUNCE — after the attack pop, winning symbols keep BOUNCING (a fast
-     *  UNIFORM scale up↔down, both axes together) until the next spin clears them.
-     *  Owner: "more bouncing, NOT model skewing or dancing" — so it's a clean ball-
-     *  bounce, not the opposing-axis squash-and-stretch the parallel branch used
-     *  (which reads as a skew). jelly = bounce amplitude; ms = one full cycle. */
+
     winBounceLoop: { enabled: true, jelly: 0.15, ms: 290, heatTempo: 0.6 },
-    /** Winning symbols LIFT out of the reel mask and stay ENLARGED through the
-     *  celebration (owner: "in the win show bigger only the symbols, not cropping
-     *  under reels"). winSustainScale = the settled size winners hold; the Wild
-     *  goes a touch bigger. The lift (symbol reparented above the mask) makes the
-     *  enlarged symbol render fully uncropped. */
+
     winSustainScale: 1.16,
-    /** Cute 3D card-turn on winning symbols (owner: "some 3d effect, cute"). A
-     *  gentle Y-axis tilt swing — real perspective foreshortening on the Cocos 3D
-     *  UI node. Capped small so the candy never goes razor-thin edge-on. Skipped
-     *  under reducedFx. */
+
     winTilt: { enabled: true, deg: 13, ms: 540 },
-    /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
-     *  presented, so winners read instantly (standard top-provider treatment).
-     *  255 disables the dim. */
+
     loserDimOpacity: 95,
-    /** Seconds each winning line stays highlighted before cycling to the next. */
+
     lineCycleSeconds: 0.85,
-    /** 2026-06-11 FIRE redesign — `showLines:false` removes the drawn payline
-     *  geometry ENTIRELY (the magenta polyline + glow segments + plasma core +
-     *  line-riding sparks, all user-rejected as "magenta geometry"). The win is
-     *  now read from the SYMBOLS: a warm fire glow behind each winning symbol +
-     *  rising fire embers. No lines, no diamonds. */
+
     showLines: false,
-    /** Fire-ember burst from winning cells (replaces the line). count = embers
-     *  per winning cell; warm orange→gold, rise + fade. Bumped 6→9 so even a
-     *  small win reads clearly (the embers + symbol glow are the only win cue
-     *  now that lines are gone). */
+
     fireEmbers: { perCell: 22, riseSpeed: 180, lifeMs: 820, spreadPx: 58 },
 
-    /** The OLD rectangular win-fire flame QUADS behind winning cells read as a
-     *  "fire background box" (user-rejected). Fire is now painted PER-SYMBOL,
-     *  clipped to each symbol's own silhouette, by symbol-win.effect. Keep these
-     *  background quads OFF. */
     fireFlames: { enabled: false },
 
-    /** CINEMA WAVE — win-line ENERGY BEAMS (win-beam.effect): an additive flowing
-     *  ember/gold plasma ribbon stretched between consecutive winning-cell
-     *  centres. This is the shader "win line" — no drawn stroke, no magenta
-     *  geometry. heightPx = ribbon thickness; maxSegments = pooled sprites;
-     *  fadeInMs/holdOpacity = reveal envelope; intensity/flowSpeed drive the
-     *  shader (config-driven; was a hardcoded value in slot-view). revealStaggerMs:
-     *  each segment starts its fade this many ms after the previous so the ribbon
-     *  DRAWS progressively along the line (owner "progressive line animation").
-     *  heightPx 36 = COMPACT ribbon (owner "more compact"); intensity 1.55 = more
-     *  bloom (owner "more bloom"); flowSpeed = charged-stream flow. */
-    // DISABLED 2026-06-15 (RADICAL WIN REDESIGN): the win-beam rendered a bright
-    // RAINBOW PLASMA BAND filling the winning ROW's cell boxes behind the symbols —
-    // a techy laser the owner rejected ("not on the box, diagonal shine, rainbow, I
-    // don't like this shit"). The win now reads PURELY ON the symbols: the cute
-    // symbol-win shader (soft body-glow + warm rim + twinkles), the symbol-shaped
-    // halo, the bouncy pop, the corner sparkles + the per-line ×N pops — no band,
-    // no laser, no rainbow, nothing on the cell box.
     beams: {
-      // RE-ENABLED 2026-06-15 as the GLOSSY CANDY MATERIAL win line (owner: "win
-      // line look like shader expert level, yummy material"). The win-beam.effect
-      // is now a PEPPERMINT material (red+whitesmoke stripe + sliding specular
-      // gloss, re-skinned in the .effect frag) layered UNDER the crisp Graphics
-      // candy-cane core — gloss halo + readable line. Tuned DOWN (intensity 1.3,
-      // height 30) so it reads as wet candy gloss, never the rejected magenta band.
       enabled: true,
       heightPx: 30,
       maxSegments: 16,
@@ -324,39 +164,9 @@ export const VIEW_CONFIG = {
       flowSpeed: 2.4,
     },
 
-    /** CINEMA WAVE — soft-burst.effect replaces the 10-layer Graphics radial glow
-     *  behind winners (it BANDED into visible concentric circles — rejected).
-     *  Shader = continuous falloff + rotating god-rays + candle flicker. The
-     *  Graphics glow remains the fallback when the material is unavailable. */
-    // DISABLED 2026-06-14: the soft-burst glow is drawn on a WHITE SQUARE frame, so
-    // at ANY size it renders as a glowing BOX behind the symbol filling the cell —
-    // owner (repeatedly): "effects on the bg/bounding box, need ONLY the symbol
-    // effect, not the symbol bg". The win now reads PURELY from the on-silhouette
-    // symbol-win shader (rim-light + glints + shimmer, alpha-clipped to the candy)
-    // + the symbol-SHAPED additive halo (winHalo, USE_TEXTURE) + the scale bounce.
-    // No square glow can paint the background. (The parallel branch re-enabled this
-    // at scale 2.25 — that is the rejected box; intentionally kept OFF on merge.)
     burst: { enabled: false, intensity: 1.2, scale: 1.1 },
 
-    // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
-    /** Award-tier ON-symbol highlight: an additive overlay that reads the
-     *  symbol's own alpha and paints an animated warm rim-light + a diagonal
-     *  specular sweep (shape-accurate, geometry-free). `enabled` gates the
-     *  whole layer; a null material or reducedFx falls back to the Graphics
-     *  sheen/sparkle. intensity = overall strength; rimWidth = uv tap offset
-     *  for the 4-tap edge band; sweepSpeed = specular rake speed; envInMs/
-     *  envHoldOpacity = the per-symbol fade-in + sustained opacity envelope;
-     *  scale = overlay size vs the symbol (1.06 gives the rim a hair of room). */
     symbolFx: {
-      // DISABLED 2026-06-15 (owner: "win shows a colored RECTANGLE / bounding box
-      // around symbols, effect only on the texture"). This overlay sets a RANDOM
-      // per-symbol sprite colour on a 1.06× quad + a diagonal specular sweep; the
-      // reel mask used to clip it to the cell, but the new win-LIFT (symbol pops
-      // ABOVE the mask, uncropped) unclips it → a randomly-coloured rectangle shows
-      // around each winner, and the diagonal sweep is itself owner-rejected. The win
-      // now reads PURELY from the symbol-SHAPED halo (svarka, alpha-clipped) + the
-      // scale pop + 3D tilt + candy star/heart pop — all on/around the texture, never
-      // a box. Re-enable only if the shader is reworked to clip hard to the alpha.
       enabled: false,
       intensity: 1.45,
       rimWidth: 0.035,
@@ -366,10 +176,6 @@ export const VIEW_CONFIG = {
       scale: 1.06,
     },
 
-    // ── Task 4.1: arcane payline glow (CCEffect bloom) — BOOSTED 2026-06-11
-    //    The Graphics stroke alpha was cut so this additive overlay carries
-    //    the visual weight of the win line. widthPx and alpha bumped so the
-    //    bloom reads as a soft energy ribbon, not a hairline. ──────────────
     glow: {
       intensity: 1.4,
       scrollSpeed: 1.6,
@@ -378,11 +184,6 @@ export const VIEW_CONFIG = {
       fallbackEnabled: true,
     },
 
-    // ── Task 6.3: Svarka plasma win-line ───────────────────────────────────
-    /** Plasma core riding the line head: coreDiscs stacked-alpha discs that
-     *  pulse-scale; sparkPerStep cascade spawn rate on head-crosses-cell;
-     *  shake = winning-symbol jitter. additiveMaterial gates the CCEffect
-     *  bright core (stacked-alpha is the always-on fallback). */
     svarka: {
       coreDiscs: 4,
       corePulseScale: 1.35,
@@ -397,26 +198,19 @@ export const VIEW_CONFIG = {
     },
   },
 
-  /** Kinetic win counter (count-up) — 3-beat: anticipation hold → count → savour. */
   counter: {
-    /** Duration = baseMs + log10(win) * logScaleMs, clamped to maxMs. */
     baseMs: 600,
     logScaleMs: 350,
     maxMs: 3000,
-    /** easeOutExpo = 1 - 2^(-10p) (fast → settle). */
+
     easing: 'easeOutExpo',
-    /** Beat-1 hold (number pinned at 0) before counting, by tier band (ms). */
+
     antHoldMs: { epic: 320, big: 240, base: 150 },
-    /** Landing pop on count-complete (damped-elastic). */
+
     landingPopMs: 380,
-    landingPopScale: 0.36, // bolder land (was 0.3); +0.42 for MEGA+
+    landingPopScale: 0.36,
     landingTintMs: 420,
 
-    // ── Task 5.1: heartbeat ticker (log-feel beats) ────────────────────────
-    /** Inside the existing tickCount stepper, on each milestone crossing
-     *  (10ⁿ boundary or N even steps) set amountLabel.node scale to popScale
-     *  then decay toward 1 per-frame: popScale += (1−popScale)*min(1, decayPerSec*dt).
-     *  Beats are dense early, sparse late — the log feel. */
     heartbeat: {
       popScale: 1.22,
       decayPerSec: 8,
@@ -424,23 +218,9 @@ export const VIEW_CONFIG = {
     },
   },
 
-  /** Tiered win ceremony (overlay shown for big wins). */
   ceremony: {
-    /** Win must be >= this multiple of TOTAL bet for the overlay. Lowered 15→10
-     *  (2026-06-11) so more wins get a celebration — small wins still read via
-     *  the symbol glow + embers, but a medium win now also earns the ceremony.
-     *  The BIG tier floor stays 15 (resolveBigWinTier), so 10–15x shows a light
-     *  ceremony without a named tier banner — graceful escalation. */
     showMinMultiple: 10,
-    /** Sylvester — the big win as a 4-beat scripted STORY, expressed as DATA.
-     *  Every duration the ceremony's emotional pacing depends on lives here, so
-     *  the whole arc is one tunable, test-guarded artifact (wired into
-     *  ceremony-view show() + fireDetonationFlash()). Beats run in order:
-     *    1 hush       — held breath before the bang
-     *    2 detonation — flash punch ON, then bloom OUT (the win is revealed)
-     *    3 climax     — count-up roll (longer for bigger wins: base + perTx*tx)
-     *    4 savour     — settle the vignette, hold, then exit
-     *  Replaces the former flat `holdMs` / `microSilenceMs` scalars. */
+
     beats: {
       hushMs: 260,
       detonationFlashInMs: 50,
@@ -451,16 +231,7 @@ export const VIEW_CONFIG = {
       savourHoldBaseMs: 2000,
       savourHoldPerTxMs: 1100,
     },
-    /** Task 5.MATRIX — 4-tier ceremony re-band (presentation only — math unchanged).
-     *  Tiers by win/TOTAL-bet multiple, high → low. First match wins. Per-tier knobs:
-     *  - shakeAmp ........ board kick amplitude in px (capped at *1.8 inside the view)
-     *  - color ........... header tint
-     *  - headerKey ....... i18n key (legacy — present until the labels are translated)
-     *  - coinParticles ... 0 = no coin geyser, >0 fires Epic-style ballistic spray
-     *  - boardDimAlpha ... 0..0.6 (SUPER/EPIC only) deeper savour-beat vignette;
-     *                       NEVER hard black — stays a stacked-alpha wash
-     *  - panelLight ...... 0..1 amount-label backing glow boost
-     *  - textPopScale .... heartbeat scale-pop on milestone crossings (Task 5.1) */
+
     tiers: [
       {
         name: 'EPIC',
@@ -509,41 +280,27 @@ export const VIEW_CONFIG = {
     ],
   },
 
-  /** Anticipation: drag the late reels when a strike is brewing. */
   anticipation: {
-    /** Early wilds (in reels 0..2) needed to anticipate the rest. */
     minEarlyWilds: 2,
-    /** Task 5.2: retarget trigger to SCATTER (presentation-only — math unchanged). */
+
     minEarlyScatters: 2,
-    /** Extra spin time added to the dragging reels (s). */
+
     extraSeconds: 0.6,
-    /** 2026-06-11 — `showAura:false` removes the magenta column + jagged
-     *  lightning diamonds (the "WILD #3" geometry the user rejected). The
-     *  anticipation now reads from the DECEL TIMING alone (the late reels drag
-     *  longer = tension) + a subtle warm reel pulse. No drawn aura geometry. */
+
     showAura: false,
     boltCount: 4,
     reStrikeMs: 110,
     auraColor: '#ff2f93',
   },
 
-  /** Win-burst shard particles. */
   particles: {
     baseCount: 18,
     perMultiple: 1.5,
     maxCount: 72,
 
-    // ── Task 5.4: particle object pool (CC-2) ──────────────────────────────
-    /** Ring of pre-built Graphics+UIOpacity shard Nodes. burst() borrows/returns
-     *  instead of new/destroy. get() returns null if liveCount >= poolCap (drop
-     *  the spawn — never grow). prealloc on first burst (or onLoad). Ceiling
-     *  raised 64->96 so a rich win shows MORE simultaneous particles instead of
-     *  silently dropping spawns (counts above are useless without the headroom). */
     poolCap: 96,
     prealloc: 72,
 
-    /** Epic-win coin geyser (CC-2 path B). count = ballistic coin nodes
-     *  launched from a single point; spreadDeg = launch cone half-angle. */
     coin: {
       count: 30,
       launchSpeed: 900,
@@ -552,36 +309,25 @@ export const VIEW_CONFIG = {
     },
   },
 
-  /** Turbo speed scalar (OFF/TURBO/MAX) — scales reel baseDur + stagger. */
   turbo: { off: 1.0, turbo: 0.4, max: 0.16 },
 
-  /** World depth. The painted bg layers offset by depth × (spin-lean + win-pulse)
-   *  so the flat backdrop reads as a layered world that LEANS into the spin and
-   *  breathes out on a win. Pure transform on existing nodes; frozen at base under
-   *  reducedFx. Deeper layers (the painting) move most; the vignette never moves. */
   world: {
     parallax: {
-      // DISABLED 2026-06-15 (owner: "why bg is moving on every click? pls fix") —
-      // the bg lean-on-spin / breathe-on-win read as the background JUMPING every
-      // click, not as depth. Zeroed so the painted world stays rock-steady. (The
-      // depth-container plumbing stays; set these >0 to re-enable a subtle drift.)
-      spinLeanPx: 0, // was 16 — no downward lean on spin
-      winPulsePx: 0, // was 12 — no breathe on win
-      leanLerp: 5, // spin-lean ease rate (× dt)
-      pulseDecay: 2.0, // win-pulse decay rate (× dt)
+      spinLeanPx: 0,
+      winPulsePx: 0,
+      leanLerp: 5,
+      pulseDecay: 2.0,
     },
   },
 
-  /** Reel land / squash / settle (damped-spring), per turbo mode. */
   land: {
-    armAt: 0.965, // p >= armAt arms the landing
+    armAt: 0.965,
     symDurMs: { off: 250, turbo: 165, max: 130 },
-    symStagMs: { off: 40, turbo: 26, max: 18 }, // bottom→top ripple
-    landDip: { off: 0.052, turbo: 0.038, max: 0.03 }, // × CELL column dip
-    landSq: { off: 0.055, turbo: 0.042, max: 0.034 }, // squash depth
+    symStagMs: { off: 40, turbo: 26, max: 18 },
+    landDip: { off: 0.052, turbo: 0.038, max: 0.03 },
+    landSq: { off: 0.055, turbo: 0.042, max: 0.034 },
   },
 
-  /** Per-cell win reveal (before the ceremony), per turbo mode (ms). */
   reveal: {
     normalMs: { off: 1300, turbo: 720, max: 480, reduced: 700 },
     fsMs: { off: 1800, turbo: 1300, max: 900, reduced: 900 },
@@ -592,34 +338,23 @@ export const VIEW_CONFIG = {
     scatterBurstStaggerMs: 120,
   },
 
-  /** Per-bonus colour-grade overlay cross-fade (ms). */
   grade: { outMs: 280, inMs: 320, outAlpha: 0.75 },
 
-  /** Feature banners (ms). */
   banner: { fsHoldMs: 1100, retriggerHoldMs: 850, reducedFsHoldMs: 500 },
 
-  /** Autoplay inter-spin pause by turbo mode (ms). */
   autoplay: { off: 720, turbo: 280, max: 140 },
 
-  /** Free-spin / bonus playback. */
   bonus: {
-    /** Speed multiplier applied to each bonus reel spin (faster than base). */
     speedMul: 0.5,
-    /** Pause between consecutive free spins (ms) — legacy flat fallback. */
+
     stepPauseMs: 200,
-    /** Dwell after a DEAD free spin (ms), per turbo mode — keep the loop brisk;
-     *  MAX is near-instant so fast players blitz a bought bonus. */
+
     deadPauseMs: { off: 170, turbo: 90, max: 45 },
-    /** Dwell after a WINNING free spin (ms), per turbo mode — savour the win, but
-     *  turbo trims the savour so the bonus never drags for fast players. */
+
     winPauseMs: { off: 560, turbo: 330, max: 190 },
-    /** A single step paying >= this multiple of the TOTAL bet earns its own
-     *  in-bonus money beat (banner + extra dwell). */
+
     bigStepMultiple: 8,
 
-    // ── Task 4.2: grid-merge wipe on bonus entry ───────────────────────────
-    /** Vertical sweep CCEffect over the reel block on controller.startBonus.
-     *  Fallback = a quick scale/alpha pulse. dir: 1 = top→bottom, -1 = bottom→top. */
     mergeWipe: {
       ms: 420,
       dir: 1 as 1 | -1,
@@ -627,28 +362,16 @@ export const VIEW_CONFIG = {
     },
   },
 
-  // ── Task 5.3: per-symbol Spine (asset-blocked) — fallback profile only ───
-  /** Until skeletons land, symbol-view.update uses per-id idle freq so two
-   *  different ids breathe at distinct rates at the same frame. mixSeconds
-   *  is the fake blend duration on win-state transitions. */
   symbols: {
     mixSeconds: 0.15,
-    /** Per-symbol-id idle profile. Override entries by id; unlisted ids use base. */
+
     idleProfiles: {
       base: { amp: 1.0, freq: 1.9 },
     } as Record<string, { amp: number; freq: number }>,
   },
 
-  // ── Task 4.3: flanking idle crystals (decor, Graphics + optional CCEffect) ─
-  /** Two faceted-crystal Graphics nodes docked just outside the frame L/R at
-   *  reelCenterY. portraitVisible=false hides them in portrait (FAB owns the
-   *  margin per 1.3). displaceAmp drives the optional crystal-idle.effect wobble. */
   decor: {
     flankCrystal: {
-      /** DISABLED 2026-06-11 — the flat magenta diamonds docked outside the
-       *  reel frame L/R looked "very basic, not designed" (user-rejected).
-       *  `enabled:false` skips the build entirely. Re-enable only with a real
-       *  faceted-crystal art asset or a proper shader, not flat Graphics. */
       enabled: false,
       sizePx: 70,
       marginPx: 36,
@@ -659,19 +382,10 @@ export const VIEW_CONFIG = {
     },
   },
 
-  // ── Task 4.4: intro→game cross-dissolve (mostly verify) ─────────────────
-  /** In-engine intro cross-dissolve. DISABLED (ms:0) — fixed at the layer that
-   *  actually matters: index.ejs now sets html/body/canvas background:#0a0610,
-   *  so the browser CANNOT show white between intro destroy and canvas paint.
-   *  Re-enable here only if a real-browser test on a specific device shows the
-   *  CSS background fix is insufficient. */
   intro: {
     fade: { ms: 0, holdMs: 0, color: '#0a0610', startAlpha: 0 },
   },
 
-  // ── Task 4.5: Buy-Bonus ambient (glint + plasma) ─────────────────────────
-  /** Glint = diagonal sheen sweep across the FAB face (Graphics, ship-first).
-   *  Plasma = swirling buy-plasma.effect under the art (CCEffect, gated). */
   buy: {
     ambient: {
       glintSweepMs: 520,
@@ -682,9 +396,6 @@ export const VIEW_CONFIG = {
     },
   },
 
-  // ── Task 3.3: info panel typography + wrap-bound layout ─────────────────
-  /** Wrapping label opt-in: enableWrapText + RESIZE_HEIGHT + a measured layout
-   *  pass (decrement y by label.height + lineGap, never a fixed 26). */
   info: {
     panelW: 540,
     panelH: 620,
@@ -698,9 +409,6 @@ export const VIEW_CONFIG = {
     maxBodyHeight: 460,
   },
 
-  // ── Task 3.4: premium menu redesign (row-card list) ─────────────────────
-  /** Row-cards: candy tile + left accent gem + display label + caption +
-   *  right chevron + press-squash. accentAlpha tints the gem. */
   menu: {
     panelW: 460,
     titleSize: 28,
@@ -712,10 +420,6 @@ export const VIEW_CONFIG = {
     accentAlpha: 0.85,
   },
 
-  // ── Task 3.1/3.2: modal scrim + reusable close-X ────────────────────────
-  /** scrimFadeMs eases in the obsidian wash; dismissOnScrim=false guards
-   *  compliance modals (errorModal, rcModal). closeX = 44px crystal-faceted
-   *  reusable component placed top-right in all dismissable panels. */
   modal: {
     scrimAlpha: 0.78,
     scrimFadeMs: 160,
@@ -723,32 +427,18 @@ export const VIEW_CONFIG = {
     closeX: { size: 44, inset: 30, strokeWidth: 4, hitPadding: 6 },
   },
 
-  // ── Task 2.x + 7.x: bars (web + portrait), buttons, cursor, footer ──────
-  /** All bar magic numbers consolidated here. `web` = landscape betting-bar-web.ts,
-   *  `mobile` = portrait betting-bar.ts. Reach in from the bar files — never
-   *  hardcode pixels in betting-bar*.ts again. */
   bar: {
     web: {
-      // 2026-06-11 — betting-panel BG removed (user request). The bar controls
-      // float directly over the painted game bg with no slab behind them. Set
-      // these > 0 again only if a designer wants the slab back.
       bgBaseAlpha: 0.0,
       bgGroundAlpha: 0.0,
       bgGroundFrac: 0.6,
       gambleGapPx: 110,
       clusterCoinsX: 0,
       carousel: {
-        // Defaults match the legacy betting-bar-web literals — designers
-        // tweak here, never in code (Task 2.3).
         cellW: 132,
-        // Mask-local centre = (SW-24)/2 = (800-24)/2 = 388. 2026-06-15: REVERTED
-        // the narrow-window experiment (SW=460/pcx=218) — a narrow centred window
-        // ALWAYS shows a void at the ladder ends (default bet = index 0), which
-        // was exactly the owner's "empty carousel" screenshot. Back to the wide
-        // reference window: all 6 levels visible, active pill centred, no void.
+
         pillCenterX: 388,
-        // Edge cells FADE but never vanish (floor 120 ≈ reference alpha 0.6) so the
-        // window always reads full, never empty at the extremes.
+
         fadeScale: [1.0, 0.82, 0.74, 0.7] as readonly number[],
         fadeOpacity: [255, 200, 150, 120] as readonly number[],
       },
@@ -758,9 +448,6 @@ export const VIEW_CONFIG = {
       },
     },
     mobile: {
-      // 0 = TRANSPARENT mobile bar (owner: "remove the background, transparent bg
-      // on the bet panel"). The full-width deck slab + black scrim are gated on
-      // this in betting-bar.drawDecor; per-control panels stay for contrast.
       bandAlpha: 0.0,
       fadeAboveBandPx: 24,
     },
@@ -770,14 +457,12 @@ export const VIEW_CONFIG = {
       hoverMs: 140,
       pressMs: 80,
       releaseMs: 180,
-      // Cubic-bezier control points (p1x, p1y, p2x, p2y) for a custom (t)=>number ease.
+
       ease: [0.16, 1.0, 0.3, 1.0] as readonly [number, number, number, number],
       enableHover: true,
     },
-    cursor: { useCustom: false }, // desktop-gated, off by default for accessibility
-    /** Task 7.2 — portrait-bar Buy control. Coords are bar-design (origin top-left,
-     *  y DOWN; Y() flips to Cocos y-up). Default places it just right of the spin
-     *  ring (spin centre = 200,322) so the Buy + Spin pair reads as the deck. */
+    cursor: { useCustom: false },
+
     buyControl: { x: 384, y: 322, size: 62 },
     capsule: { fill: '#140d1c', radius: 14, edgeWidth: 1.5 },
     footer: { y: -42, height: 28, dividerY: -28 },
@@ -787,7 +472,6 @@ export const VIEW_CONFIG = {
 
 export type BigWinTier = (typeof VIEW_CONFIG.ceremony.tiers)[number];
 
-/** Resolve the ceremony tier for a win/total-bet multiple, or null if below the lowest. */
 export function resolveBigWinTier(multiple: number): BigWinTier | null {
   for (const tier of VIEW_CONFIG.ceremony.tiers) {
     if (multiple >= tier.minMultiple) return tier;

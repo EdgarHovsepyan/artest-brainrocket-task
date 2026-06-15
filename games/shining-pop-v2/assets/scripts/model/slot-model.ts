@@ -1,7 +1,3 @@
-// MVC — MODEL. Owns game state + rules. Pure TypeScript: NO Cocos, NO rendering.
-// Wraps the engine-agnostic logic core and adds stateful balance / bet plus the
-// WILD STRIKE base feature and Buy-Feature free spins.
-
 import { BONUS_MODES, BonusMode, SETTINGS } from '../logic/game-config';
 import { BonusResult, runFreeSpins, runScatterFreeSpins } from '../logic/bonus-engine';
 import { createRng, Rng } from '../logic/rng';
@@ -10,15 +6,14 @@ import { SpinResult } from '../logic/types';
 
 export interface SpinOutcome {
   result: SpinResult;
-  /** WILD STRIKE multiplier applied this spin (1 = no strike). */
+
   wildStrike: number;
   betCents: number;
   winCents: number;
   balanceCents: number;
-  /** Scatter-triggered free-spins result (null = no scatter trigger this spin).
-   *  Its win is already folded into winCents; the View plays the steps back. */
+
   freeSpins: BonusResult | null;
-  /** Flat scatter pay credited this spin, in cents (0 = none). */
+
   scatterCents: number;
 }
 
@@ -64,7 +59,6 @@ export class SlotModel {
     this.betCents = Math.max(SETTINGS.activeLines, cents);
   }
 
-  /** Run one spin: deduct bet, evaluate, apply WILD STRIKE, credit win. */
   play(): SpinOutcome {
     if (!this.canSpin()) throw new Error('SlotModel.play(): insufficient balance');
     this.balanceCents -= this.betCents;
@@ -72,11 +66,10 @@ export class SlotModel {
     const wildStrike = wildStrikeMultiplier(result.grid);
     const lineBetCents = this.betCents / SETTINGS.activeLines;
     let winCents = Math.round(result.totalPayout * wildStrike * lineBetCents);
-    // SCATTER pay — flat, NOT multiplied by WILD STRIKE.
+
     const scatterCents = Math.round(result.scatterPay * lineBetCents);
     winCents += scatterCents;
-    // SCATTER-triggered free spins — reuse the buy-feature engine. The win is
-    // folded into winCents now; the View plays the steps back after the reveal.
+
     let freeSpins: BonusResult | null = null;
     if (result.freeSpins > 0) {
       freeSpins = runScatterFreeSpins(this.rng, result.freeSpins);
@@ -94,17 +87,14 @@ export class SlotModel {
     };
   }
 
-  /** A cosmetic grid for the idle board — does not touch balance or the live RNG. */
   idleGrid() {
     return engineSpin(createRng(7)).grid;
   }
 
-  /** Cost (in cents) to buy a feature at the current bet. */
   bonusCost(mode: BonusMode): number {
     return Math.round(this.betCents * BONUS_MODES[mode].cost);
   }
 
-  /** Buy a feature: deduct cost, run the free-spins sequence, credit total win. */
   buyBonus(mode: BonusMode): BonusOutcome {
     const costCents = this.bonusCost(mode);
     if (this.balanceCents < costCents) {

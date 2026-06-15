@@ -1,8 +1,3 @@
-// MVC — VIEW. Builds the whole board from code (background, reel frame, 5 reels,
-// HUD, control deck, win-line overlay, ceremony/particle/anticipation layers) and
-// exposes an imperative API the Controller drives. The View never reads model
-// state and never computes a payout — it only renders what it is told.
-
 import {
   _decorator,
   Button,
@@ -55,29 +50,24 @@ import { BuyBonusModal, BuyTier } from './buy-bonus-modal';
 
 const { ccclass } = _decorator;
 
-// ---- Palette: SHINING-POP crystal-violet — magenta on deep violet (was acid/black) ----
-// Names kept for minimal churn; values repointed to the shining-pop identity (palette.ts).
-const ACID = new Color(255, 0, 127, 255); // primary magenta accent (#ff007f)
-const INK = new Color(20, 10, 32, 255); // deep violet glass fill (#140a20)
-const PLATE = new Color(25, 17, 64, 255); // HUD panel violet (#191140)
-const PLATE_EDGE = new Color(184, 111, 218, 255); // orchid rim (#b86fda)
-const SHADOW = new Color(5, 2, 12, 170); // obsidian shadow
-const MUTED = new Color(201, 206, 216, 255); // white-smoke caption (kill purple text)
+const ACID = new Color(255, 0, 127, 255);
+const INK = new Color(20, 10, 32, 255);
+const PLATE = new Color(25, 17, 64, 255);
+const PLATE_EDGE = new Color(184, 111, 218, 255);
+const SHADOW = new Color(5, 2, 12, 170);
+const MUTED = new Color(201, 206, 216, 255);
 
-// Per-payline colour identity (WL6): 10 max-contrast candy hues so overlapping
-// lines stay readable instead of collapsing into one magenta jumble. All vivid
-// enough to clear ~3:1 on the deep-violet bg.
 const LINE_HUES = [
-  '#ff4fa3', // magenta
-  '#ffd23f', // gold
-  '#3fe0ff', // cyan
-  '#7cff5c', // lime
-  '#ff7a3f', // orange
-  '#b98cff', // violet
-  '#ff6b6b', // coral
-  '#5cffd0', // teal
-  '#ffa6e6', // pink
-  '#c6ff4f', // chartreuse
+  '#ff4fa3',
+  '#ffd23f',
+  '#3fe0ff',
+  '#7cff5c',
+  '#ff7a3f',
+  '#b98cff',
+  '#ff6b6b',
+  '#5cffd0',
+  '#ffa6e6',
+  '#c6ff4f',
 ].map((h) => new Color().fromHEX(h));
 
 const SYM_RES = [
@@ -93,9 +83,6 @@ const SYM_RES = [
   'sym_l5_10',
 ];
 
-// Non-finite guard: a bad value renders $0.00, never "NaN"/"∞" on the win ticker.
-// Currency-prefixed for the desktop in-canvas HUD (externalControls=false path);
-// the web bar formats its own readouts. USD display currency.
 const fmt = (cents: number) => formatMoney((Number.isFinite(cents) ? cents : 0) / 100, 'USD');
 
 interface DeckButton {
@@ -132,10 +119,7 @@ export class SlotView extends Component {
   private frames: SpriteFrame[] = [];
   private spinFrames: Record<string, SpriteFrame> = {};
   private brandFrames: Record<string, SpriteFrame> = {};
-  /** CC-1 shared shader-material kit. Loaded by `loadAssets()` from
-   *  `resources/effects/<name>`. Entries stay `null` on load failure — every
-   *  consumer must defend with a Graphics fallback (`getEffectMaterial` returns
-   *  null when either the material missed or `vfx.materialsEnabled === false`). */
+
   private effectMaterials: Record<string, Material | null> = {};
 
   private reels: ReelView[] = [];
@@ -146,79 +130,56 @@ export class SlotView extends Component {
   private winLabel: Label | null = null;
   private bannerLabel: Label | null = null;
   private winLineG: Graphics | null = null;
-  /** Overlay above the reels where winning symbols are reparented during a win so
-   *  their enlarged 3D pop renders uncropped (escapes the per-reel mask). */
+
   private winLift!: Node;
   private winSpark: Node | null = null;
-  // Task 4.1 — additive payline-glow segments tracing the same polyline as the
-  // Graphics stroke. The Graphics stroke stays as the always-on fallback; if
-  // the shader fails / is disabled, these segments just render plain quads tinted.
+
   private winLineGlow: Node | null = null;
   private winLineGlowSegs: Node[] = [];
-  // Task 6.3 — Svarka plasma core (4 stacked-alpha discs riding the line head,
-  // pulse-scaled by a schedule stepper) + optional svarka-additive Sprite on
-  // top. Replaces the single winSpark diamond. lastSparkPtIdx tracks the head's
-  // last-known polyline-cell index so head-crosses-cell can fire sparkCascade.
+
   private plasmaCore: Node | null = null;
   private plasmaDiscs: Node[] = [];
   private plasmaTime = 0;
   private lastSparkPtIdx = -1;
-  // Task 4.3 — flanking idle crystals docked outside the reel frame L/R.
+
   private flankCrystalL: Node | null = null;
   private flankCrystalR: Node | null = null;
-  // Task 4.2 — reel portal warp sprites (top + bottom of the reel block) + bonus
-  // grid-merge wipe. All three are additive sprites with optional CCEffect; the
-  // fallback is a scale/alpha pulse via Node tween.
+
   private reelPortalTop: Node | null = null;
   private reelPortalBottom: Node | null = null;
   private gridMergeNode: Node | null = null;
-  // Task 4.5 — Buy-Bonus ambient: Graphics glint sheen + optional plasma sprite.
+
   private buyPlasma: Node | null = null;
-  // Task 1.2 — stacked-alpha feather over reel window mask top/bottom.
+
   private windowFeatherTop: Node | null = null;
   private windowFeatherBottom: Node | null = null;
-  // VISUAL BUST — animated flame sprites (win-fire.effect) behind winning
-  // symbols. A pool sized to the grid; activated at winning cell centres on a
-  // win, deactivated on clear. Null material (vfx off / load fail) → the
-  // radial symbol glow is the fallback.
+
   private winFlames: Node[] = [];
   private winBeams: Node[] = [];
   private winCoreG: Graphics | null = null;
   private whiteFrame: SpriteFrame | null = null;
-  // CC-1 — shared u_time for all CCEffect materials advanced by a single schedule.
+
   private uTime = 0;
-  // Cache of the last bonus-atmosphere mode so a re-entry to the same mode
-  // doesn't re-fire the grid-merge wipe.
+
   private lastBonusMode: 'idle' | 'wilds' | 'crowns' | 'reels' = 'idle';
-  // True while a bonus/free-spin feature is running — moves the logo to the
-  // reels-left, vertically-centred spot (per fit()).
+
   private inBonus = false;
-  // Authored free-spins background Spine (Cupids-Crush). PRELOADED at boot now
-  // (see loadAssets) — the build() lazy load is a warm cache hit, so the first
-  // bonus enters with ZERO load hitch and a bad skeleton surfaces on the loader,
-  // not mid-feature.
+
   private fsBg: sp.Skeleton | null = null;
   private fsBgOp: UIOpacity | null = null;
   private fsBgLoading = false;
-  // Every authored Spine skeleton, warmed into the asset cache at boot so no
-  // feature/ceremony ever loads (and possibly fails) mid-round. Holding the
-  // refs here also pins them against auto-release.
+
   private preloadedSpines: Record<string, sp.SkeletonData> = {};
-  // Transient cinematic win bloom-flash — opacity 0 at REST (never covers the
-  // board), flares warm on the big-win detonation frame, then decays.
+
   private cineBloomOp: UIOpacity | null = null;
-  // DEPTH PARALLAX — the painted bg layers leak a small per-layer offset (deeper
-  // layers move less) driven by spin-lean + win-pulse, so the flat backdrop reads
-  // as a layered world that LEANS into the spin and breathes out on a win. Pure
-  // transform on existing nodes (no new draw). Frozen at base under reducedFx.
+
   private parallaxLayers: { node: Node; depth: number; baseX: number; baseY: number }[] = [];
-  private pxLean = 0; // lerped 0..1 spin lean
-  private pxLeanTarget = 0; // 0 at rest, 1 while spinning
-  private pxPulse = 0; // win breathe, decays to 0
-  // The buy-FAB's build-time scale (targetW/aw) — fit() multiplies it by a
-  // per-orientation factor so the badge stays a consistent on-screen size.
+  private pxLean = 0;
+  private pxLeanTarget = 0;
+  private pxPulse = 0;
+
   private buyFabBaseScale = 1;
-  // Sequential charged-reveal state (WL1/WL3) — driven by Component.schedule.
+
   private revealIdx = 0;
   private revealP = 0;
   private revealDur = 0.24;
@@ -244,9 +205,7 @@ export class SlotView extends Component {
   private infoPanel: Node | null = null;
   private infoTab: 'rules' | 'paytable' | 'info' = 'rules';
   private quickBetPanel: Node | null = null;
-  /** Set by the controller to hide the betting bar while ANY panel/modal is open
-   *  (the bar renders on a separate z and was poking THROUGH the panels on mobile —
-   *  owner: "panels overlap the bar, crushing the game"). */
+
   onOverlay: ((open: boolean) => void) | null = null;
   private betSelectCb: ((cents: number) => void) | null = null;
   private reducedFx = false;
@@ -265,20 +224,15 @@ export class SlotView extends Component {
   private gw = 0;
   private gh = 0;
   private pitch = 0;
-  // Title block — stored so fit() can shrink + reparent it to the upper-LEFT in
-  // landscape (it stays top-centre in portrait). logoArt holds the breathing
-  // sprite on an INNER child so fit()'s scale on logoNode never fights the
-  // idle breathe tween.
+
   private logoNode: Node | null = null;
   private titleCaption: Node | null = null;
 
   private winLines: { lineIndex: number; count: number }[] = [];
-  /** Live per-line win-amount pop labels (rise + fade); destroyed on clearWins. */
+
   private lineWinPops: Node[] = [];
   private winCycle = 0;
 
-  /** When `externalControls` is true the View skips its own HUD + control deck —
-   *  the shared BettingBar provides them (the Controller wires it). */
   private externalControls = false;
 
   async init(externalControls = false): Promise<void> {
@@ -309,8 +263,7 @@ export class SlotView extends Component {
         ),
       );
     });
-    // Brand assets ported from the master: the real logo (black-keyed) + the
-    // painted candy background. Missing files fall back to procedural art.
+
     [
       ['ui2/logo', 'logo'],
       ['bg/bg', 'bg'],
@@ -330,8 +283,7 @@ export class SlotView extends Component {
         ),
       );
     });
-    // CC-1: shared shader-material kit. Each .effect → a Material; failures
-    // stay `null` (never throws — consumers fall back to Graphics).
+
     [
       'payline-glow',
       'reel-portal',
@@ -363,13 +315,7 @@ export class SlotView extends Component {
         ),
       );
     });
-    // SPINE PRELOAD — warm every authored skeleton into the asset cache while the
-    // loader is still up, so the first bonus (free-spins world) and the first big
-    // win (ceremony callout) play with ZERO load hitch and a corrupt/missing
-    // skeleton fails HERE, never mid-feature. resources.load caches by path, so
-    // the later lazy loads (build()'s fs-bg; ceremony-view's win callout) become
-    // instant cache hits without those call sites changing. Failures are logged
-    // and tolerated — each consumer keeps its procedural/tween fallback.
+
     ['spine/cupid-fs-bg/cupid_freespins_background', 'spine/cupid-wf/cupid-wf'].forEach((path) => {
       jobs.push(
         new Promise<void>((res) =>
@@ -384,58 +330,44 @@ export class SlotView extends Component {
     return Promise.all(jobs).then(() => undefined);
   }
 
-  /** CC-1 accessor — returns the Material for `key`, or null if the master
-   *  switch `vfx.materialsEnabled` is off or the .effect failed to load.
-   *  Consumers MUST treat `null` as "use the Graphics fallback". */
   getEffectMaterial(key: string): Material | null {
     if (!VIEW_CONFIG.vfx.materialsEnabled) return null;
     return this.effectMaterials[key] ?? null;
   }
 
-  // ---- small node helpers ---------------------------------------------------
   private mkNode(name: string, w: number, h: number, parent: Node): Node {
     const n = new Node(name);
-    // Inherit the parent's render layer: nodes created AFTER the boot-time
-    // relayer pass (lazy panels, rebuilt panels) otherwise sit on DEFAULT,
-    // which the 2D UI renderer skips -> invisible UI.
+
     n.layer = parent.layer;
     n.addComponent(UITransform).setContentSize(w, h);
     parent.addChild(n);
     return n;
   }
 
-  /** Public refit hook — the controller owns cc.view's single resize callback. */
   refit(): void {
     this.fit();
   }
 
-  /** Brand art lookup for sibling surfaces (the bar wears the real spin button). */
   getBrandFrame(key: string): SpriteFrame | null {
     return this.brandFrames[key] ?? null;
   }
 
-  /** Per-mode bonus atmosphere wash (master parity: pink-shimmer / hot-magenta
-   *  / electric-violet). Tints the world without re-rendering it. */
   setBonusAtmosphere(mode: 'idle' | 'wilds' | 'crowns' | 'reels'): void {
-    // Task 4.2 — fire a grid-merge wipe on every IDLE → bonus transition.
     if (mode !== 'idle' && this.lastBonusMode === 'idle') this.playGridMergeWipe();
     this.lastBonusMode = mode;
-    // 2026-06-11 — bonus moves the logo to reels-left / vertical-centre. Refit
-    // so the logo repositions immediately on enter/exit.
+
     const wasBonus = this.inBonus;
     this.inBonus = mode !== 'idle';
     if (this.inBonus !== wasBonus) {
       this.fit();
-      // Authored free-spins world (Cupids-Crush Spine): intro on enter, idle
-      // loop during, outro on exit — turns the bonus into a distinct world
-      // instead of a recoloured base board. Lazy-loaded on first enter.
+
       this.updateFreeSpinScene(this.inBonus);
     }
     const tints: Record<typeof mode, [number, number, number, number]> = {
       idle: [0, 0, 0, 0],
-      wilds: [255, 90, 156, 26], // STICKY WILDS — hot pink world
-      crowns: [255, 200, 70, 44], // STICKY CROWNS — GOLD world (matches the crown; was magenta, clashed with WILDS)
-      reels: [186, 60, 218, 44], // WILD REELS — electric violet world
+      wilds: [255, 90, 156, 26],
+      crowns: [255, 200, 70, 44],
+      reels: [186, 60, 218, 44],
     };
     const [r, g, b, a] = tints[mode];
     if (!this.bonusWash) {
@@ -443,7 +375,7 @@ export class SlotView extends Component {
       this.bonusWash.addComponent(Graphics);
       this.bonusWashOp = this.bonusWash.addComponent(UIOpacity);
       this.bonusWashOp.opacity = 0;
-      this.bonusWash.setSiblingIndex(2); // above the painted bg, under the reels
+      this.bonusWash.setSiblingIndex(2);
     }
     const gg = this.bonusWash.getComponent(Graphics)!;
     gg.clear();
@@ -456,34 +388,24 @@ export class SlotView extends Component {
       .start();
   }
 
-  /** Free-spins authored scene: play intro→idle on enter, outro→hide on exit.
-   *  Falls back silently (procedural wash still runs) if the skeleton can't load. */
   private updateFreeSpinScene(entering: boolean): void {
     if (entering) {
       this.ensureFsBg(() => {
         const sk = this.fsBg;
         if (!sk || !sk.node.isValid) return;
-        // WHITE-GLITCH FIX — Cocos 3.8.8 sp.Skeleton paints its SETUP/BIND pose (a
-        // full-coverage white pma quad) on the first frame it's active if the pose
-        // isn't primed yet. So: force opacity 0, set the animation, PRIME frame-0
-        // with update(0), and only THEN make the node active (active=true LAST).
-        // No white sheet can render because the node is invisible + already posed.
+
         if (this.fsBgOp) {
           Tween.stopAllByTarget(this.fsBgOp);
           this.fsBgOp.opacity = 0;
         }
         sk.setAnimation(0, 'freespins-intro', false);
         sk.addAnimation(0, 'freespins-idle', true, 0);
-        sk.updateAnimation(0); // compute the real frame-0 pose before the node ever shows
-        // Z-ORDER FIX — the fs-world was buried at a low sibling index, BELOW the
-        // base-game bg decorations (bokeh/glow/vignette) which painted over it and
-        // washed it out. Raise it to just under the reel FRAME so the Cupids
-        // free-spins world dominates the backdrop (still below the reels), AND
-        // dim the base bg atmosphere so the two backgrounds don't clash.
+        sk.updateAnimation(0);
+
         const frame = this.node.getChildByName('frame');
         if (frame) sk.node.setSiblingIndex(Math.max(0, frame.getSiblingIndex() - 1));
         this.fadeBaseBgForBonus(true);
-        sk.node.active = true; // safe now: posed + invisible, then fade up
+        sk.node.active = true;
         if (this.fsBgOp) {
           tween(this.fsBgOp).to(0.5, { opacity: 255 }, { easing: 'sineOut' }).start();
         }
@@ -499,13 +421,10 @@ export class SlotView extends Component {
         })
         .start();
     } else if (!entering) {
-      this.fadeBaseBgForBonus(false); // no fs-bg loaded — still restore the base bg
+      this.fadeBaseBgForBonus(false);
     }
   }
 
-  /** Dim the base-game background atmosphere (bokeh / glow / vignette) while the
-   *  Cupids free-spins world is up, so the two backdrops don't clash; restore on
-   *  exit. Found by name (no extra wiring) and cached on first use. */
   private baseBgLayers: UIOpacity[] | null = null;
   private fadeBaseBgForBonus(dim: boolean): void {
     if (!this.baseBgLayers) {
@@ -544,15 +463,13 @@ export class SlotView extends Component {
       this.fsBgOp = n.addComponent(UIOpacity);
       this.fsBgOp.opacity = 0;
       n.active = false;
-      // above the painted bg + mode wash, below the reels.
+
       if (this.bonusWash) n.setSiblingIndex(this.bonusWash.getSiblingIndex() + 1);
       this.fsBg = sk;
       cb();
     });
   }
 
-  /** Free-spin HUD: spins remaining + running total. Approval point — the
-   *  player must always know where they are in the bonus. */
   setBonusHud(spinIdx: number | null, totalSpins: number, runningCents: number): void {
     if (spinIdx == null) {
       if (this.bonusHud) {
@@ -582,8 +499,7 @@ export class SlotView extends Component {
       tween(op).to(0.3, { opacity: 255 }, { easing: 'sineOut' }).start();
       this.bonusHud = hud;
     }
-    // Counter is integer-only — coerce defensively so it can NEVER show a
-    // decimal/non-finite ("3 / 8", never "3 / 8.0" or "NaN / NaN").
+
     const _i = (v: number) => (Number.isFinite(v) ? Math.trunc(v) : 0);
     if (this.bonusHudSpins) this.bonusHudSpins.string = `${_i(spinIdx) + 1} / ${_i(totalSpins)}`;
     if (this.bonusHudWin) {
@@ -597,24 +513,20 @@ export class SlotView extends Component {
     }
   }
 
-  /** Network/error modal: dismissible card centred over the dimmed game,
-   *  blocks input to background. Title + body + button label. Returns true if
-   *  newly shown (controller decides what to do on dismiss via callback). */
   showError(title: string, body: string, buttonLabel: string, onAction: () => void): void {
     this.closeOverlays();
     const root = this.node.parent ?? this.node;
     root.getChildByName('errorModal')?.destroy();
     const w = 460;
     const h = 220;
-    // 2026-06-11 BUG FIX — Canvas-root parent + centred above the bar (same as
-    // rcModal). Was a board child → inherited fit()'s scale/offset → clipped.
+
     const layer = this.mkNode('errorModal', 2600, 2200, root);
     layer.setSiblingIndex(root.children.length - 1);
     const scrim = layer.addComponent(Graphics);
     scrim.fillColor = new Color(0, 0, 0, 200);
     scrim.rect(-1300, -1100, 2600, 2200);
     scrim.fill();
-    // hit-blocking on the scrim
+
     layer.on(Node.EventType.TOUCH_END, () => undefined);
     const card = this.mkNode('errCard', w, h, layer);
     card.setPosition(0, this.bottomInset / 2, 0);
@@ -640,8 +552,6 @@ export class SlotView extends Component {
     root.getChildByName('errorModal')?.destroy();
   }
 
-  /** Reality Check (responsible-gaming): blocking session-summary card with
-   *  Time / Spins / Bet / Net and CONTINUE (resets the timer) + STOP. */
   showRealityCheck(
     stats: { minutes: number; spins: number; betText: string; netText: string },
     onContinue: () => void,
@@ -652,21 +562,16 @@ export class SlotView extends Component {
     root.getChildByName('rcModal')?.destroy();
     const w = 460;
     const h = 300;
-    // 2026-06-11 BUG FIX — parent to the CANVAS ROOT (not the board) so the
-    // modal does NOT inherit the board's fit() scale + offset (which pushed it
-    // down into the betting bar with the buttons clipped). The card is then
-    // centred in the area ABOVE the bar: Canvas-y = bottomInset/2 (the midpoint
-    // of the visible region between the screen top and the bar). Screen-pixel
-    // sized (scale 1), so it always fits.
+
     const layer = this.mkNode('rcModal', 2600, 2200, root);
-    layer.setSiblingIndex(root.children.length - 1); // above board + bar
+    layer.setSiblingIndex(root.children.length - 1);
     const scrim = layer.addComponent(Graphics);
     scrim.fillColor = new Color(10, 10, 14, 200);
     scrim.rect(-1300, -1100, 2600, 2200);
     scrim.fill();
     layer.on(Node.EventType.TOUCH_END, () => undefined);
     const card = this.mkNode('rcCard', w, h, layer);
-    card.setPosition(0, this.bottomInset / 2, 0); // centre in the area above the bar
+    card.setPosition(0, this.bottomInset / 2, 0);
     this.surfChrome(card, w, h, 50);
     this.mkLabel('REALITY CHECK', 0, h / 2 - 32, 22, ACID, card, true);
     this.mkLabel('You have been playing for a while.', 0, h / 2 - 64, 13, MUTED, card);
@@ -707,10 +612,6 @@ export class SlotView extends Component {
     ).setActive(true);
   }
 
-  /** Master drawSurfChrome port — ONE premium panel language for every popup:
-   *  violet glass gradient body, glossy top sheen, magenta bloom + hot border,
-   *  cyan dispersion hairline, optional title divider. Gradients approximated
-   *  with stacked stops (cc.Graphics has none). */
   private surfChrome(parent: Node, w: number, h: number, titleDivAt = 0): Graphics {
     const g = parent.addComponent(Graphics);
     g.fillColor = new Color(25, 16, 52, 248);
@@ -744,21 +645,17 @@ export class SlotView extends Component {
     return g;
   }
 
-  /** GLASS counter plate — a deliberately TRANSLUCENT surface for the free-spins
-   *  HUD so the live bonus world reads THROUGH it (the solid modal `surfChrome`
-   *  blocked the reels behind the counter). A faint frosted fill + a top sheen
-   *  highlight + the brand pink rim — a floating glass tag, not an opaque card. */
   private glassCounterChrome(parent: Node, w: number, h: number): Graphics {
     const g = parent.addComponent(Graphics);
-    // Frosted body — low alpha so the candy world shows behind it.
+
     g.fillColor = new Color(22, 13, 46, 120);
     g.roundRect(-w / 2, -h / 2, w, h, 16);
     g.fill();
-    // Upper sheen — a brighter glass band across the top third.
+
     g.fillColor = new Color(255, 255, 255, 16);
     g.roundRect(-w / 2 + 3, h / 2 - h * 0.42, w - 6, h * 0.36, 13);
     g.fill();
-    // Soft outer pink halo + crisp inner rim (matches the modal brand language).
+
     g.lineWidth = 6;
     g.strokeColor = new Color(255, 0, 127, 42);
     g.roundRect(-w / 2 - 1, -h / 2 - 1, w + 2, h + 2, 17);
@@ -774,8 +671,6 @@ export class SlotView extends Component {
     return g;
   }
 
-  /** Screen px reserved at the bottom for the web bar's solid band — the board
-   *  contain-fits into the remaining area and centres above it. */
   setBottomInset(px: number): void {
     this.bottomInset = px;
     this.fit();
@@ -842,7 +737,6 @@ export class SlotView extends Component {
     return this.mkLabel(value, x, y - 14, 28, valueCol);
   }
 
-  /** A drawn text button with press feedback + an active (acid) state. */
   private mkTextButton(
     text: string,
     x: number,
@@ -886,7 +780,6 @@ export class SlotView extends Component {
     };
   }
 
-  // ---- board ---------------------------------------------------------------
   private build(): void {
     const { cell, gap } = VIEW_CONFIG.layout;
     this.gw = GRID.reels * cell + (GRID.reels - 1) * gap;
@@ -896,27 +789,18 @@ export class SlotView extends Component {
     this.buildBackground();
     this.buildTitle();
     this.buildFrame();
-    // Cosmic-shimmer DISABLED 2026-06-15 (owner: "what are these diamond/star
-    // elements in the reels, looks CSS — remove"). The diamond-shaped twinkles read
-    // as basic geometry, not authored art. The reel window now reads clean: the glass
-    // portal well + the painted candy world bleeding through the transparency.
+
     this.buildReels();
-    // WIN-LIFT overlay — winning symbols reparent here during the celebration so
-    // they pop BIGGER + tilt in 3D ABOVE the per-reel mask, fully uncropped (owner:
-    // "show bigger only the symbols, not cropping under reels"). Created right after
-    // the reels so it sits just above them but below the cinematic/ceremony layers.
+
     this.winLift = this.mkNode('winLift', 10, 10, this.node);
-    // REEL TAP → reveal all paylines with the candy bloom for 1s, then reset (owner:
-    // "click the reels to show the win-combination lines, shader bloom, hide 1s").
-    // An invisible catcher over the reel window; only fires when no win is on screen.
+
     const tap = this.mkNode('paylineTap', this.gw, this.gh, this.node);
     tap.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     tap.on(Node.EventType.TOUCH_END, () => this.showAllPaylines());
-    this.buildCinematicBloom(); // transient win bloom-flash (opacity 0 at rest)
+    this.buildCinematicBloom();
 
     this.winLineG = this.mkNode('winLines', 10, 10, this.node).addComponent(Graphics);
-    // Hot leading-edge spark that rides along each line as it draws L->R (WL1).
-    // Sibling created AFTER winLines so it renders on top of the stroke.
+
     const spark = this.mkNode('winSpark', 26, 26, this.node);
     const sg = spark.addComponent(Graphics);
     sg.fillColor = new Color(255, 255, 255, 235);
@@ -936,31 +820,20 @@ export class SlotView extends Component {
     spark.active = false;
     this.winSpark = spark;
 
-    // Wave C — additive payline glow segments (4.1) + Svarka plasma core (6.3).
-    // Built BEFORE the particles layer so plasma sits underneath shard bursts.
     this.buildWinLineGlow();
     this.buildPlasmaCore();
-    // Wave C — reel portal warp + bonus grid-merge wipe (4.2). Hidden until fired.
+
     this.buildReelPortal();
     this.buildGridMerge();
-    // Wave C — flanking idle crystals (4.3). fit() owns their L/R positioning.
+
     this.buildFlankCrystals();
-    // VISUAL BUST — flame sprites behind winning symbols (built after reels so
-    // the siblingIndex lookup finds the reels node).
+
     this.buildWinFlames();
-    // CINEMA WAVE — win-line energy beams (win-beam.effect ribbons between
-    // winning cells) + the soft-burst under-glow injection: cells lazily swap
-    // their banded Graphics radial for the shader burst on first win.
+
     this.buildWinBeams();
     SymbolView.fxBurstMat = this.getEffectMaterial('soft-burst');
     SymbolView.fxWhiteFrame = this.getWhiteFrame();
-    // Dedicated win-HALO material: svarka-additive with USE_TEXTURE forced ON so
-    // the additive glow is alpha-clipped to each winning symbol's silhouette (a
-    // candy-shaped aura, never a square/disc). We mint a SEPARATE instance — the
-    // shared svarka-additive is used texture-less by the plasma core (a radial
-    // disc), so flipping the macro there would break it. cc_spriteTexture is a
-    // per-sprite binding, so one shared halo material still samples each symbol's
-    // own frame. Null when materials are off → ensureHalo() no-ops (shader carries).
+
     const haloBase = this.getEffectMaterial('svarka-additive');
     if (haloBase?.effectAsset) {
       const hm = new Material();
@@ -969,10 +842,10 @@ export class SlotView extends Component {
     } else {
       SymbolView.fxHaloMat = null;
     }
-    // CGI particles — every pooled shard upgrades to an additive light point.
+
     ParticlePool.glowMat = this.getEffectMaterial('particle-glow');
     ParticlePool.glowFrame = this.getWhiteFrame();
-    // Apply the tuned intensities (the effects otherwise run at their defaults).
+
     const fx = VIEW_CONFIG.win.symbolFx;
     this.getEffectMaterial('symbol-win')?.setProperty('u_intensity', fx.intensity);
     this.getEffectMaterial('symbol-win')?.setProperty('u_rimWidth', fx.rimWidth);
@@ -981,18 +854,16 @@ export class SlotView extends Component {
       'u_intensity',
       VIEW_CONFIG.win.burst.intensity,
     );
-    // Config-driven (intensity 1.55 = owner "more bloom"; flowSpeed = charged flow).
+
     const beam = VIEW_CONFIG.win.beams;
     this.getEffectMaterial('win-beam')?.setProperty('u_intensity', beam.intensity);
     this.getEffectMaterial('win-beam')?.setProperty('u_flowSpeed', beam.flowSpeed);
 
-    // VFX layers above the reels/win-lines
     this.anticipation = this.mkNode('anticipation', 10, 10, this.node).addComponent(
       AnticipationLayer,
     );
     this.particles = this.mkNode('particles', 10, 10, this.node).addComponent(ParticleLayer);
 
-    // CC-1 schedule stepper advances u_time on all CCEffect materials + plasma pulse.
     this.schedule(this.tickUTime, 0);
 
     if (!this.externalControls) {
@@ -1001,26 +872,19 @@ export class SlotView extends Component {
     }
     this.bannerLabel = this.mkLabel('', 0, 250, 36, ACID, this.node, true);
 
-    // ceremony on top of everything; shakes the whole view node
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);
     this.ceremony.build(this.node);
 
-    // Always-visible buy-feature FAB docked in the empty side margin (Pixi parity)
     this.buildBuyFab();
 
     this.fit();
   }
 
-  /** Floating Buy-Feature button ported from the Pixi flagship: a candy FAB that
-   *  lives in the empty left margin, vertically centred on the reels, with idle
-   *  breathe/float/glow life and a press squash. A child of this.node, so fit()
-   *  rescales/repositions it with the board automatically — no per-frame layout.
-   *  Visual-only; taps the SAME buy modal the menu hub uses. */
   private buildBuyFab(): void {
     const sf = this.brandFrames.buyArt ?? null;
     const fab = this.mkNode('buyFab', 96, 96, this.node);
     const fabAnim = this.mkNode('buyFabAnim', 96, 96, fab);
-    // Separate press node so the press squash never fights the breathe on fabAnim.
+
     const fabPress = this.mkNode('buyFabPress', 96, 96, fabAnim);
     let targetW = 100;
     if (sf) {
@@ -1028,8 +892,7 @@ export class SlotView extends Component {
       const aw = Math.max(1, os.width);
       const ah = Math.max(1, os.height);
       [fab, fabAnim, fabPress].forEach((n) => n.getComponent(UITransform)!.setContentSize(aw, ah));
-      // Glow = tinted, scaled, low-opacity duplicate (Cocos has no BlurFilter, so
-      // this approximates the Pixi additive blur).
+
       const glowN = this.mkNode('buyGlow', aw, ah, fabPress);
       const gsp = glowN.addComponent(Sprite);
       gsp.sizeMode = Sprite.SizeMode.CUSTOM;
@@ -1050,10 +913,9 @@ export class SlotView extends Component {
       const asp = artN.addComponent(Sprite);
       asp.sizeMode = Sprite.SizeMode.CUSTOM;
       asp.spriteFrame = sf;
-      this.buyFabBaseScale = targetW / aw; // fit() multiplies this per-orientation
+      this.buyFabBaseScale = targetW / aw;
       fab.setScale(this.buyFabBaseScale, this.buyFabBaseScale, 1);
     } else {
-      // Fallback candy pill if the art frame is missing.
       const g = fabPress.addComponent(Graphics);
       g.fillColor = new Color(179, 36, 126, 255);
       g.roundRect(-48, -48, 96, 96, 22);
@@ -1064,12 +926,9 @@ export class SlotView extends Component {
       g.stroke();
       this.mkLabel('BUY\nBONUS', 0, 0, 17, new Color(255, 255, 255, 255), fabPress, true);
     }
-    // Dock in the left margin (gap from the frame edge), centred on the reels.
+
     fab.setPosition(-(this.gw / 2 + 14 + targetW / 2), VIEW_CONFIG.layout.reelCenterY, 0);
-    // Idle life — breathe (fabAnim scale) + float (fabAnim position). BOTH on the
-    // INNER node so fit() stays the sole owner of the OUTER fab.position; putting
-    // the float on `fab` let it overwrite fit()'s dock every frame, pinning the
-    // FAB to its build-time left position (the landscape right-dock never took).
+
     if (!this.reducedFx) {
       tween(fabAnim)
         .to(1.5, { scale: new Vec3(1.05, 1.05, 1) }, { easing: 'sineInOut' })
@@ -1084,7 +943,7 @@ export class SlotView extends Component {
         .repeatForever()
         .start();
     }
-    // Press squash + tap → open the buy modal (same entry as the menu hub).
+
     let downAt = 0;
     fab.on(Node.EventType.TOUCH_START, () => {
       downAt = 1;
@@ -1108,26 +967,15 @@ export class SlotView extends Component {
     fab.on(Node.EventType.TOUCH_CANCEL, () => release(false));
     this.buyFab = fab;
 
-    // Task 4.5 — Buy-Bonus ambient FX (glint sweep + optional plasma).
     this.addBuyAmbient(fabPress, targetW);
   }
 
-  /** Task 4.5 — diagonal glint sheen swept across the FAB face on a loop +
-   *  optional buy-plasma.effect sprite UNDER the button art. The glint is the
-   *  always-on Graphics fallback; the plasma is the additive overlay gated by
-   *  vfx.materialsEnabled. reducedFx disables both. */
   private addBuyAmbient(fabPress: Node, fabW: number): void {
     if (this.reducedFx) return;
     const cfg = VIEW_CONFIG.buy.ambient;
 
-    // No diagonal glint sweep across the FAB (owner rejects diagonal shine). The
-    // buy-plasma additive material + the soft radial buyGlow pulse carry the FAB's
-    // "alive" cue — a glossy candy breathing in place, not a swept sheen bar.
-
-    // Plasma: a Sprite filling the fab face, clipped by the art layer. Material
-    // is the additive overlay; without it the sprite is a low-alpha tinted plate.
     const plasmaNode = this.mkNode('buyPlasma', fabW, fabW, fabPress);
-    plasmaNode.setSiblingIndex(0); // sits at the back
+    plasmaNode.setSiblingIndex(0);
     const psp = plasmaNode.addComponent(Sprite);
     psp.sizeMode = Sprite.SizeMode.CUSTOM;
     psp.color = new Color(255, 90, 156, Math.round(cfg.plasmaAlpha * 255));
@@ -1136,22 +984,13 @@ export class SlotView extends Component {
     this.buyPlasma = plasmaNode;
   }
 
-  /** Hide the FAB while the picker is open / future replay mode; show otherwise. */
   setBuyFabVisible(on: boolean): void {
     if (this.buyFab) this.buyFab.active = on;
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  Wave D helpers — dismissable-panel scrim + close-X (Tasks 3.1 + 3.2)
-  // ════════════════════════════════════════════════════════════════════════
-
-  /** Task 3.1 — full-bleed obsidian wash behind a dismissable panel. TOUCH_END
-   *  on the scrim invokes `onTap`, fading out the panel. Compliance modals
-   *  (errorModal, rcModal) pass an empty `onTap` so taps are SWALLOWED, not
-   *  dismissed — preserves the regulatory "force the user to read" gate. */
   private mkScrim(parent: Node, onTap: () => void): Node {
     const scrim = this.mkNode('scrim', 2600, 2200, parent);
-    scrim.setSiblingIndex(0); // behind the panel
+    scrim.setSiblingIndex(0);
     const g = scrim.addComponent(Graphics);
     const sc = new Color().fromHEX(PAL.scrim);
     g.fillColor = new Color(sc.r, sc.g, sc.b, Math.round(VIEW_CONFIG.modal.scrimAlpha * 255));
@@ -1161,9 +1000,6 @@ export class SlotView extends Component {
     return scrim;
   }
 
-  /** Task 3.2 — reusable crystal-faceted X in the panel's top-right corner.
-   *  Min 44px hit + press squash + cyan-hairline backing plate. Used by all
-   *  dismissable panels for an in-family iconography. */
   private mkCloseX(parent: Node, panelW: number, panelH: number, onClose: () => void): Node {
     const cfg = VIEW_CONFIG.modal.closeX;
     const x = panelW / 2 - cfg.inset;
@@ -1177,7 +1013,7 @@ export class SlotView extends Component {
     node.setPosition(x, y, 0);
     const g = node.addComponent(Graphics);
     const half = cfg.size / 2;
-    // Crystal backing plate — 3 stacked-alpha facets (NEVER hard black).
+
     g.fillColor = new Color(20, 12, 40, 200);
     g.roundRect(-half, -half, cfg.size, cfg.size, 12);
     g.fill();
@@ -1188,7 +1024,7 @@ export class SlotView extends Component {
     g.strokeColor = new Color().fromHEX(PAL.cyan);
     g.roundRect(-half, -half, cfg.size, cfg.size, 12);
     g.stroke();
-    // X strokes — bold magenta/white double for the 2-color rim system.
+
     g.lineWidth = cfg.strokeWidth + 2;
     g.strokeColor = new Color(0, 0, 0, 180);
     const x0 = half * 0.45;
@@ -1204,7 +1040,7 @@ export class SlotView extends Component {
     g.moveTo(x0, x0);
     g.lineTo(-x0, -x0);
     g.stroke();
-    // Press squash + tap → close.
+
     node.on(Node.EventType.TOUCH_START, () => {
       Tween.stopAllByTarget(node);
       tween(node)
@@ -1226,8 +1062,6 @@ export class SlotView extends Component {
     return node;
   }
 
-  /** Convenience: add BOTH the scrim and the close-X to a panel in one call.
-   *  panelW/panelH are the panel's content size; onClose is the dismiss callback. */
   private addPanelDismiss(panel: Node, panelW: number, panelH: number, onClose: () => void): void {
     this.mkScrim(panel, () => {
       if (VIEW_CONFIG.modal.dismissOnScrim) onClose();
@@ -1235,13 +1069,6 @@ export class SlotView extends Component {
     this.mkCloseX(panel, panelW, panelH, onClose);
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  //  Wave C helpers — payline glow / Svarka / portal / merge / flank crystals
-  // ════════════════════════════════════════════════════════════════════════
-
-  /** Task 4.1 — additive sprite segments that trace each currently-drawn
-   *  payline. Pre-allocates 5 segments (max line is 5 cells = 4 segments; +1
-   *  spare). Each segment is a unit-white Sprite re-sized + rotated per draw. */
   private buildWinLineGlow(): void {
     const parent = this.mkNode('winLineGlow', 10, 10, this.node);
     this.winLineGlow = parent;
@@ -1259,9 +1086,6 @@ export class SlotView extends Component {
     }
   }
 
-  /** Task 6.3 — Svarka plasma core: 3-4 stacked-alpha discs riding the win-line
-   *  head + optional svarka-additive Sprite for an additive bright core. The
-   *  schedule stepper pulse-scales the discs. */
   private buildPlasmaCore(): void {
     const cfg = VIEW_CONFIG.win.svarka;
     const root = this.mkNode('plasmaCore', 40, 40, this.node);
@@ -1270,7 +1094,7 @@ export class SlotView extends Component {
     for (let i = 0; i < cfg.coreDiscs; i++) {
       const disc = this.mkNode(`disc${i}`, 40, 40, root);
       const g = disc.addComponent(Graphics);
-      // Stacked-alpha cyan core: outer dim, inner hot — fakes additive radiance.
+
       const r = 18 - i * 4;
       const alpha = 60 + i * 50;
       g.fillColor = new Color(127, 231, 255, alpha);
@@ -1282,7 +1106,7 @@ export class SlotView extends Component {
       g.fill();
       this.plasmaDiscs.push(disc);
     }
-    // Optional additive svarka material on TOP of the discs.
+
     if (cfg.additiveMaterial) {
       const mat = this.getEffectMaterial('svarka-additive');
       if (mat) {
@@ -1295,42 +1119,30 @@ export class SlotView extends Component {
     }
   }
 
-  /** VISUAL BUST — a tiny solid-white SpriteFrame so the flame sprites have a
-   *  full-rect texture for the win-fire shader to multiply against (the shader
-   *  supplies its own flame shape via vfall/hfall; the white frame just gives
-   *  it a surface). Created once, reused by every flame sprite. */
   private getWhiteFrame(): SpriteFrame {
     if (this.whiteFrame) return this.whiteFrame;
     const w = 8;
     const data = new Uint8Array(w * w * 4).fill(255);
-    // Cocos 3.8.8: reset() configures the GPU texture, uploadData() pushes the
-    // raw RGBA bytes. (The ImageAsset({_data}) ctor path crashes the dynamic
-    // atlas packer with a texSubImage2D overload error.)
+
     const tex = new Texture2D();
     tex.reset({ width: w, height: w, format: Texture2D.PixelFormat.RGBA8888 });
     tex.uploadData(data);
     const sf = new SpriteFrame();
     sf.texture = tex;
-    sf.packable = false; // keep it OUT of the dynamic atlas (procedural texture)
+    sf.packable = false;
     this.whiteFrame = sf;
     return sf;
   }
 
-  /** VISUAL BUST — pool of animated flame sprites (win-fire.effect) placed
-   *  behind winning symbols. Sized to the full grid (reels×rows). Each is a
-   *  white-masked additive sprite with the flame material; hidden until a win
-   *  positions + activates it. Null material → stays hidden (radial glow is the
-   *  fallback). The flame node sits at siblingIndex below the symbol so the
-   *  symbol reads on top of its own fire. */
   private buildWinFlames(): void {
     if (!VIEW_CONFIG.vfx.materialsEnabled) return;
-    if (!VIEW_CONFIG.win.fireFlames.enabled) return; // per-symbol fire is in symbol-win now
+    if (!VIEW_CONFIG.win.fireFlames.enabled) return;
     const mat = this.getEffectMaterial('win-fire');
-    if (!mat) return; // no material → flames disabled, radial glow carries it
+    if (!mat) return;
     const { cell } = VIEW_CONFIG.layout;
     const count = GRID.reels * GRID.rows;
     const root = this.mkNode('winFlames', 10, 10, this.node);
-    // Render below the reels so symbols sit on top of the flame.
+
     const reelsNode = this.node.getChildByName('reels');
     if (reelsNode) root.setSiblingIndex(Math.max(0, reelsNode.getSiblingIndex()));
     for (let i = 0; i < count; i++) {
@@ -1345,13 +1157,12 @@ export class SlotView extends Component {
     }
   }
 
-  /** Activate flame sprites behind each winning cell centre. */
   private showWinFlames(centers: Vec3[]): void {
     if (this.reducedFx || !this.winFlames.length) return;
     centers.forEach((c, i) => {
       const n = this.winFlames[i];
       if (!n) return;
-      // Flame rises FROM the bottom of the symbol → offset down a touch.
+
       n.setPosition(c.x, c.y - VIEW_CONFIG.layout.cell * 0.18, 0);
       n.active = true;
       n.setScale(0.6, 0.5, 1);
@@ -1366,7 +1177,6 @@ export class SlotView extends Component {
     });
   }
 
-  /** Hide all flame sprites (on clear). */
   private hideWinFlames(): void {
     this.winFlames.forEach((n) => {
       if (!n) return;
@@ -1377,10 +1187,6 @@ export class SlotView extends Component {
     });
   }
 
-  /** CINEMA WAVE — pooled win-line energy-beam segments (win-beam.effect). Each
-   *  is a white-frame additive sprite stretched + rotated between two winning
-   *  cell centres. Null material → pool stays empty (embers + symbol fire carry
-   *  the win read; no Graphics line fallback — drawn strokes were rejected). */
   private buildWinBeams(): void {
     if (!VIEW_CONFIG.win.beams.enabled) return;
     const cfg = VIEW_CONFIG.win.beams;
@@ -1399,25 +1205,16 @@ export class SlotView extends Component {
         this.winBeams.push(n);
       }
     }
-    // Crisp CORE LINE above the plasma bloom: a 3px gold stroke + 1.2px white
-    // hairline tracing the full payline — the elegant "the line itself" read
-    // (and the always-on fallback when materials are off).
+
     const core = this.mkNode('winCore', 10, 10, root);
     this.winCoreG = core.addComponent(Graphics);
   }
 
-  /** Lay the pooled beams along each winning line's cell-centre polyline. The
-   *  segments overlap their feathered ends so the line reads as ONE continuous
-   *  flowing energy ribbon, not jointed sticks. */
   private showWinBeams(lineWins: { lineIndex: number; count: number }[]): void {
     if (this.reducedFx) return;
     const cfg = VIEW_CONFIG.win.beams;
     const staggerS = (cfg.revealStaggerMs ?? 0) / 1000;
-    // 2026-06-15: the per-line-HUE winCoreG core is NEUTERED — the readable core is
-    // now the red+whitesmoke candy-cane drawn by paintCandyLines (drawCandyWinLines),
-    // so the win line stays ONE cohesive candy identity. The win-beam ribbon below
-    // is the glossy PEPPERMINT MATERIAL halo around that candy-cane. Drawing the hue
-    // core here too would triple the line (candy-cane + hue core + ribbon) = a jumble.
+
     if (this.winCoreG) this.winCoreG.clear();
     if (!this.winBeams.length) return;
     let b = 0;
@@ -1430,9 +1227,9 @@ export class SlotView extends Component {
         const dy = p1.y - p0.y;
         const len = Math.hypot(dx, dy);
         if (len < 1) continue;
-        const idx = b; // capture this segment's draw order for the stagger
+        const idx = b;
         const n = this.winBeams[b++];
-        // Overscan 22% so feathered ends overlap into a continuous ribbon.
+
         n.getComponent(UITransform)!.setContentSize(len * 1.22, cfg.heightPx);
         n.setPosition((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, 0);
         n.angle = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -1441,9 +1238,7 @@ export class SlotView extends Component {
         Tween.stopAllByTarget(op);
         Tween.stopAllByTarget(n);
         op.opacity = 0;
-        // PROGRESSIVE TRACE — segment idx lights `idx*staggerS` after the first,
-        // so the ribbon sweeps along the line head-to-tail (a tiny scale-pop on
-        // arrival sells the "drawing" energy without any rejected drawn geometry).
+
         n.setScale(1, 0.7, 1);
         tween(op)
           .delay(idx * staggerS)
@@ -1468,17 +1263,14 @@ export class SlotView extends Component {
     });
   }
 
-  /** Task 4.3 — two faceted-crystal Graphics nodes docked just outside the
-   *  reel frame L/R at reelCenterY. Idle breathe + glow pulse via Node tween;
-   *  position handled in fit() (orientation-gated). */
   private buildFlankCrystals(): void {
     const cfg = VIEW_CONFIG.decor.flankCrystal;
-    if (!cfg.enabled) return; // 2026-06-11 — basic flat diamonds disabled
+    if (!cfg.enabled) return;
     const make = (name: string): Node => {
       const n = this.mkNode(name, cfg.sizePx, cfg.sizePx * 1.6, this.node);
       const g = n.addComponent(Graphics);
       const r = cfg.sizePx / 2;
-      // Faceted magenta crystal: 3 stacked diamonds (dark → mid → bright facets)
+
       g.fillColor = new Color(154, 59, 214, 130);
       g.moveTo(0, r * 1.5);
       g.lineTo(r, 0);
@@ -1500,8 +1292,8 @@ export class SlotView extends Component {
       g.lineTo(-r * 0.18, 0);
       g.close();
       g.fill();
-      n.active = false; // fit() turns them on when landscape
-      // Optional shimmer material on top.
+      n.active = false;
+
       const mat = this.getEffectMaterial('crystal-idle');
       if (mat) {
         const overlay = this.mkNode('shimmer', cfg.sizePx, cfg.sizePx * 1.6, n);
@@ -1511,7 +1303,6 @@ export class SlotView extends Component {
         sp.color = new Color(255, 200, 240, 80);
       }
       if (!this.reducedFx) {
-        // Idle breathe
         tween(n)
           .to(1.4, { scale: new Vec3(1.06, 1.06, 1) }, { easing: 'sineInOut' })
           .to(1.4, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
@@ -1525,11 +1316,9 @@ export class SlotView extends Component {
     this.flankCrystalR = make('flankCrystalR');
   }
 
-  /** Task 4.2 — additive sprites docked at the reel block top/bottom. Hidden
-   *  by default; fire entry/exit pulses on spin launch/settle. */
   private buildReelPortal(): void {
     const cfg = VIEW_CONFIG.spin.portal;
-    if (!cfg.enabled) return; // 2026-06-11 — "arrow lines" disabled; skip build
+    if (!cfg.enabled) return;
     const portalMat = this.getEffectMaterial('reel-portal');
     const fringe = new Color().fromHEX(cfg.fringeColor);
     const make = (name: string): Node => {
@@ -1547,8 +1336,6 @@ export class SlotView extends Component {
     this.reelPortalBottom = make('reelPortalBottom');
   }
 
-  /** Task 4.2 — bonus-entry grid merge wipe. A full-bleed sprite swept across
-   *  the reel block with grid-merge.effect; fallback = scale/alpha pulse. */
   private buildGridMerge(): void {
     const cfg = VIEW_CONFIG.bonus.mergeWipe;
     const mergeMat = this.getEffectMaterial('grid-merge');
@@ -1564,11 +1351,10 @@ export class SlotView extends Component {
     this.gridMergeNode = n;
   }
 
-  /** Fire the reel-portal entry pulse (on spin launch). */
   private playReelPortalEntry(): void {
     if (this.reducedFx) return;
     const cfg = VIEW_CONFIG.spin.portal;
-    if (!cfg.enabled) return; // 2026-06-11 — "arrow lines" disabled
+    if (!cfg.enabled) return;
     [this.reelPortalTop, this.reelPortalBottom].forEach((n) => {
       if (!n) return;
       n.active = true;
@@ -1584,11 +1370,10 @@ export class SlotView extends Component {
     });
   }
 
-  /** Fire the reel-portal exit pulse (on settle). */
   private playReelPortalExit(): void {
     if (this.reducedFx) return;
     const cfg = VIEW_CONFIG.spin.portal;
-    if (!cfg.enabled) return; // 2026-06-11 — "arrow lines" disabled
+    if (!cfg.enabled) return;
     [this.reelPortalTop, this.reelPortalBottom].forEach((n) => {
       if (!n) return;
       n.active = true;
@@ -1604,7 +1389,6 @@ export class SlotView extends Component {
     });
   }
 
-  /** Fire the grid-merge wipe on bonus entry. */
   private playGridMergeWipe(): void {
     if (this.reducedFx) return;
     const cfg = VIEW_CONFIG.bonus.mergeWipe;
@@ -1627,10 +1411,6 @@ export class SlotView extends Component {
       .start();
   }
 
-  /** Schedule stepper: advance the shared u_time uniform on all CCEffect
-   *  materials so per-frame shader animation ticks reliably (a plain-object
-   *  tween wouldn't tick in the 3.8.8 web runtime). Also pulse-scales the
-   *  plasma core discs while visible (Task 6.3 corePulse). */
   private tickUTime = (dt: number): void => {
     this.uTime += dt;
     if (VIEW_CONFIG.vfx.materialsEnabled) {
@@ -1648,14 +1428,11 @@ export class SlotView extends Component {
         if (m && typeof m.setProperty === 'function') {
           try {
             m.setProperty('u_time', this.uTime);
-          } catch {
-            /* swallow */
-          }
+          } catch {}
         }
       }
     }
-    // Task 6.3 plasma core pulse — when visible, scale each disc with a sine
-    // pulse, slightly out of phase per disc so the core "breathes".
+
     if (this.plasmaCore && this.plasmaCore.active) {
       const cfg = VIEW_CONFIG.win.svarka;
       this.plasmaTime += dt;
@@ -1670,8 +1447,7 @@ export class SlotView extends Component {
         this.plasmaDiscs[i].setScale(s, s, 1);
       }
     }
-    // DEPTH PARALLAX — lerp the spin-lean toward its target, decay the win pulse,
-    // and push each painted layer by its depth weight. reducedFx freezes at base.
+
     if (this.parallaxLayers.length) {
       const p = VIEW_CONFIG.world.parallax;
       if (this.reducedFx) {
@@ -1689,23 +1465,15 @@ export class SlotView extends Component {
   };
 
   private buildBackground(): void {
-    // Task 1.1 — oversize base + painted bg by bgCoverOverscan so the bleed
-    // area always exceeds 16:9 / 21:9 / 9:16 / 9:21. Without this the engine
-    // cover (#0a0610) shows as a letterbox band on ultrawide and tall viewports.
     const overscan = VIEW_CONFIG.layout.bgCoverOverscan;
     const baseW = Math.round(2600 * overscan);
     const baseH = Math.round(2200 * overscan);
     const base = this.mkNode('bg', baseW, baseH, this.node);
     const bg = base.addComponent(Graphics);
-    bg.fillColor = new Color(10, 6, 16, 255); // deep violet base (#0a0610)
+    bg.fillColor = new Color(10, 6, 16, 255);
     bg.rect(-baseW / 2, -baseH / 2, baseW, baseH);
     bg.fill();
     if (this.brandFrames.bg) {
-      // The master's painted candy world, cover-fit over the whole bleed area
-      // (2752x1536 source). Procedural depth bands are skipped — the painting
-      // carries its own light; bokeh + vignette still layer on top. Overscan
-      // (Task 1.1) also lifted into the photo so its painted edges bleed off
-      // the viewport on ultrawide/tall rather than docking inside the cover.
       const ratio = 2752 / 1536;
       const w = Math.max(baseW, baseH * ratio);
       const photo = this.mkNode('bg_art', w, w / ratio, this.node);
@@ -1716,21 +1484,17 @@ export class SlotView extends Component {
       const op = photo.addComponent(UIOpacity);
       op.opacity = 235;
     } else {
-      // Vertical depth wash — three stacked translucent bands approximate the
-      // master's painted gradient (lighter horizon behind the reels, dark floor).
-      bg.fillColor = new Color(40, 22, 78, 70); // indigo horizon
+      bg.fillColor = new Color(40, 22, 78, 70);
       bg.rect(-1300, -120, 2600, 620);
       bg.fill();
-      bg.fillColor = new Color(25, 17, 64, 90); // mid violet
+      bg.fillColor = new Color(25, 17, 64, 90);
       bg.rect(-1300, -560, 2600, 440);
       bg.fill();
-      bg.fillColor = new Color(4, 2, 8, 130); // floor shadow
+      bg.fillColor = new Color(4, 2, 8, 130);
       bg.rect(-1300, -1100, 2600, 460);
       bg.fill();
     }
 
-    // Bokeh field — deterministic scatter of soft candy diamonds (no circles).
-    // Seeded RNG so every boot composes identically.
     const dots = this.mkNode('bg_bokeh', 10, 10, this.node);
     const dg = dots.addComponent(Graphics);
     const rng = createRng(20260610).next;
@@ -1740,8 +1504,8 @@ export class SlotView extends Component {
       const r = 4 + rng() * 14;
       const warm = rng() > 0.55;
       dg.fillColor = warm
-        ? new Color(255, 90, 156, Math.round(10 + rng() * 22)) // pink candy
-        : new Color(120, 200, 255, Math.round(8 + rng() * 16)); // cool sparkle
+        ? new Color(255, 90, 156, Math.round(10 + rng() * 22))
+        : new Color(120, 200, 255, Math.round(8 + rng() * 16));
       dg.moveTo(x, y - r);
       dg.lineTo(x + r, y);
       dg.lineTo(x, y + r);
@@ -1759,13 +1523,13 @@ export class SlotView extends Component {
     const glow = this.mkNode('bg_glow', 10, 10, this.node);
     glow.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     const gg = glow.addComponent(Graphics);
-    // Ambient depth: faint stacked ACID diamonds (NOT rings — VFX-ban compliant).
+
     const DIAMONDS = 6;
     for (let i = DIAMONDS; i > 0; i--) {
       const t = i / DIAMONDS;
       const w = 620 * t;
       const h = 470 * t;
-      gg.fillColor = new Color(255, 90, 156, Math.round(2 + (1 - t) * 7)); // soft pink bloom (#ff5a9c)
+      gg.fillColor = new Color(255, 90, 156, Math.round(2 + (1 - t) * 7));
       gg.moveTo(0, -h);
       gg.lineTo(w, 0);
       gg.lineTo(0, h);
@@ -1780,7 +1544,6 @@ export class SlotView extends Component {
       .repeatForever()
       .start();
 
-    // Directional corner vignette — pulls the eye to the board (master ART-04).
     const vig = this.mkNode('bg_vignette', 10, 10, this.node);
     const vg = vig.addComponent(Graphics);
     vg.fillColor = new Color(0, 0, 0, 110);
@@ -1797,10 +1560,6 @@ export class SlotView extends Component {
       vg.fill();
     });
 
-    // DEPTH PARALLAX — register the painted layers with a depth weight (the deep
-    // painting moves MOST as the world "leans", sparkles/glow follow at a fraction;
-    // the vignette never moves). tickUTime offsets each by depth × (spin-lean +
-    // win-pulse). Base = the node's build position so a resize never drifts it.
     (
       [
         ['bg_art', 1.0],
@@ -1815,21 +1574,16 @@ export class SlotView extends Component {
   }
 
   private buildTitle(): void {
-    // OUTER node = the transform fit() moves/scales per orientation. The art +
-    // breathe live on an INNER child so the responsive scale never fights the
-    // idle breathe tween.
     const logo = this.mkNode('logo', 300, 150, this.node);
     logo.setPosition(0, 312, 0);
     this.logoNode = logo;
     const art = this.mkNode('logoArt', 300, 150, logo);
     if (this.brandFrames.logo) {
-      // The REAL game logo (master art, black-keyed offline).
       const sp = art.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.spriteFrame = this.brandFrames.logo;
       art.getComponent(UITransform)!.setContentSize(232, 145);
     } else {
-      // Fallback: brand-family text block.
       const back = art.addComponent(Graphics);
       back.fillColor = new Color(255, 0, 127, 26);
       back.roundRect(-185, -40, 370, 84, 18);
@@ -1866,31 +1620,20 @@ export class SlotView extends Component {
 
   private buildFrame(): void {
     const { reelCenterY } = VIEW_CONFIG.layout;
-    // 2026-06-15 (owner: "gap in the border and reels — clean") — frame pad
-    // tightened 24→14 (7px each side) so the bright rim HUGS the reels instead of
-    // sitting in a 12px dead band. The inset stack below is shrunk to match.
+
     const w = this.gw + 14;
     const h = this.gh + 14;
     const frame = this.mkNode('frame', w, h, this.node);
     frame.setPosition(0, reelCenterY, 0);
-    // 2026-06-13 PORTAL REDESIGN — the old frame was a flat dark rounded-rect with
-    // 5+ concentric stroke layers (3 pink halos + smoke-white rim + pink inner rim),
-    // which read as a busy "CSS container" and crushed at the corners. Reworked to
-    // a PORTAL: a pulsing energy halo around the window (separate node, behind the
-    // glass so only the outer ring shows), a deep well with centre-darkening for
-    // real depth, and ONE clean bright rim. No more concentric-stroke crush.
 
-    // (a) PORTAL ENERGY HALO — feathered ring hugging the window, drawn on its own
-    // node BEHIND the frame so the glass covers the inner part and only the outer
-    // glow shows. It breathes (opacity tween) so the board feels alive, not static.
     const halo = this.mkNode('portalGlow', w + 120, h + 120, this.node);
     halo.setPosition(0, reelCenterY, 0);
     const hg = halo.addComponent(Graphics);
     for (let i = 9; i >= 0; i--) {
-      const t = i / 9; // 0 = tight/hot at the rim, 1 = wide/faint outer
+      const t = i / 9;
       const sp = i * 6;
       hg.lineWidth = 9 - t * 6;
-      // candy-pink core → magenta outer, quadratic feather to nothing
+
       hg.strokeColor = new Color(
         255,
         Math.round(60 + (1 - t) * 110),
@@ -1910,22 +1653,17 @@ export class SlotView extends Component {
       .start();
 
     const g = frame.addComponent(Graphics);
-    // (b) Drop shadow grounds the portal on the bg.
+
     g.fillColor = new Color(0, 0, 0, 160);
     g.roundRect(-w / 2 - 6, -h / 2 - 12, w + 12, h + 8, 18);
     g.fill();
-    // (c) PORTAL WELL — deep glass + stacked centre-darkening insets give the
-    // window genuine DEPTH (a portal into another space), not a flat panel.
-    // TRANSPARENCY (owner: "reels need a transparency effect") — the well is now
-    // a semi-transparent glass (alpha 158, was 214) so the cosmic shimmer + the
-    // painted candy world read THROUGH the window like a real portal, not a solid
-    // dark panel. Symbols stay fully opaque, so readability is untouched.
+
     g.fillColor = new Color(14, 7, 26, 158);
     g.roundRect(-w / 2, -h / 2, w, h, 14);
     g.fill();
     for (let i = 1; i <= 3; i++) {
-      const inset = i * 5; // shrunk (was i*9, i<=5) so the thinner frame's
-      g.fillColor = new Color(7, 3, 16, 14); // centre-darkening can't dim edge cells
+      const inset = i * 5;
+      g.fillColor = new Color(7, 3, 16, 14);
       g.roundRect(
         -w / 2 + inset,
         -h / 2 + inset,
@@ -1935,12 +1673,12 @@ export class SlotView extends Component {
       );
       g.fill();
     }
-    // (d) ONE clean bright energy rim (replaces the crushed multi-stroke stack).
+
     g.lineWidth = 3;
     g.strokeColor = new Color(255, 150, 205, 205);
     g.roundRect(-w / 2, -h / 2, w, h, 14);
     g.stroke();
-    // (e) thin top gloss sheen — one band, no bevel stack.
+
     g.fillColor = new Color(245, 247, 250, 20);
     g.roundRect(-w / 2 + 8, h / 2 - 16, w - 16, 9, 6);
     g.fill();
@@ -1948,13 +1686,7 @@ export class SlotView extends Component {
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
     const sg = sep.addComponent(Graphics);
-    // 2026-06-15 (owner: "boxes pixel designed? remove it, focus on the reel
-    // borders") — DROPPED the per-column cream rim STROKE + gloss sheen that drew
-    // a rounded box around each of the 5 columns (read as a pixel/grid design).
-    // The reels now flow as 5 CONTINUOUS columns over the portal well + cosmic
-    // shimmer, framed by the ONE clean bright frame rim — no column boxes, no grid.
-    // Only a whisper-faint glass fill remains so each column still catches a touch
-    // of light (edge-to-edge, no inset gap so symbols reach the frame cleanly).
+
     const { cell, gap } = VIEW_CONFIG.layout;
     for (let r = 0; r < GRID.reels; r++) {
       const x = -this.gw / 2 + r * this.pitch;
@@ -1966,12 +1698,6 @@ export class SlotView extends Component {
     void gap;
   }
 
-  /** SUBTLE COSMIC SHIMMER (owner: reels → "galaxy portal", direction = *subtle
-   *  cosmic shimmer*, lowest-risk touch to the candy theme). A whisper of deep
-   *  space INSIDE the reel window, behind the symbols: a faint drifting nebula
-   *  wash + three phase-offset star layers that twinkle. No per-frame repaint —
-   *  the twinkle is breathing UIOpacity tweens at desynced periods (SY1), so the
-   *  cost is ~free and it never fights the candy art. reducedFx → static, dim. */
   private buildCosmicShimmer(): void {
     const { reelCenterY } = VIEW_CONFIG.layout;
     const root = this.mkNode('cosmicShimmer', this.gw, this.gh, this.node);
@@ -1989,8 +1715,6 @@ export class SlotView extends Component {
       g.fill();
     };
 
-    // (a) NEBULA WASH — 3 large soft candy-cool diamond blobs, very low alpha, a
-    // single slow lateral drift. Reads as cosmic depth, never as a second bg.
     const neb = this.mkNode('cosmicNebula', this.gw, this.gh, root);
     const ng = neb.addComponent(Graphics);
     (
@@ -2017,11 +1741,7 @@ export class SlotView extends Component {
         .start();
     }
 
-    // (b) STAR LAYERS — 3 desynced twinkle layers so some stars glow while others
-    // dim, with no per-frame work. Each is a cluster of tiny star-diamonds in
-    // cool white with the occasional candy-pink, breathing on its own clock.
     const layerCfg: [number, number, number, number][] = [
-      // [starCount, dimAlpha, brightAlpha, periodS]
       [10, 26, 150, 2.3],
       [9, 20, 120, 3.1],
       [8, 30, 170, 1.7],
@@ -2034,11 +1754,9 @@ export class SlotView extends Component {
         const y = (rng() - 0.5) * 2 * halfH;
         const r = 2.2 + rng() * 2.6;
         const pink = rng() > 0.78;
-        const c = pink
-          ? new Color(255, 158, 208, 255) // candy-pink sparkle
-          : new Color(232, 240, 255, 255); // cool starlight
+        const c = pink ? new Color(255, 158, 208, 255) : new Color(232, 240, 255, 255);
         star(sg, x, y, r, c);
-        // tiny cross-glint on the brightest stars
+
         if (r > 4) star(sg, x, y, r * 1.9, new Color(c.r, c.g, c.b, 36));
       }
       const op = layer.addComponent(UIOpacity);
@@ -2068,37 +1786,28 @@ export class SlotView extends Component {
       rv.build(this.frames);
       this.reels[r] = rv;
     }
-    // Task 1.2 — stacked-alpha edge feather over the top + bottom of the
-    // GRAPHICS_RECT reel mask so symbols dissolve into the bezel instead of
-    // snapping at the hard mask edge. Built once; spans gw, mirrored top/bottom.
+
     this.buildWindowFeather();
   }
 
-  /** Task 1.2 — 5 stacked translucent dark rects fading inward over
-   *  windowFeatherPx, drawn above the reel strips so the cells dissolve into
-   *  the bezel at the mask edge. Two nodes total: one at the top of the reel
-   *  window, one at the bottom. */
   private buildWindowFeather(): void {
     const { reelCenterY, windowFeatherPx } = VIEW_CONFIG.layout;
     const make = (sign: 1 | -1, name: string): Node => {
       const n = this.mkNode(name, this.gw + 4, windowFeatherPx, this.node);
       const g = n.addComponent(Graphics);
       const steps = 5;
-      // sign = +1: top edge → dark band sits above the mask edge, fading DOWN
-      //         (outer alpha high, inner alpha 0) so cells exiting the window dim.
-      // sign = -1: bottom edge → mirrored.
+
       for (let i = 0; i < steps; i++) {
         const t = i / (steps - 1);
         const stripH = windowFeatherPx / steps;
         const yTop =
           sign === 1 ? windowFeatherPx / 2 - i * stripH : -windowFeatherPx / 2 + i * stripH;
-        const alpha = Math.round(180 * (1 - t)); // outer→inner: 180→0
+        const alpha = Math.round(180 * (1 - t));
         g.fillColor = new Color(10, 6, 16, alpha);
         g.rect(-(this.gw + 4) / 2, yTop - (sign === 1 ? stripH : 0), this.gw + 4, stripH);
         g.fill();
       }
-      // Park the node at (0, reelCenterY ± gh/2 ± windowFeatherPx/2). fit()
-      // owns repositioning if gh changes; this is the initial placement.
+
       n.setPosition(0, reelCenterY + sign * (this.gh / 2 - windowFeatherPx / 2), 0);
       return n;
     };
@@ -2106,25 +1815,18 @@ export class SlotView extends Component {
     this.windowFeatherBottom = make(-1, 'windowFeatherBottom');
   }
 
-  /** Build the transient cinematic win bloom — a warm full-screen node held at
-   *  opacity 0 (so it can NEVER cover the resting board), flared on the big-win
-   *  detonation frame. Mounted above the board but below the win FX / HUD /
-   *  ceremony built next, so the win number + banner stay readable over the flash. */
   private buildCinematicBloom(): void {
     const W = 2600;
     const H = 2200;
     const bloom = this.mkNode('cineBloom', W, H, this.node);
     const bg = bloom.addComponent(Graphics);
-    bg.fillColor = new Color(255, 238, 205, 255); // warm white-gold light
+    bg.fillColor = new Color(255, 238, 205, 255);
     bg.rect(-W / 2, -H / 2, W, H);
     bg.fill();
     this.cineBloomOp = bloom.addComponent(UIOpacity);
     this.cineBloomOp.opacity = 0;
   }
 
-  /** Fire the cinematic light-bloom flare (detonation frame). intensity 0..1 maps
-   *  to a brief, warm (never pure-white) flash — a single rare-event flash, well
-   *  within the flash-safety budget. */
   cinematicBloom(intensity = 1): void {
     if (!this.cineBloomOp || this.reducedFx) return;
     const peak = Math.round(34 + 60 * Math.min(1, Math.max(0, intensity)));
@@ -2163,7 +1865,7 @@ export class SlotView extends Component {
     } else {
       const g = n.addComponent(Graphics);
       g.fillColor = ACID;
-      // faceted octagon (NOT a circle — VFX-ban compliant)
+
       const rad = size / 2;
       for (let k = 0; k < 8; k++) {
         const a = (Math.PI / 4) * k - Math.PI / 8;
@@ -2194,24 +1896,18 @@ export class SlotView extends Component {
     n.on(Button.EventType.CLICK, () => this.spinCb?.());
   }
 
-  // ---- responsive contain-fit ----------------------------------------------
   private bottomInset = 0;
 
-  /** Task 1.3 — collision-clamped FAB dock-x. Computes the FAB centre x so its
-   *  inner edge stays >= frameHalfW + minClearancePx and outer edge stays
-   *  <= screenHalfW/scale - edgePadPx. On a narrow viewport where neither
-   *  constraint can be met, returns null and the caller hides the FAB. */
   private fabDockX(sign: 1 | -1, scale: number, screenW: number): number | null {
     const fab = VIEW_CONFIG.layout.fab;
-    const frameHalfW = this.gw / 2 + 24; // halo on the frame
-    // Clearance uses the SHRUNKEN landscape badge — checking the full-size
-    // width made the dock report "no room" on wide boards and hide the badge.
+    const frameHalfW = this.gw / 2 + 24;
+
     const fabHalfW = (fab.sizePx * fab.landscapeScale) / 2;
     const ideal = sign * (frameHalfW + fab.gapPx + fabHalfW);
     const screenHalfWLocal = screenW / 2 / scale;
     const outerLimit = screenHalfWLocal - fab.edgePadPx - fabHalfW;
     const innerLimit = frameHalfW + fab.minClearancePx + fabHalfW;
-    if (outerLimit < innerLimit) return null; // narrow viewport — hide
+    if (outerLimit < innerLimit) return null;
     const idealAbs = Math.abs(ideal);
     const clampedAbs = Math.max(innerLimit, Math.min(outerLimit, idealAbs));
     return sign * clampedAbs;
@@ -2222,50 +1918,28 @@ export class SlotView extends Component {
     const L = VIEW_CONFIG.layout;
     const { designWidth, designHeight, reelCenterY } = L;
     const availH = Math.max(160, vis.height - this.bottomInset);
-    // Fit + centre the CONTENT BAND, not the full 760 design. With the shared
-    // betting bar (externalControls) there is no bottom control deck, so the
-    // live content is just logo-top -> reels-bottom; fitting that band makes the
-    // reels fill the screen and removes the dead space the empty deck reserved.
-    // Logo top + reels bottom from Task 1.1 tunables.
+
     const isLandscape = vis.width > vis.height * 1.05;
-    // LANDSCAPE: the logo is screen-relative (not part of this band), so the
-    // full contentTopPx headroom was dead space that shrank the reels — fit just
-    // the frame crown instead. PORTRAIT keeps the logo band.
+
     const contentTop = isLandscape
       ? reelCenterY + this.gh / 2 + L.landscapeTopPadPx
       : L.contentTopPx;
     const contentBottom = this.externalControls
-      ? reelCenterY - this.gh / 2 - L.boardBottomGapPx // reels bottom + clean gap to the bar
-      : -designHeight / 2; // own-HUD build keeps the full design envelope
+      ? reelCenterY - this.gh / 2 - L.boardBottomGapPx
+      : -designHeight / 2;
     const contentH = contentTop - contentBottom;
     const contentCenter = (contentTop + contentBottom) / 2;
-    // Task 7.1 — portrait reels fill ≥90% of visible width. The 760 design
-    // envelope is irrelevant in portrait (it wins on height-clamp already);
-    // instead, scale to portraitWidthFill * vis.width / gw so the reels are
-    // designed-portrait-wide regardless of canvas aspect.
+
     const sWidth = isLandscape
       ? (vis.width * L.landscapeWidthFill) / designWidth
       : (vis.width * L.portraitWidthFill) / this.gw;
     const s = Math.min(sWidth, availH / contentH);
     this.node.setScale(s, s, 1);
-    // Land the content centre at the centre of the area above the bar.
+
     this.node.setPosition(0, this.bottomInset / 2 - contentCenter * s, 0);
 
-    // Orientation-gated title + FAB placement (same threshold the rest of the app
-    // uses). LANDSCAPE: the big top-centre logo crowded the reels and the FAB was
-    // a lone heavy mass on the left making the (already-centred) reels read
-    // off-centre. Shrink the logo to the upper-LEFT shoulder and move the FAB to
-    // the RIGHT margin so the composition is balanced around the centred reels.
-    // PORTRAIT: untouched (top-centre logo); the FAB is hidden because Task 7.2
-    // moves Buy into the betting bar deck — the board FAB would overlap the FAB
-    // slot in portrait.
     if (this.logoNode) {
       if (isLandscape) {
-        // 2026-06-11 — SCREEN-RELATIVE logo (responsive). Convert a screen
-        // fraction (0,0)=bottom-left .. (1,1)=top-right into board-local coords
-        // by inverse-transforming through the board position + scale, so the
-        // logo holds its top-left screen spot at ANY viewport. In bonus it
-        // slides to the reels-left, vertically-centred.
         this.logoNode.setScale(L.logo.landscapeScale, L.logo.landscapeScale, 1);
         const fx = this.inBonus ? L.logo.bonusScreenX : L.logo.landscapeScreenX;
         const fy = this.inBonus ? L.logo.bonusScreenY : L.logo.landscapeScreenY;
@@ -2282,40 +1956,24 @@ export class SlotView extends Component {
       }
     }
     if (this.titleCaption) {
-      // The long MAX-WIN caption is orphaned at top-centre once the logo moves
-      // left; hide it in landscape (the same info lives in the intro peek + info
-      // panel) and keep it under the logo in portrait.
       this.titleCaption.active = !isLandscape;
     }
     if (this.buyFab) {
-      // 2026-06-11 — the board FAB IS the BUY BONUS component in BOTH
-      // orientations (matches the PixiJS reference; the redundant bar control
-      // was removed — it caused the "two circles"). LANDSCAPE: docked on the
-      // LEFT of the reels at reelCenterY (reference parity). PORTRAIT: in the
-      // bottom-left deck, screen-relative + counter-scaled so the big portrait
-      // board scale doesn't blow it up.
       const fab = L.fab;
       const base = this.buyFabBaseScale;
-      // The FAB lives on the CANVAS ROOT, above the betting bar — docked inside
-      // the control band it would otherwise render BEHIND the bar's opaque slab
-      // (the bar is a later sibling). Reparent once; both branches then position
-      // in canvas space.
+
       const fabRoot = this.node.parent;
       if (fabRoot && this.buyFab.parent !== fabRoot) {
         this.buyFab.setParent(fabRoot);
       }
-      // Re-assert TOP order every fit — the bar joins the root AFTER the first
-      // fit and would otherwise paint over the badge (modals hide the FAB on
-      // open, so sitting top-most never covers a dialog).
+
       if (fabRoot) this.buyFab.setSiblingIndex(fabRoot.children.length - 1);
       if (isLandscape) {
-        // Board-local shoulder dock converted to canvas space (scale tracks the
-        // board so the badge keeps its size relative to the reels).
         const lsc = base * s * fab.landscapeScale;
         this.buyFab.setScale(lsc, lsc, 1);
         const x = this.fabDockX(fab.landscapeDockSign as 1 | -1, s, vis.width);
         if (x === null) {
-          this.buyFab.active = false; // viewport too narrow for both frame + FAB
+          this.buyFab.active = false;
         } else {
           this.buyFab.active = true;
           this.buyFab.setPosition(
@@ -2326,15 +1984,12 @@ export class SlotView extends Component {
         }
       } else {
         this.buyFab.active = true;
-        // Fixed on-screen size: scale the art node to an explicit canvas width
-        // (board-relative scales don't apply on the canvas root).
+
         const ut = this.buyFab.getComponent(UITransform);
         const sc = fab.portraitWidthPx / Math.max(1, ut?.width ?? 96);
         this.buyFab.setScale(sc, sc, 1);
         const canvasX = (fab.portraitScreenX - 0.5) * vis.width;
-        // Dock INSIDE the control band, level with the spin button (left side):
-        // the band height (bottomInset) is the one stable reference across
-        // viewports — screen fractions overlapped the reels on short phones.
+
         const fabScreenH = (ut?.height ?? 96) * sc;
         const fromBottom =
           this.bottomInset > 0
@@ -2343,17 +1998,14 @@ export class SlotView extends Component {
         this.buyFab.setPosition(canvasX, fromBottom - vis.height / 2, 0);
       }
     }
-    // Task 1.2 — keep the feather nodes pinned to the reel window edges.
+
     if (this.windowFeatherTop) {
       this.windowFeatherTop.setPosition(0, reelCenterY + this.gh / 2 - L.windowFeatherPx / 2, 0);
     }
     if (this.windowFeatherBottom) {
       this.windowFeatherBottom.setPosition(0, reelCenterY - this.gh / 2 + L.windowFeatherPx / 2, 0);
     }
-    // Task 4.3 — flanking crystals docked just outside the frame L/R at
-    // reelCenterY. Portrait hides them (FAB used to own that margin; mobile
-    // bar's deck Buy still does); landscape shows them as decor.
-    // portraitVisible flag overrides.
+
     if (this.flankCrystalL && this.flankCrystalR) {
       const cfg = VIEW_CONFIG.decor.flankCrystal;
       const shouldShow = isLandscape || cfg.portraitVisible;
@@ -2365,34 +2017,23 @@ export class SlotView extends Component {
         this.flankCrystalR.setPosition(fx, reelCenterY, 0);
       }
     }
-    // Task 4.2 — keep portal sprites pinned to the reel block top/bottom.
+
     if (this.reelPortalTop) this.reelPortalTop.setPosition(0, reelCenterY + this.gh / 2 + 6, 0);
     if (this.reelPortalBottom)
       this.reelPortalBottom.setPosition(0, reelCenterY - this.gh / 2 - 6, 0);
     if (this.gridMergeNode) this.gridMergeNode.setPosition(0, reelCenterY, 0);
-    // Keep the (screen-space) buy modal sized/centred above the bar on resize.
+
     if (this.buyModal?.isOpen()) this.fitBuyModal();
   }
 
-  // ---- buy menu (premium modal — flagship parity) ---------------------------
-  /** Per-mode presentation (accent + one-line special). Visual only — costs and
-   *  spin counts come from the model/config, never invented here. */
   private static BUY_PRESENT: Record<string, { accent: string; special: string }> = {
     wilds: { accent: '#ff5ab0', special: 'Wilds stick & bounce every spin' },
     crowns: { accent: '#ffcf5a', special: 'Crowns lock in for the feature' },
     reels: { accent: '#b86fda', special: 'Full wild reels strike in' },
   };
 
-  /** (Re)build the premium buy-feature modal from the model's modes + costs.
-   *  Same signature as the old plain list — the controller is unchanged; only the
-   *  surface is upgraded to the flagship 3-tier card (committed BuyBonusModal). */
   configureBuyMenu(options: BuyOption[]): void {
     if (!this.buyModal) {
-      // SCREEN-SPACE overlay (like the intro), NOT a board child — otherwise the
-      // board's contain-fit scale + offset drag the card down into the betting
-      // bar and clip its bottom rows. Parent to the Canvas-level root + a high
-      // sibling index so it sits above the bar; fitBuyModal() then sizes/centres
-      // it within the safe area above the bar.
       const root = this.node.parent ?? this.node;
       const host = this.mkNode('buyModal', 10, 10, root);
       host.setPosition(0, 0, 0);
@@ -2405,8 +2046,7 @@ export class SlotView extends Component {
       this.buyModal.on('bet:inc', () => this.buyBetStepCb?.(1));
       this.buyModal.on('bet:dec', () => this.buyBetStepCb?.(-1));
       this.buyModal.on('ui:click', () => this.audio.click());
-      // Unaffordable BUY press: the modal shakes its own button; the host adds
-      // the audio cue. The intent never reaches the controller.
+
       this.buyModal.on('buy:blocked', () => this.audio.click());
     }
     const tiers: BuyTier[] = options.map((o, i) => {
@@ -2425,20 +2065,20 @@ export class SlotView extends Component {
   }
 
   private buyBetText = '';
-  /** Push the current bet text into the modal's inline stepper (controller sets it). */
+
   setBuyBet(betText: string): void {
     this.buyBetText = betText;
     this.buyModal?.setBet(betText);
   }
-  /** Refresh each tier's live cost after a bet change (controller supplies texts). */
+
   refreshBuyCosts(costTexts: string[]): void {
     this.buyModal?.setCosts(costTexts);
   }
-  /** Per-tier affordability (controller recomputes on balance/bet changes). */
+
   setBuyAffordable(flags: boolean[]): void {
     this.buyModal?.setAffordable(flags);
   }
-  /** Wire the modal's inline bet stepper back to the controller's bet ladder. */
+
   onBuyBetStep(cb: (dir: number) => void): void {
     this.buyBetStepCb = cb;
   }
@@ -2455,24 +2095,18 @@ export class SlotView extends Component {
 
   openBuyMenu(): void {
     this.closeOverlays();
-    this.fitBuyModal(); // size + centre within the safe area above the bar before showing
+    this.fitBuyModal();
     this.buyModal?.open();
     this.audio.buyOpen();
-    this.setBuyFabVisible(false); // hide the FAB behind its own picker
+    this.setBuyFabVisible(false);
   }
 
-  /** Drive the screen-space buy modal's fit with the live bar inset so its bottom
-   *  rows (YOUR BET stepper + CANCEL/BUY) never clip behind the betting bar. */
   private fitBuyModal(): void {
     if (!this.buyModal) return;
     const vis = view.getVisibleSize();
     this.buyModal.fit(vis.width, vis.height, this.bottomInset);
   }
 
-  // ---- autoplay panel (parity port of the master's AUTOPLAY drawer) ----------
-  /** (Re)build the autoplay panel: count tiles + the two stop toggles.
-   *  Rebuilt by the Controller whenever a toggle flips (master parity: the Pixi
-   *  drawer re-populates on toggle). Hidden until the AUTO control opens it. */
   configureAutoplayPanel(cfg: AutoplayPanelConfig): void {
     const wasOpen = this.autoplayPanel?.active ?? false;
     this.autoplayPanel?.destroy();
@@ -2537,7 +2171,7 @@ export class SlotView extends Component {
       ty,
     );
     toggleRow('Stop on Big Win', `≥ 25× total bet`, cfg.stopOnBigWin, 'stopOnBigWin', ty - 56);
-    // Tasks 3.1 + 3.2 — scrim outside-click dismiss + crystal close-X.
+
     this.addPanelDismiss(panel, w, h, () => this.closeAutoplayPanel());
     this.autoplayPanel = panel;
   }
@@ -2552,9 +2186,6 @@ export class SlotView extends Component {
     this.popClose(this.autoplayPanel);
   }
 
-  // ---- settings panel (parity port of the master's SETTINGS drawer) ----------
-  /** (Re)build: Sound toggle · Turbo Speed OFF/TURBO/MEGA pills · Reduced Effects.
-   *  Rebuilt by the Controller on every change (master parity: drawer re-populates). */
   configureSettingsPanel(cfg: SettingsPanelConfig): void {
     const wasOpen = this.settingsPanel?.active ?? false;
     this.settingsPanel?.destroy();
@@ -2606,7 +2237,7 @@ export class SlotView extends Component {
       () => this.settingsChangeCb?.('reducedFx', !cfg.reducedFx),
       panel,
     ).setActive(cfg.reducedFx);
-    // Tasks 3.1 + 3.2 — scrim outside-click dismiss + crystal close-X.
+
     this.addPanelDismiss(panel, w, h, () => this.closeSettingsPanel());
     this.settingsPanel = panel;
   }
@@ -2621,14 +2252,11 @@ export class SlotView extends Component {
     this.popClose(this.settingsPanel);
   }
 
-  // ---- GAME INFORMATION panel (master parity: Rules / Paytable / Info tabs) --
-  /** Rebuild the info panel on the given tab. Content derives from logic data
-   *  (paytable rows, computed max win) so the panel can never drift from the math. */
   private buildInfoPanel(tab: 'rules' | 'paytable' | 'info'): void {
     const wasOpen = this.infoPanel?.active ?? true;
     this.infoPanel?.destroy();
     this.infoTab = tab;
-    // Task 3.3 — all sizes from VIEW_CONFIG.info; localization-safe wrapping.
+
     const info = VIEW_CONFIG.info;
     const w = info.panelW;
     const h = info.panelH;
@@ -2649,9 +2277,7 @@ export class SlotView extends Component {
       ).setActive(tab === name);
     });
     const top = h / 2 - 104;
-    // Task 3.3 — wrapping label factory. Uses RESIZE_HEIGHT + enableWrapText
-    // + a measured contentWidth (panel inner minus margins). Returns the laid-
-    // out height so the caller can stack the next line at `y - height - lineGap`.
+
     const contentWidth = w - info.leftMargin * 2;
     const wrapLine = (
       text: string,
@@ -2661,7 +2287,7 @@ export class SlotView extends Component {
     ): number => {
       const n = this.mkNode('infoLine', contentWidth, size + 8, panel);
       n.setPosition(-w / 2 + info.leftMargin, y, 0);
-      // Anchor top-left so the label's box grows downward when wrapping.
+
       const ut = n.getComponent(UITransform);
       if (ut) ut.setAnchorPoint(0, 1);
       const l = n.addComponent(Label);
@@ -2673,7 +2299,7 @@ export class SlotView extends Component {
       l.overflow = Label.Overflow.RESIZE_HEIGHT;
       l.enableWrapText = true;
       applyFont(l, 'body');
-      // Force a layout pass so the measured height is available immediately.
+
       l.updateRenderData(true);
       return ut ? ut.height : size + 4;
     };
@@ -2691,8 +2317,6 @@ export class SlotView extends Component {
         y -= ht + info.lineGap;
       }
     } else if (tab === 'paytable') {
-      // Paytable is a measured-column table, not a wrap field — keep the existing
-      // tight rendering since the row labels are short (single symbol names).
       this.mkLabel('SYMBOL', -w / 2 + info.leftMargin, top, 11, ACID, panel).horizontalAlign =
         Label.HorizontalAlign.LEFT;
       [3, 4, 5].forEach((n, i) => {
@@ -2710,9 +2334,7 @@ export class SlotView extends Component {
         y -= 30;
       }
       wrapLine('Pays are line-bet multiples.', y - 6, info.captionSize);
-      // SCATTER + free-spins documentation (the new feature). Rendered under the
-      // line-pay table so players see the rainbow-lollipop scatter pays + free-spin
-      // award that the line table deliberately omits.
+
       y -= 30;
       for (const line of SCATTER_LINES) {
         const ht = wrapLine(line, y, info.captionSize, line.startsWith('   ') ? MUTED : ACID);
@@ -2733,8 +2355,7 @@ export class SlotView extends Component {
       stat('LINES', String(PAYLINES.length));
       stat('GRID', `${GRID.reels}×${GRID.rows}`);
       y -= 6;
-      // Buy-feature documentation (approval gate B4/I4): every mode named, its
-      // mechanic described and its cost basis stated — sourced from BONUS_MODES.
+
       y -= wrapLine('FEATURES', y, info.headerSize, ACID) + info.lineGap;
       for (const line of FEATURES_LINES) {
         y -= wrapLine(line, y, info.captionSize) + 3;
@@ -2753,7 +2374,7 @@ export class SlotView extends Component {
       panel,
     );
     void close;
-    // Tasks 3.1 + 3.2 — scrim outside-click dismiss + crystal close-X.
+
     this.addPanelDismiss(panel, w, h, () => this.closeInfoPanel());
     this.infoPanel = panel;
   }
@@ -2769,16 +2390,12 @@ export class SlotView extends Component {
     this.popClose(this.infoPanel);
   }
 
-  // ---- MENU hub (master pending item: menu shows more than one destination) --
-  /** Small hub the bar's menu glyph opens: BUY FEATURE / SETTINGS / AUTOPLAY. */
   openMenuHub(): void {
     if (!this.menuHub) this.menuHub = this.buildMenuHub();
     this.closeOverlays();
     this.popOpen(this.menuHub);
   }
 
-  /** Task 3.4 — per-entry presentation (accent gem + one-line caption). Mirrors
-   *  the BUY_PRESENT pattern so the menu and buy panel read as one design system. */
   private static MENU_PRESENT: Record<string, { accent: string; caption: string }> = {
     'BUY FEATURE': { accent: '#ff5ab0', caption: 'Skip the wait — buy any feature' },
     'QUICK BET': { accent: '#ffcf5a', caption: 'Preset stake grid' },
@@ -2788,9 +2405,6 @@ export class SlotView extends Component {
   };
 
   private buildMenuHub(): Node {
-    // Task 3.4 — row-cards premium redesign. Each entry: candy tile + left gem
-    // (accent colour per MENU_PRESENT) + display-font label + caption + right
-    // chevron + press squash. Sized by VIEW_CONFIG.menu.
     const cfg = VIEW_CONFIG.menu;
     const entries: [string, () => void][] = [
       ['BUY FEATURE', () => this.openBuyMenu()],
@@ -2816,7 +2430,6 @@ export class SlotView extends Component {
       const row = this.mkNode(`menuRow_${label}`, rowW, cfg.rowH, hub);
       row.setPosition(0, y, 0);
 
-      // Candy tile background — soft violet with cyan hairline rim.
       const tile = row.addComponent(Graphics);
       tile.fillColor = new Color().fromHEX(PAL.tileBg);
       tile.roundRect(-rowW / 2, -cfg.rowH / 2, rowW, cfg.rowH, 14);
@@ -2826,7 +2439,6 @@ export class SlotView extends Component {
       tile.roundRect(-rowW / 2, -cfg.rowH / 2, rowW, cfg.rowH, 14);
       tile.stroke();
 
-      // Left accent gem (diamond) at the inner edge — tier colour.
       const gemNode = this.mkNode('gem', cfg.gemSize * 2, cfg.gemSize * 2, row);
       gemNode.setPosition(-rowW / 2 + 22, 0, 0);
       const gg = gemNode.addComponent(Graphics);
@@ -2847,7 +2459,6 @@ export class SlotView extends Component {
       gg.close();
       gg.fill();
 
-      // Display-font label + body caption — stacked vertically next to gem.
       const labelNode = this.mkNode('label', rowW * 0.7, cfg.labelSize + 4, row);
       labelNode.setPosition(-rowW / 2 + 56, 8, 0);
       const lbl = labelNode.addComponent(Label);
@@ -2872,7 +2483,6 @@ export class SlotView extends Component {
       if (capUt) capUt.setAnchorPoint(0, 0.5);
       applyFont(cap, 'body');
 
-      // Right chevron — fake "drill-in" affordance.
       const chevNode = this.mkNode('chev', 14, 14, row);
       chevNode.setPosition(rowW / 2 - 22, 0, 0);
       const cg = chevNode.addComponent(Graphics);
@@ -2883,7 +2493,6 @@ export class SlotView extends Component {
       cg.lineTo(-3, -6);
       cg.stroke();
 
-      // Press-squash + tap → close menu, open destination.
       row.on(Node.EventType.TOUCH_START, () => {
         Tween.stopAllByTarget(row);
         tween(row)
@@ -2907,19 +2516,10 @@ export class SlotView extends Component {
       y -= cfg.rowH + cfg.rowGap;
     });
 
-    // Tasks 3.1 + 3.2 — scrim outside-click dismiss + crystal close-X.
     this.addPanelDismiss(hub, w, h, () => (hub.active = false));
     return hub;
   }
 
-  /** Hide every floating panel (one overlay at a time, master parity). */
-  /** Reusable panel OPEN transition — pop-scale + fade in (backOut). Cancels any
-   *  in-flight close tween (Tween.stopAllByTarget also kills the pending
-   *  deactivate .call), so open-after-close never leaves a panel hidden. */
-  /** Largest uniform scale at which `node` (a panel) fits inside ~92% of the
-   *  visible viewport in BOTH axes — so info/settings/etc. are never cropped on a
-   *  short (laptop landscape) or narrow screen (owner: "info + settings cropped
-   *  from top and bottom on my laptop"). 1 when the panel already fits. */
   private panelFitScale(node: Node): number {
     const ui = node.getComponent(UITransform);
     if (!ui || ui.height <= 0 || ui.width <= 0) return 1;
@@ -2937,9 +2537,7 @@ export class SlotView extends Component {
     Tween.stopAllByTarget(node);
     Tween.stopAllByTarget(op);
     node.active = true;
-    // Re-centre on the VIEWPORT centre (Canvas world 0) + scale to fit so the panel
-    // is never clipped top/bottom on short screens. this.node's parent is the
-    // centred Canvas, so the viewport centre in local space is -pos.y/scale.y.
+
     const k = this.panelFitScale(node);
     const sy = this.node.scale.y || 1;
     node.setPosition(node.position.x, -this.node.position.y / sy, 0);
@@ -2951,8 +2549,6 @@ export class SlotView extends Component {
     tween(op).to(0.16, { opacity: 255 }).start();
   }
 
-  /** Reusable panel CLOSE transition — fade + settle out, then deactivate and
-   *  reset so the next open starts clean. No-op if already inactive. */
   private popClose(node: Node | null): void {
     if (!node || !node.active) return;
     const op = node.getComponent(UIOpacity) ?? node.addComponent(UIOpacity);
@@ -2967,7 +2563,7 @@ export class SlotView extends Component {
         node.active = false;
         node.setScale(1, 1, 1);
         op.opacity = 255;
-        this.onOverlay?.(this.anyOverlayOpen()); // reshow the bar once nothing's open
+        this.onOverlay?.(this.anyOverlayOpen());
       })
       .start();
   }
@@ -2982,7 +2578,6 @@ export class SlotView extends Component {
     this.scheduleOverlaySync();
   }
 
-  /** True while any panel/modal is on screen. */
   private anyOverlayOpen(): boolean {
     const on = (n: Node | null): boolean => !!(n && n.isValid && n.active);
     if (
@@ -2998,13 +2593,10 @@ export class SlotView extends Component {
     return false;
   }
 
-  /** Notify the controller (next frame, once active states settle) so it can hide/
-   *  show the betting bar in lockstep with the overlays. */
   private scheduleOverlaySync(): void {
     this.scheduleOnce(() => this.onOverlay?.(this.anyOverlayOpen()), 0);
   }
 
-  // ---- QUICK BET panel (master parity: preset stake grid, not raw arithmetic) --
   configureQuickBetPanel(levelsCents: readonly number[], currentCents: number): void {
     const wasOpen = this.quickBetPanel?.active ?? false;
     this.quickBetPanel?.destroy();
@@ -3034,7 +2626,7 @@ export class SlotView extends Component {
         panel,
       ).setActive(cents === currentCents);
     });
-    // Tasks 3.1 + 3.2 — scrim outside-click dismiss + crystal close-X.
+
     this.addPanelDismiss(panel, w, h, () => this.closeQuickBetPanel());
     this.quickBetPanel = panel;
   }
@@ -3053,29 +2645,20 @@ export class SlotView extends Component {
     this.betSelectCb = cb;
   }
 
-  // ---- INTRO GATE — first-gesture overlay (audio unlock + branded arrival) ----
-  /** Full-screen tap-to-play overlay. The FIRST gesture anywhere must unlock the
-   *  AudioContext (master learning) — the controller wires that; this is the
-   *  branded surface. */
   buildIntro(onDismiss: () => void): void {
-    // The intro is a SCREEN overlay, not part of the game board. Parent it to the
-    // Canvas root (sibling of the view + bar) so the board fit() transform never
-    // drags it, and a high sibling index keeps it ABOVE the betting bar — the old
-    // bug where the bar covered the lower intro (CTA/studio "only logo showing").
     const root = this.node.parent ?? this.node;
-    // Oversized so it covers any aspect even before the board fit settles.
+
     const ov = this.mkNode('intro', 4000, 3200, root);
     const g = ov.addComponent(Graphics);
-    // Softer dim (was 232 ≈ opaque) so the painted candy world reads THROUGH the
-    // gate — branded arrival over the real bg, not a flat black card.
+
     g.fillColor = new Color(8, 4, 16, 150);
     g.rect(-2000, -1600, 4000, 3200);
     g.fill();
-    // Deeper centre pool behind the logo so the wordmark keeps its contrast.
+
     g.fillColor = new Color(6, 3, 12, 90);
     g.rect(-900, -520, 1800, 1040);
     g.fill();
-    // Corner vignette so the eye pulls to the centre (matches the board ART-04).
+
     g.fillColor = new Color(0, 0, 0, 120);
     [
       [-1300, 1100, 1, -1],
@@ -3090,8 +2673,6 @@ export class SlotView extends Component {
       g.fill();
     });
 
-    // Soft candy glow behind the logo — layered pink diamonds (no circles),
-    // slowly breathing. Gives the arrival depth instead of a flat black field.
     const glow = this.mkNode('introGlow', 10, 10, ov);
     glow.setPosition(0, 70, 0);
     const gg = glow.addComponent(Graphics);
@@ -3114,7 +2695,6 @@ export class SlotView extends Component {
       .repeatForever()
       .start();
 
-    // Deterministic floating candy sparkles (seeded — identical every boot).
     const spk = this.mkNode('introSparks', 10, 10, ov);
     const sg = spk.addComponent(Graphics);
     const rng = createRng(20260611).next;
@@ -3140,7 +2720,6 @@ export class SlotView extends Component {
       .repeatForever()
       .start();
 
-    // LOGO — entrance pop (scale + fade) then a gentle breathing loop.
     const logoNode = this.mkNode('introLogo', 440, 276, ov);
     logoNode.setPosition(0, 70, 0);
     const logoOp = logoNode.addComponent(UIOpacity);
@@ -3169,7 +2748,6 @@ export class SlotView extends Component {
       })
       .start();
 
-    // MAX-WIN teaser line (fades in under the logo).
     const teaser = this.mkLabel(
       `MAX WIN ${maxWinMultiple().toLocaleString('en-US')}× · WILD STRIKE`,
       0,
@@ -3182,13 +2760,11 @@ export class SlotView extends Component {
     teaserOp.opacity = 0;
     tween(teaserOp).delay(0.45).to(0.4, { opacity: 220 }).start();
 
-    // CTA — a candy pill with a brighter label so it reads as a button, not text.
-    // Dropped below the game-info peek that now occupies the mid-band.
     const ctaGroup = this.mkNode('introCta', 320, 72, ov);
     ctaGroup.setPosition(0, -288, 0);
     const cg = ctaGroup.addComponent(Graphics);
     const drawCta = (glowA: number) => {
-      if (!cg.isValid) return; // guard: tween may tick a frame after destroy
+      if (!cg.isValid) return;
       cg.clear();
       cg.fillColor = new Color(255, 90, 156, Math.round(40 + glowA * 50));
       cg.roundRect(-150, -34, 300, 68, 34);
@@ -3216,7 +2792,7 @@ export class SlotView extends Component {
       .union()
       .repeatForever()
       .start();
-    // Pulse the pill's outer glow in sync (proxy tween drives the redraw).
+
     const glowProxy = { v: 0 };
     tween(glowProxy)
       .delay(0.5)
@@ -3226,16 +2802,11 @@ export class SlotView extends Component {
       .repeatForever()
       .start();
 
-    // GAME-INFO PEEK — show OUR game (top-paying symbols + their payouts +
-    // RTP/volatility/lines + the buy-feature names), not just a MAX teaser, and
-    // NOT the removed third-party studio badge. Every value is read-only from the
-    // LOCKED math/data (paytableRows / RTP_DISPLAY / VOLATILITY_DISPLAY /
-    // PAYLINES / BONUS_MODES) so the intro can never drift from the paytable.
     const peek = this.mkNode('introPeek', 460, 170, ov);
     peek.setPosition(0, -150, 0);
     const peekOp = peek.addComponent(UIOpacity);
     peekOp.opacity = 0;
-    const top = paytableRows().slice(0, 4); // Wild + top highs (PAYTABLE order)
+    const top = paytableRows().slice(0, 4);
     const gapX = 100;
     top.forEach((row, i) => {
       const cx = (i - (top.length - 1) / 2) * gapX;
@@ -3269,18 +2840,12 @@ export class SlotView extends Component {
       new Color(255, 150, 200, 255),
       peek,
     );
-    // SCATTER teaser (owner: "update the intro with the new scatter") — the
-    // headline new feature on the very first screen, read-only from the math.
+
     this.mkLabel(SCATTER_TEASER, 0, -106, 12, new Color(191, 232, 255, 255), peek);
     tween(peekOp).delay(0.6).to(0.5, { opacity: 235 }).start();
 
-    // Screen-fit the gate (it's a Canvas overlay now, not board-space): scale so
-    // the logo→studio band fits the viewport, centred at screen centre. Raise it
-    // above the bar — the bar node is created AFTER the intro in boot, so re-assert
-    // the top sibling index next frame (when the bar exists).
     const vis = view.getVisibleSize();
-    // Taller content band now (logo → peek → CTA), so fit to ~880 of height so
-    // the bottom CTA never clips on a short/portrait viewport.
+
     const introS = Math.min(vis.width / 480, vis.height / 920, 1.3);
     ov.setScale(introS, introS, 1);
     ov.setPosition(0, 0, 0);
@@ -3290,46 +2855,27 @@ export class SlotView extends Component {
     raise();
     this.scheduleOnce(raise, 0);
 
-    // Tap anywhere → a quick confirming flash + logo punch, then fade the gate.
     ov.once(Node.EventType.TOUCH_END, () => {
       this.audio.click();
-      // Stop the repeatForever glow proxy (a PLAIN-object tween that would
-      // otherwise keep ticking after ov.destroy() and redraw a destroyed
-      // Graphics → crash). Node tweens auto-stop on destroy; this one does not.
+
       Tween.stopAllByTarget(glowProxy);
       Tween.stopAllByTarget(logoNode);
       tween(logoNode)
         .to(0.12, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'quadOut' })
         .to(0.18, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
         .start();
-      // 2026-06-11 polish — REMOVED the white-pink confirm flash entirely. It
-      // peaked at alpha 55 (22% white over the whole screen) which the user
-      // reads as a "white flash on tap". The intro panel's own fade is the
-      // confirmation; a separate flash bloom is gratuitous and conflicts with
-      // the AAA "no white moments ever" rule. Leaving the node-creation lines
-      // commented out as a marker against accidental re-introduction.
-      //   const flash = this.mkNode('introFlash', 4000, 3200, ov);
-      //   ... fg.fillColor = new Color(255, 240, 250, 255); fg.rect(...); fg.fill();
-      //   ... tween(fop).to(0.08, { opacity: 55 }).to(0.24, { opacity: 0 }).start();
-      // Single clean fade — the gate starts dimming IMMEDIATELY (no 0.18 delay),
-      // so there's no "dim lingers under a white flash then flickers out" stage.
+
       const op = ov.getComponent(UIOpacity) ?? ov.addComponent(UIOpacity);
       tween(op)
         .to(0.32, { opacity: 0 }, { easing: 'quadOut' })
         .call(() => ov.destroy())
         .start();
 
-      // Task 4.4 — micro cross-dissolve. The original 320ms hold + fade left a
-      // perceived "screen went black" stage; instead start at startAlpha (< 255
-      // so the painted bg is visible underneath FROM THE FIRST FRAME) and fade
-      // to 0 over a short ms (≤120 typical). The intro overlay's own quadOut
-      // does the heavy lifting; this is only the few-frame insurance against
-      // the engine's first-paint gap.
       const intro = VIEW_CONFIG.intro.fade;
       if (intro.ms > 0) {
         const fadeParent = this.node.parent ?? this.node;
         const fade = this.mkNode('introFade', 4000, 3200, fadeParent);
-        fade.setSiblingIndex(fadeParent.children.length - 1); // top of root tree
+        fade.setSiblingIndex(fadeParent.children.length - 1);
         const dg = fade.addComponent(Graphics);
         const c = new Color().fromHEX(intro.color);
         dg.fillColor = c;
@@ -3348,13 +2894,11 @@ export class SlotView extends Component {
     });
   }
 
-  /** Reduced-effects accessibility flag — gates particles + anticipation drag. */
   setReducedFx(on: boolean): void {
     this.reducedFx = on;
     this.reels.forEach((r) => r.setReducedMotion(on));
   }
 
-  // ---- public API the Controller drives ------------------------------------
   onSpinClicked(cb: () => void): void {
     this.spinCb = cb;
   }
@@ -3400,7 +2944,6 @@ export class SlotView extends Component {
     if (this.winLabel) this.winLabel.string = fmt(cents);
   }
 
-  /** Transient banner (e.g. "WILD ×3", bonus name). Empty string clears. */
   setBanner(text: string): void {
     const l = this.bannerLabel;
     if (!l) return;
@@ -3432,17 +2975,11 @@ export class SlotView extends Component {
     return this.reels.some((r) => r.spinning);
   }
 
-  /** Slam all reels to their result now (re-click quick-stop). */
   quickStopReels(): void {
     this.anticipation.clear();
     this.reels.forEach((r) => r.quickStop());
   }
 
-  /**
-   * Animate every reel to its result; resolves when all settle. `speedMul` < 1 is
-   * faster (turbo / bonus). Adds anticipation drag + glow to the late reels when a
-   * WILD STRIKE is brewing (>= minEarlyWilds wilds already showing in reels 0..2).
-   */
   async playSpin(grid: number[][], speedMul = 1): Promise<void> {
     const { minSpinMs, reelStopStaggerMs } = VIEW_CONFIG.spin;
     const { minEarlyWilds, extraSeconds } = VIEW_CONFIG.anticipation;
@@ -3451,9 +2988,7 @@ export class SlotView extends Component {
     for (let r = 0; r < 3; r++) for (const id of grid[r]) if (id === SYMBOLS.WILD) earlyWilds++;
     const antic = earlyWilds >= minEarlyWilds && !this.reducedFx;
     const turbo = speedMul <= VIEW_CONFIG.turbo.turbo;
-    // Accelerating stop-cadence + per-reel gap FLOOR (kills the turbo "slab stop").
-    // cadence = cumulative stagger units per reel (reducedFx → flat linear); the
-    // floor keeps the L→R cascade readable even when turbo crushes the spacing.
+
     const cadence = this.reducedFx ? [0, 1, 2, 3, 4] : VIEW_CONFIG.spin.stopCadence;
     const minGapMs =
       VIEW_CONFIG.spin.stopMinGapMs[
@@ -3462,14 +2997,12 @@ export class SlotView extends Component {
 
     this.audio.spinStart();
     this.audio.startRush();
-    this.pxLeanTarget = 1; // world leans into the spin (depth parallax)
+    this.pxLeanTarget = 1;
     if (antic) this.audio.anticipation();
-    // Task 4.2 — portal entry pulse at launch (single fire — both top/bottom).
+
     this.playReelPortalEntry();
     await Promise.all(
       this.reels.map((reel, i) => {
-        // Floored, cadence-shaped cumulative stop offset (real ms), converted back
-        // to a pre-speedMul spin time so spinTo's `× speedMul` lands it on target.
         let cumGapMs = 0;
         for (let k = 1; k <= i; k++) {
           const dUnits = (cadence[k] ?? k) - (cadence[k - 1] ?? k - 1);
@@ -3478,8 +3011,7 @@ export class SlotView extends Component {
         let dur = minSpinMs / 1000 + cumGapMs / 1000 / speedMul;
         if (antic && i >= 3) {
           dur += extraSeconds;
-          // 2026-06-11 — aura geometry gated. The drag-time alone carries the
-          // tension; the magenta column + lightning diamonds are gone.
+
           if (VIEW_CONFIG.anticipation.showAura) {
             this.anticipation.spawn(
               this.cellCenter(i, 0).x,
@@ -3492,7 +3024,7 @@ export class SlotView extends Component {
         }
         return reel.spinTo(grid[i], dur, speedMul).then(() => {
           this.audio.reelStop(i, turbo);
-          // Task 4.2 — portal exit pulse on the LAST reel's settle.
+
           if (i === this.reels.length - 1) this.playReelPortalExit();
           const wildRows: number[] = [];
           grid[i].forEach((id, row) => {
@@ -3500,8 +3032,7 @@ export class SlotView extends Component {
           });
           if (wildRows.length) {
             reel.flashWilds(wildRows);
-            // Heavy-landing RECOIL — fired in the SAME tick as the reel-stop audio
-            // transient (above) so the "thunk" is frame-locked to the sound.
+
             reel.recoil(VIEW_CONFIG.spin.bounce.wildRecoilScale);
             this.audio.wildLand();
           }
@@ -3510,22 +3041,17 @@ export class SlotView extends Component {
       }),
     );
     this.audio.stopRush();
-    this.pxLeanTarget = 0; // reels landed → world eases back out of the lean
+    this.pxLeanTarget = 0;
     this.anticipation.clear();
   }
 
   showWins(result: SpinResult): void {
     this.clearWins();
     const byReel = winningCellsByReel(result, GRID.reels);
-    // WAVE BLINK (slot-vfx): stagger the per-symbol pulse L->R by reel so the win
-    // reads as a wave, not a flash. The rich in-cell sheen/sparkle fires only on
-    // FOCUSED wins (<= 8 cells); on dense wins (full wild reel lights 20+ cells)
-    // the per-cell white sheens would stack into a wash, so those get pulse+glow.
+
     const totalCells = byReel.reduce((sum, rows) => sum + (rows ? rows.length : 0), 0);
     const rich = totalCells <= 8;
-    // CINEMA WAVE — shader rim-light/sweep on winners. reducedFx → null so the
-    // symbol falls back to the Graphics sheen; otherwise advance the shared
-    // material's u_time globally (one stepper, all overlays animate in sync).
+
     const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
     const waveStagger = VIEW_CONFIG.win.highlightWaveStagger;
     this.reels.forEach((reel, i) =>
@@ -3533,22 +3059,16 @@ export class SlotView extends Component {
         this.cellCenter(i, row),
       ),
     );
-    // Win-wave AUDIO arpeggio — a rising-pitch tick per WINNING reel as the L→R
-    // highlight wave sweeps across, so the (previously silent) blink-wave becomes a
-    // building arpeggio that resolves into the win sting. Pitch climbs with the
-    // winning-reel order; capped to winning reels (a 1-reel win = one tick). Motion
-    // reinforcement, not information → skipped under reducedFx.
+
     if (!this.reducedFx && totalCells > 0) {
       const winningReels = this.reels.map((_, i) => i).filter((i) => (byReel[i]?.length ?? 0) > 0);
       winningReels.forEach((reelIdx, order) => {
         const progress = winningReels.length > 1 ? order / (winningReels.length - 1) : 0;
         this.scheduleOnce(() => this.audio.countTick(progress), reelIdx * waveStagger);
       });
-      this.pxPulse = 1; // world "breathes out" on the win (depth parallax)
+      this.pxPulse = 1;
     }
-    // One global u_time stepper drives symbol-win + soft-burst + win-beam in sync.
-    // The burst shows on EVERY win (it replaced the always-on glow), so schedule
-    // whenever any shader-backed win layer can be visible.
+
     const anyWinFx =
       winMat ?? this.getEffectMaterial('soft-burst') ?? this.getEffectMaterial('win-beam');
     if (anyWinFx && !this.reducedFx && totalCells > 0) {
@@ -3560,9 +3080,6 @@ export class SlotView extends Component {
     this.winLines = result.lineWins.map((w) => ({ lineIndex: w.lineIndex, count: w.count }));
     if (this.winLines.length === 0) return;
 
-    // 2026-06-11 FIRE redesign — no drawn payline geometry. The win reads from
-    // the warm symbol glow + rising fire embers off every winning cell. Skip
-    // the entire line-reveal pipeline (polyline + glow segments + plasma core).
     if (!VIEW_CONFIG.win.showLines) {
       const centers: Vec3[] = [];
       byReel.forEach((rows, reel) => {
@@ -3570,37 +3087,26 @@ export class SlotView extends Component {
       });
       if (centers.length && !this.reducedFx) {
         this.particles.fireEmbers(centers);
-        // Per-symbol fire now lives IN symbol-win.effect (clipped to each symbol
-        // silhouette). The old rectangular flame quads are gated OFF — they read
-        // as a "fire background box" which the user rejected.
+
         if (VIEW_CONFIG.win.fireFlames.enabled) this.showWinFlames(centers);
-        // CINEMA WAVE — the shader win-line: flowing energy ribbons along each
-        // winning line's cell centres (win-beam.effect, ember/gold plasma).
+
         if (VIEW_CONFIG.win.beams.enabled) this.showWinBeams(this.winLines);
       }
-      // Per-line WIN-AMOUNT pops — a "×N" label rises off each winning line so the
-      // player sees WHICH line paid and HOW MUCH (discernible outcome; matches the
-      // Pixi fly-up). Shown even under reducedFx (it's information, not motion).
+
       this.showLineWinPops(result);
-      // Cinematic CANDY WIN LINE — the win PATH the owner asked for ("where is the
-      // win line??"), as a thin warm-gold thread (not the rejected magenta line or
-      // rainbow beam).
+
       this.drawCandyWinLines(this.winLines);
       return;
     }
 
     this.startWinLinePulse();
     if (this.reducedFx) {
-      // WL8: reduced-motion swaps the animated draw for an instant reveal, but
-      // keeps colour identity + the readability cycle.
       this.winCycle = 0;
       this.cycleWinLine();
       this.schedule(this.cycleWinLine, VIEW_CONFIG.win.lineCycleSeconds);
       return;
     }
-    // WL3: sequential charged reveal with momentum — more lines draw faster, so
-    // dense wins build rhythm instead of one mushy simultaneous flash. Then fall
-    // into the existing one-bright cycle for readability.
+
     this.revealDur = Math.max(0.1, 0.26 - this.winLines.length * 0.016);
     this.revealIdx = 0;
     this.revealP = 0;
@@ -3612,7 +3118,7 @@ export class SlotView extends Component {
     if (this.candySpark) return this.candySpark;
     const n = this.mkNode('candySpark', 18, 18, this.winLineG!.node);
     const g = n.addComponent(Graphics);
-    // bright candy spark: soft red halo → white-hot core (no ring/stroke)
+
     (
       [
         [11, 255, 70, 96, 90],
@@ -3632,17 +3138,9 @@ export class SlotView extends Component {
     return n;
   }
 
-  /** Cinematic CANDY WIN LINE (cocos-aaa-visual-gate WL1) — a thin warm-GOLD path
-   *  traced along each winning line's cell centres with a soft glow underlay + a
-   *  bright leading SPARK that races L→R as if drawing the line. NOT the rejected
-   *  magenta polyline or the rainbow plasma beam — one elegant gold thread that
-   *  reads the win PATH. Pure Graphics + one pooled spark; cleared in clearWins. */
   private candyLinePts: Vec3[][] = [];
   private tickCandyLine = (): void => this.paintCandyLines();
 
-  /** REEL TAP — reveal ALL paylines (the candy bloom + peppermint ribbon) for one
-   *  second so the player can read the win-combination patterns, then reset. No-op
-   *  while a real win is on screen (it owns the line layer). */
   private showAllPaylines(): void {
     if (this.winLines.length > 0) return;
     const all = PAYLINES.map((_, i) => ({ lineIndex: i, count: GRID.reels }));
@@ -3653,7 +3151,7 @@ export class SlotView extends Component {
   }
 
   private hidePaylines = (): void => {
-    if (this.winLines.length > 0) return; // a win arrived meanwhile — don't wipe it
+    if (this.winLines.length > 0) return;
     this.unschedule(this.tickCandyLine);
     this.candyLinePts = [];
     this.winLineG?.clear();
@@ -3664,12 +3162,6 @@ export class SlotView extends Component {
     }
   };
 
-  /** CANDY-MATERIAL win line (owner: "candy material, red + whitesmoke, bloom, all
-   *  lines, master level"). Collects EVERY winning line's cell-centre path, then
-   *  paints them as a flowing red+whitesmoke CANDY-CANE stripe over a soft red
-   *  BLOOM, re-painted each frame so the stripes scroll like a live peppermint
-   *  ribbon. A bright candy spark traces the longest line on reveal. reducedFx →
-   *  a single static paint, no scroll, no spark. */
   private drawCandyWinLines(lines: { lineIndex: number; count: number }[]): void {
     const g = this.winLineG;
     if (!g) return;
@@ -3687,14 +3179,14 @@ export class SlotView extends Component {
     this.paintCandyLines();
     if (!this.reducedFx) {
       this.unschedule(this.tickCandyLine);
-      this.schedule(this.tickCandyLine, 0); // flowing stripes (the "material" lives)
+      this.schedule(this.tickCandyLine, 0);
     }
-    // soft fade-in of the whole line layer (ease-out entrance — web-animations)
+
     const op = g.node.getComponent(UIOpacity) ?? g.node.addComponent(UIOpacity);
     Tween.stopAllByTarget(op);
     op.opacity = 0;
     tween(op).to(0.18, { opacity: 255 }, { easing: 'quadOut' }).start();
-    // leading candy SPARK traces the longest line on reveal (skipped under reducedFx)
+
     if (longest.length >= 2 && !this.reducedFx) {
       const spark = this.ensureCandySpark();
       spark.active = true;
@@ -3711,9 +3203,6 @@ export class SlotView extends Component {
     }
   }
 
-  /** Paint all candy win lines this frame: a soft red BLOOM (stacked translucent
-   *  strokes, reads as candy glow) + a red+whitesmoke CANDY-CANE core whose dashes
-   *  scroll by a u_time phase so the peppermint stripe flows. */
   private paintCandyLines(): void {
     const g = this.winLineG;
     if (!g) return;
@@ -3722,9 +3211,8 @@ export class SlotView extends Component {
     const SMOKE = new Color(247, 247, 250, 250);
     const DASH = 12;
     const t = this.reducedFx ? 0 : this.uTime;
-    const phase = (t * 46) % (DASH * 2); // dash scroll
-    // BREATHING BLOOM — a live "post-process" pulse on the halo width + intensity,
-    // so the glow reads as an HDR bloom that is alive, not a static stroke (WC5).
+    const phase = (t * 46) % (DASH * 2);
+
     const pulse = this.reducedFx ? 1 : 1 + 0.16 * Math.sin(t * 3.0);
     const stroke = (
       pts: Vec3[],
@@ -3741,15 +3229,11 @@ export class SlotView extends Component {
       g.stroke();
     };
     for (const pts of this.candyLinePts) {
-      // (1) BLOOM HALO — wide gaussian-falloff red→pink glow that breathes. On the
-      // dark portal well stacked translucent passes read as additive HDR light;
-      // per slot-vfx-artist canon we keep this Graphics, not a fragile post shader.
       stroke(pts, 255, 56, 92, 16 * pulse, 32 * pulse);
       stroke(pts, 255, 76, 110, 28 * pulse, 22 * pulse);
       stroke(pts, 255, 112, 142, 52, 14);
       stroke(pts, 255, 172, 198, 94, 8);
-      // (2) CANDY-CANE core — continuous DASH chunks coloured by global distance +
-      // phase so red/whitesmoke stripes flow seamlessly along the whole line.
+
       let accum = 0;
       for (let i = 1; i < pts.length; i++) {
         const ax = pts[i - 1].x,
@@ -3771,9 +3255,7 @@ export class SlotView extends Component {
         }
         accum += len;
       }
-      // (3) WHITE-HOT FILAMENT — a thin blown-out core down the ribbon centre. This
-      // is the post-process bloom signature: a clipped-to-white highlight the glow
-      // bleeds out of. Pulses with the bloom so the whole line feels charged.
+
       stroke(pts, 255, 252, 250, 170 + 50 * (pulse - 1) * 6, 1.9);
     }
   }
@@ -3783,15 +3265,14 @@ export class SlotView extends Component {
     this.unschedule(this.tickReveal);
     this.unschedule(this.tickSymbolWin);
     if (this.winSpark) this.winSpark.active = false;
-    // Wave C — drop the additive overlays back to inactive on clear.
+
     if (this.plasmaCore) this.plasmaCore.active = false;
     if (this.winLineGlow) this.winLineGlowSegs.forEach((s) => (s.active = false));
     this.lastSparkPtIdx = -1;
-    this.hideWinFlames(); // VISUAL BUST — drop the flame sprites on clear
-    this.hideWinBeams(); // CINEMA WAVE — drop the energy ribbons on clear
+    this.hideWinFlames();
+    this.hideWinBeams();
     this.stopWinLinePulse();
-    // Drop any in-flight per-line win-amount pops (stop their tweens first so a
-    // mid-flight step can't write to a destroyed node/opacity).
+
     this.lineWinPops.forEach((n) => {
       if (!n.isValid) return;
       Tween.stopAllByTarget(n);
@@ -3801,10 +3282,10 @@ export class SlotView extends Component {
     });
     this.lineWinPops.length = 0;
     this.winLines = [];
-    this.unschedule(this.tickCandyLine); // stop the flowing candy-line repaint
+    this.unschedule(this.tickCandyLine);
     this.candyLinePts = [];
     this.winLineG?.clear();
-    // Candy win-line spark + the line layer's fade go inactive/reset on clear.
+
     if (this.candySpark) {
       Tween.stopAllByTarget(this.candySpark);
       this.candySpark.active = false;
@@ -3819,11 +3300,6 @@ export class SlotView extends Component {
     this.reels.forEach((reel) => reel.clearHighlight());
   }
 
-  /** Per-line win-amount pop: a "×N" label (N = the line's paytable multiple)
-   *  rises + fades off the line's last winning cell, coloured by the line's hue —
-   *  so the player sees WHICH line paid and HOW MUCH (Salen & Zimmerman:
-   *  discernible outcome; parity with the Pixi fly-up). Tracked + destroyed in
-   *  clearWins. Under reducedFx it fades in place (no rise). */
   private showLineWinPops(result: SpinResult): void {
     for (const w of result.lineWins) {
       if (w.payout <= 0) continue;
@@ -3863,11 +3339,6 @@ export class SlotView extends Component {
     }
   }
 
-  /** CINEMA WAVE — advance u_time on ALL win-presentation materials while a win
-   *  is shown: symbol-win (fire/rim/sweep on the symbol), soft-burst (rotating
-   *  god-ray glow behind it), win-beam (flowing line ribbons). ONE stepper keeps
-   *  them phase-locked; per-node fades are UIOpacity envelopes. Stopped in
-   *  clearWins. */
   private symWinT = 0;
   private tickSymbolWin = (dt: number): void => {
     this.symWinT += dt;
@@ -3877,7 +3348,6 @@ export class SlotView extends Component {
     }
   };
 
-  /** Subtle idle breathe on the whole win-line overlay once drawn (WL1 tail). */
   private startWinLinePulse(): void {
     const node = this.winLineG?.node;
     if (!node) return;
@@ -3903,8 +3373,6 @@ export class SlotView extends Component {
     }
   }
 
-  /** Per-frame charged-draw stepper: fully-revealed lines dim, current line drawn
-   *  up to revealP with the hot spark at its head, rest not yet shown. */
   private tickReveal = (dt: number): void => {
     if (this.revealIdx >= this.winLines.length) {
       this.unschedule(this.tickReveal);
@@ -3920,8 +3388,8 @@ export class SlotView extends Component {
     if (this.revealP >= 1) {
       this.revealP = 0;
       this.revealIdx++;
-      this.lastSparkPtIdx = -1; // fresh line — re-arm sparkCascade triggers
-      this.audio.countTick(0.5); // per-line tick as each trace lands
+      this.lastSparkPtIdx = -1;
+      this.audio.countTick(0.5);
     }
     this.redrawReveal();
   };
@@ -3934,7 +3402,7 @@ export class SlotView extends Component {
       const w = this.winLines[i];
       this.strokeLine(this.linePts(w), false, LINE_HUES[w.lineIndex % LINE_HUES.length]);
     }
-    // Task 4.1 — hide all glow segments first; the current line repopulates them.
+
     if (this.winLineGlow) this.winLineGlowSegs.forEach((s) => (s.active = false));
     const cur = this.winLines[this.revealIdx];
     if (cur) {
@@ -3942,9 +3410,7 @@ export class SlotView extends Component {
       const drawn: Vec3[] = [];
       const head = this.polyAt(pts, this.revealP, drawn);
       this.strokeLine(drawn, true, LINE_HUES[cur.lineIndex % LINE_HUES.length]);
-      // Task 4.1 — additive glow segments tracing the same `drawn` polyline.
-      // Each segment is a stretched/rotated Sprite tinted by the line hue; the
-      // payline-glow.effect material (if loaded) modulates it additively.
+
       if (this.winLineGlow && drawn.length >= 2) {
         const hue = LINE_HUES[cur.lineIndex % LINE_HUES.length];
         const tint = new Color(hue.r, hue.g, hue.b, 255);
@@ -3967,28 +3433,23 @@ export class SlotView extends Component {
           if (sp) sp.color = tint;
         }
       }
-      // Task 6.3 — plasma core rides the head (replaces the single winSpark
-      // diamond). Stacked-alpha discs pulse-scale via tickUTime; the optional
-      // svarka-additive sprite is the additive intensifier on top.
+
       if (this.plasmaCore) {
         this.plasmaCore.active = true;
         this.plasmaCore.setPosition(head.x, head.y, 0);
-        if (this.winSpark) this.winSpark.active = false; // deprecated by plasma
+        if (this.winSpark) this.winSpark.active = false;
       } else if (this.winSpark) {
-        // Pure fallback path (shouldn't normally hit; build always makes plasma)
         this.winSpark.active = true;
         this.winSpark.setPosition(head.x, head.y, 0);
       }
-      // Task 6.3 — head-crosses-cell: fire sparkCascade + shake the winning
-      // symbol. drawn.length-1 is the latest fully-drawn pt; when it increases,
-      // the head just crossed into a new cell column.
+
       const newIdx = drawn.length - 1;
       if (newIdx > this.lastSparkPtIdx) {
         const pt = drawn[newIdx];
         if (pt && this.particles && !this.reducedFx) {
           this.particles.sparkCascade(pt.x, pt.y);
         }
-        // Reel index === polyline pt index (one pt per reel for a paying line).
+
         if (!this.reducedFx && newIdx < cur.count) {
           const row = PAYLINES[cur.lineIndex]?.[newIdx];
           if (row !== undefined && this.reels[newIdx]) {
@@ -3999,22 +3460,16 @@ export class SlotView extends Component {
         this.lastSparkPtIdx = newIdx;
       }
     } else {
-      // No current line to draw — reset spark tracking.
       this.lastSparkPtIdx = -1;
     }
   }
 
-  /** Bounce the sticky cells (persistent wilds/crowns) after a free spin so they
-   *  read as locked + alive rather than respun. positions = [reel, row][]. */
   pulseSticky(
     positions: Array<[number, number]>,
     mode: 'idle' | 'wilds' | 'crowns' | 'reels' = this.lastBonusMode,
   ): void {
     if (!positions || positions.length === 0) return;
-    // Distinct lock "feel" per bonus mechanic so the three features don't read as
-    // the same bounce (paired with the per-mode world tint in setBonusAtmosphere):
-    //   STICKY WILDS — energetic double-pop; CROWNS — tight, bright authoritative
-    //   snap (gold world); WILD REELS — big column surge as the whole reel locks.
+
     const lock =
       mode === 'crowns'
         ? { peak: 1.1, glowPeak: 210 }
@@ -4028,16 +3483,11 @@ export class SlotView extends Component {
     });
   }
 
-  // Count-up state — driven by Component.schedule, NOT tween({v:0}). A
-  // plain-object tween target is never ticked by the TweenSystem in this 3.8.8
-  // web runtime (MEMORY cocos-web-runtime-animation-gotchas), so the HUD WIN
-  // could snap/freeze; a scheduled frame-stepper always advances.
   private winCountTo = 0;
   private winCountDur = 1;
   private winCountElapsed = 0;
   private winCountLastTick = 0;
 
-  /** Kinetic count-up of the win amount, with audio ticks. */
   countUp(toCents: number): void {
     const { baseMs, logScaleMs, maxMs } = VIEW_CONFIG.counter;
     this.winCountDur = Math.max(
@@ -4052,7 +3502,6 @@ export class SlotView extends Component {
     this.schedule(this.tickWin, 0);
   }
 
-  /** Frame-stepped HUD count-up (arrow fn so `this` binds + unschedule matches). */
   private tickWin = (dt: number): void => {
     this.winCountElapsed += dt;
     const p = Math.min(1, this.winCountElapsed / this.winCountDur);
@@ -4068,22 +3517,17 @@ export class SlotView extends Component {
     }
   };
 
-  /** Big-win ceremony (tiered). Returns false for small wins (HUD count-up only).
-   *  The CONTROLLER owns the triumphant win sting + LDW gate; here we only AV-sync
-   *  the ceremony's OWN beats — a physical braam on the detonation frame and a
-   *  per-pip tick as the big number rolls (both safe: the ceremony only shows for
-   *  8x+ wins, never an LDW return). */
   playCeremony(winCents: number, betCents: number, multiplier: number): boolean {
     this.ceremony.onDetonate = () => {
       if (!this.reducedFx) {
         this.audio.impact();
-        // Cinematic light-bloom flare on the detonation frame; intensity by tier.
+
         const mult = betCents > 0 ? winCents / betCents : 0;
         this.cinematicBloom(Math.min(1, mult / 100));
       }
     };
     this.ceremony.onCountPip = () => this.audio.countTick(0.6);
-    // Task 5.MATRIX — EPIC-tier coin geyser fires through the CC-2 particle pool.
+
     this.ceremony.onCoinGeyser = () => {
       if (!this.reducedFx) this.particles.coinGeyser();
     };
@@ -4094,7 +3538,6 @@ export class SlotView extends Component {
     this.ceremony.showFeatureUnlocked(name, mode);
   }
 
-  /** Shard burst from the winning cells, scaled by win/total-bet multiple. */
   burstParticles(result: SpinResult, multiple: number): void {
     if (this.reducedFx) return;
     const centers: Vec3[] = [];
@@ -4120,7 +3563,6 @@ export class SlotView extends Component {
     this.audio.setVolume(v);
   }
 
-  // ---- winning-line overlay -------------------------------------------------
   private cellCenter(reel: number, row: number): Vec3 {
     const { cell, reelCenterY } = VIEW_CONFIG.layout;
     return new Vec3(
@@ -4130,7 +3572,6 @@ export class SlotView extends Component {
     );
   }
 
-  /** The cell-centre polyline for a winning line. */
   private linePts(w: { lineIndex: number; count: number }): Vec3[] {
     const rows = PAYLINES[w.lineIndex];
     const pts: Vec3[] = [];
@@ -4138,8 +3579,6 @@ export class SlotView extends Component {
     return pts;
   }
 
-  /** Walk `pts` to a fraction of total arc length; push the visited points into
-   *  `out` and return the interpolated head (for the leading spark). */
   private polyAt(pts: Vec3[], frac: number, out: Vec3[]): Vec3 {
     out.length = 0;
     if (pts.length === 0) return new Vec3();
@@ -4172,14 +3611,6 @@ export class SlotView extends Component {
     return head;
   }
 
-  /** Stroke a (possibly partial) polyline. Polish 2026-06-11: dramatically cut
-   *  the visible stroke alpha so the line reads as an ATMOSPHERIC guide rather
-   *  than a graphic "drawn line through the symbols". The visual reading of the
-   *  win line is now carried by the cell pulse (playWin), the additive
-   *  payline-glow shader segments (Task 4.1), the Svarka plasma core riding
-   *  the head (Task 6.3), and the spark cascades on head-crosses-cell. The
-   *  Graphics stroke survives as a faint trace only — never as the dominant
-   *  visual. (slot-vfx-artist canon: never lead with a raw colored line.) */
   private strokeLine(pts: Vec3[], bright: boolean, color: Color): void {
     const g = this.winLineG;
     if (!g || pts.length < 2) return;
@@ -4187,14 +3618,12 @@ export class SlotView extends Component {
       g.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
     };
-    // Soft black underlay — kept thin + low-alpha for a subtle depth seat.
+
     g.lineWidth = bright ? 5 : 3;
     g.strokeColor = new Color(0, 0, 0, bright ? 90 : 50);
     path();
     g.stroke();
-    // Coloured core — cut from full-alpha graphic to a soft atmospheric tint.
-    // The shader bloom (payline-glow material) + plasma core + cell pulse
-    // carry the actual visual weight; this is just a subtle path memory.
+
     g.lineWidth = bright ? 2 : 1.5;
     g.strokeColor = bright
       ? new Color(color.r, color.g, color.b, 75)

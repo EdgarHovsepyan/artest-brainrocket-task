@@ -1,9 +1,3 @@
-// MVC — VIEW. Acid/white diamond shards bursting from winning cells, scaled by
-// the win-to-bet multiple. As of CC-2 (Task 5.4), every shard is borrowed from a
-// sibling ParticlePool — no new/destroy in the hot path. Two new spawn paths land
-// for downstream tasks: sparkCascade(x,y) for 6.3 Svarka, coinGeyser() for the
-// Epic-tier ceremony.
-
 import { _decorator, Color, Component, tween, Vec3 } from 'cc';
 import { ParticlePool, PoolShard } from './particle-pool';
 import { VIEW_CONFIG } from './view-config';
@@ -11,16 +5,15 @@ import { VIEW_CONFIG } from './view-config';
 const { ccclass } = _decorator;
 const WHITE = new Color(255, 255, 255, 255);
 const COIN = new Color(255, 196, 64, 255);
-// CANDY CONFETTI — the win burst sprays a sweet-shop mix (pink, mint, gold,
-// lavender, sugar-white, sky) so a win reads "yummy candy", not harsh acid/fire.
+
 const CANDY = [
-  new Color(255, 120, 180, 255), // candy pink
-  new Color(255, 90, 156, 255), // hot pink
-  new Color(126, 240, 192, 255), // mint
-  new Color(255, 205, 90, 255), // gold
-  new Color(200, 160, 255, 255), // lavender
-  new Color(255, 250, 252, 255), // sugar white
-  new Color(150, 215, 255, 255), // sky candy
+  new Color(255, 120, 180, 255),
+  new Color(255, 90, 156, 255),
+  new Color(126, 240, 192, 255),
+  new Color(255, 205, 90, 255),
+  new Color(200, 160, 255, 255),
+  new Color(255, 250, 252, 255),
+  new Color(150, 215, 255, 255),
 ];
 const candy = () => CANDY[(Math.random() * CANDY.length) | 0]!;
 
@@ -28,13 +21,13 @@ interface PhysParticle {
   slot: PoolShard;
   vx: number;
   vy: number;
-  /** Vertical acceleration (px/s²) — negative pulls a rising ember back. */
+
   g: number;
-  /** Per-frame velocity retention at 60fps (drag); <1 = damping. */
+
   damp: number;
   life: number;
   age: number;
-  /** Twinkle phase offset so the field never flickers in unison. */
+
   ph: number;
   s0: number;
 }
@@ -42,8 +35,7 @@ interface PhysParticle {
 @ccclass('ParticleLayer')
 export class ParticleLayer extends Component {
   private pool!: ParticlePool;
-  // CGI particles — a real integrator (velocity, gravity, drag, twinkle) instead
-  // of point-to-point tweens. One stepper runs only while particles are alive.
+
   private phys: PhysParticle[] = [];
   private physOn = false;
 
@@ -63,7 +55,7 @@ export class ParticleLayer extends Component {
     life: number,
   ): void {
     const slot = this.pool.get(x, y, color, s0);
-    if (!slot) return; // pool full — silent drop
+    if (!slot) return;
     this.phys.push({ slot, vx, vy, g, damp, life, age: 0, ph: Math.random() * 6.283, s0 });
     if (!this.physOn) {
       this.physOn = true;
@@ -87,7 +79,7 @@ export class ParticleLayer extends Component {
       const pos = n.position;
       n.setPosition(pos.x + p.vx * dt, pos.y + p.vy * dt, 0);
       const t = p.age / p.life;
-      // Envelope: quick ignite → sustained → fade; candle-twinkle on top.
+
       const fade = t < 0.12 ? t / 0.12 : t > 0.55 ? 1 - (t - 0.55) / 0.45 : 1;
       const tw = 0.75 + 0.25 * Math.sin(p.age * 14 + p.ph);
       p.slot.opacity.opacity = Math.round(255 * Math.max(0, fade) * tw);
@@ -100,7 +92,6 @@ export class ParticleLayer extends Component {
     }
   };
 
-  /** Burst shards from each centre; volume scales with `multiple` (win/total bet). */
   burst(centers: Vec3[], multiple: number): void {
     const { baseCount, perMultiple, maxCount } = VIEW_CONFIG.particles;
     const big = multiple >= VIEW_CONFIG.ceremony.showMinMultiple;
@@ -112,23 +103,16 @@ export class ParticleLayer extends Component {
     }
   }
 
-  /** SUGAR SPARKLES (candy redesign): sweet-coloured motes rising from each
-   *  winning cell — pink/gold/mint/sugar-white — drifting up + sideways and
-   *  fading. The win indicator that replaces the drawn payline; reads as candy
-   *  sparkle off the symbol (was warm fire embers — off-theme for a candy slot),
-   *  no geometry. */
   fireEmbers(centers: Vec3[]): void {
     const cfg = VIEW_CONFIG.win.fireEmbers;
     const life = cfg.lifeMs / 1000;
     const warm = [
-      new Color(255, 130, 190, 255), // candy pink
-      new Color(255, 205, 90, 255), // gold
-      new Color(140, 240, 200, 255), // mint
-      new Color(255, 250, 250, 255), // sugar-white spark
+      new Color(255, 130, 190, 255),
+      new Color(255, 205, 90, 255),
+      new Color(140, 240, 200, 255),
+      new Color(255, 250, 250, 255),
     ];
     for (const c of centers) {
-      // Phase 1 — IGNITE RING: a radial pop of fast, hard-damped light points
-      // (the energy leaving the symbol), settling within ~half a second.
       for (let i = 0; i < 8; i++) {
         const ang = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
         const v = 240 + Math.random() * 120;
@@ -144,8 +128,7 @@ export class ParticleLayer extends Component {
           0.4 + Math.random() * 0.2,
         );
       }
-      // Phase 2 — EMBER RISE: buoyant motes that decelerate as they climb,
-      // drifting + twinkling; the white-hot quarter is faster and shorter.
+
       for (let i = 0; i < cfg.perCell; i++) {
         const hot = i % 4 === 3;
         this.spawnPhys(
@@ -163,7 +146,6 @@ export class ParticleLayer extends Component {
     }
   }
 
-  /** 6.3 Svarka cascade: short-lived hot-cyan sparks pulled down by gravity at (x,y). */
   sparkCascade(x: number, y: number): void {
     const cfg = VIEW_CONFIG.win.svarka;
     const color = new Color().fromHEX(cfg.sparkColor);
@@ -171,19 +153,15 @@ export class ParticleLayer extends Component {
     const g = cfg.sparkGravity;
     for (let i = 0; i < cfg.sparkPerStep; i++) {
       const slot = this.pool.get(x, y, color, 0.6 + Math.random() * 0.4);
-      if (!slot) return; // pool full — silent drop
+      if (!slot) return;
       const vx = (Math.random() - 0.5) * 200;
-      const vy = -60 + Math.random() * 40; // small upward kick before gravity wins
+      const vy = -60 + Math.random() * 40;
       const endX = x + vx * life;
       const endY = y + vy * life - 0.5 * g * life * life;
       this.ballistic(slot, endX, endY, life, 'quadIn');
     }
   }
 
-  /** Epic-ceremony coin geyser: ballistic gold shards launched from a point.
-   *  Real parabola — each coin RISES to an apex (quadOut), then FALLS well past
-   *  the board (quadIn) while spinning, fading only near the end, so the screen
-   *  reads as a torrent of coins raining down, not a puff that vanishes mid-air. */
   coinGeyser(originX = 0, originY = VIEW_CONFIG.layout.reelCenterY): void {
     const cfg = VIEW_CONFIG.particles.coin;
     const spread = (cfg.spreadDeg * Math.PI) / 180;
@@ -191,18 +169,18 @@ export class ParticleLayer extends Component {
     for (let i = 0; i < cfg.count; i++) {
       const slot = pool.get(originX, originY, COIN, 1.2);
       if (!slot) return;
-      const ang = -Math.PI / 2 + (Math.random() - 0.5) * spread; // upward cone
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * spread;
       const v = cfg.launchSpeed * (0.85 + Math.random() * 0.45);
       const vx = Math.cos(ang) * v;
       const vy = Math.sin(ang) * v;
-      // Rise to the apex, then fall far below the launch point.
+
       const tApex = Math.max(0.18, Math.abs(vy) / cfg.gravity);
       const apexX = originX + vx * tApex;
       const apexY = originY + vy * tApex - 0.5 * cfg.gravity * tApex * tApex;
       const fall = tApex + 0.55 + Math.random() * 0.35;
       const endX = apexX + vx * fall * 0.65;
-      const endY = apexY - 0.5 * cfg.gravity * fall * fall; // drops below the board
-      const spin = Math.random() * 720 - 360; // each coin tumbles its own way
+      const endY = apexY - 0.5 * cfg.gravity * fall * fall;
+      const spin = Math.random() * 720 - 360;
       const node = slot.node;
       node.angle = 0;
       tween(node)
@@ -223,11 +201,10 @@ export class ParticleLayer extends Component {
   }
 
   private spawn(x: number, y: number, big: boolean): void {
-    // Candy confetti: mostly the sweet-shop mix, a sugar-white sparkle ~1 in 5.
     const color = Math.random() < 0.2 ? WHITE : candy();
     const scale = big ? 0.95 : 0.62;
     const slot = this.pool.get(x, y, color, scale);
-    if (!slot) return; // pool full — silent drop
+    if (!slot) return;
     const ang = Math.random() * Math.PI * 2;
     const dist = (big ? 150 : 80) * (0.5 + Math.random());
     const life = 0.5 + Math.random() * 0.4;
