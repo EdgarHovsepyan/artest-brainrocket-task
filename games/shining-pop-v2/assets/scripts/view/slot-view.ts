@@ -3192,8 +3192,13 @@ export class SlotView extends Component {
     const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
     const waveStagger = VIEW_CONFIG.win.highlightWaveStagger;
     this.reels.forEach((reel, i) =>
-      reel.highlight(byReel[i] ?? [], i * waveStagger, rich, winMat, this.winLift, (row) =>
-        this.cellCenter(i, row),
+      reel.highlight(
+        byReel[i] ?? [],
+        i * waveStagger,
+        rich,
+        winMat,
+        VIEW_CONFIG.win.liftWinSymbols ? this.winLift : null,
+        (row) => this.cellCenter(i, row),
       ),
     );
 

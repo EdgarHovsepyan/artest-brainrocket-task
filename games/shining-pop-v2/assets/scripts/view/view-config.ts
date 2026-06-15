@@ -164,6 +164,11 @@ export const VIEW_CONFIG = {
 
     winSustainScale: 1.16,
 
+    // Lift winning symbols out of the reel mask (uncropped, above the frame).
+    // OFF: a tall symbol (the wild) at the bottom row hangs below the frame into
+    // the bar and reads as "moved + empty slot". Pop in place, cropped instead.
+    liftWinSymbols: false,
+
     winTilt: { enabled: true, deg: 13, ms: 540 },
 
     // Per-tier halo warmth (Koster — tiers must be discriminable at a glance):
