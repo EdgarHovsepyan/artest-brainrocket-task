@@ -35,7 +35,7 @@ export class CeremonyView extends Component {
   private shockNode!: Node;
   private shockG!: Graphics;
   private sparkleRoot!: Node;
-  private sparkles: { node: Node; op: UIOpacity }[] = [];
+  private sparkles: { node: Node; op: UIOpacity; spin: number }[] = [];
   private panelLightOp!: UIOpacity;
   private headerLabel!: Label;
   private amountLabel!: Label;
@@ -476,8 +476,11 @@ export class CeremonyView extends Component {
       [255, 255, 255],
       [255, 158, 208],
       [255, 206, 71],
+      [150, 215, 255],
     ];
-    const diamond = (g: Graphics, r: number): void => {
+    // Three crisp confetti silhouettes — romb (diamond), box (square), star — so
+    // the unlock burst reads as varied jewellery, not a cloud of identical dots.
+    const romb = (g: Graphics, r: number): void => {
       g.moveTo(0, r);
       g.lineTo(r, 0);
       g.lineTo(0, -r);
@@ -485,26 +488,51 @@ export class CeremonyView extends Component {
       g.close();
       g.fill();
     };
-    for (let i = 0; i < 18; i++) {
-      const n = this.mk('spk', 18, 18, this.sparkleRoot);
+    const box = (g: Graphics, r: number): void => {
+      const s = r * 0.82;
+      g.rect(-s, -s, s * 2, s * 2);
+      g.fill();
+    };
+    const star = (g: Graphics, r: number): void => {
+      const inner = r * 0.46;
+      for (let k = 0; k < 10; k++) {
+        const rad = k % 2 ? inner : r;
+        const a = -Math.PI / 2 + (k * Math.PI) / 5;
+        const x = Math.cos(a) * rad;
+        const y = Math.sin(a) * rad;
+        if (k === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.close();
+      g.fill();
+    };
+    const shapes = [romb, box, star];
+    const COUNT = 24;
+    for (let i = 0; i < COUNT; i++) {
+      const n = this.mk('spk', 22, 22, this.sparkleRoot);
       n.layer = this.sparkleRoot.layer;
       const g = n.addComponent(Graphics);
       const [cr, cg, cb] = palette[i % palette.length];
-      g.fillColor = new Color(cr, cg, cb, 64);
-      diamond(g, 9);
-      g.fillColor = new Color(cr, cg, cb, 255);
-      diamond(g, 4.4);
+      const shape = shapes[i % shapes.length];
+      // Size variety so the burst has near/far depth, not one flat scale.
+      const r = 8 + (i % 4) * 2.4;
+      g.fillColor = new Color(cr, cg, cb, 64); // soft outer glow
+      shape(g, r);
+      g.fillColor = new Color(cr, cg, cb, 255); // bright core
+      shape(g, r * 0.5);
       const op = n.addComponent(UIOpacity);
       op.opacity = 0;
       n.active = false;
-      this.sparkles.push({ node: n, op });
+      // Boxes and stars spin; rombs read cleaner mostly upright. Alternate sign.
+      const spin = (shape === box ? 220 : shape === star ? 300 : 120) * (i % 2 ? 1 : -1);
+      this.sparkles.push({ node: n, op, spin });
     }
   }
 
   private fireSparkleBurst(): void {
     const n = this.sparkles.length;
     for (let i = 0; i < n; i++) {
-      const { node, op } = this.sparkles[i];
+      const { node, op, spin } = this.sparkles[i];
       Tween.stopAllByTarget(node);
       Tween.stopAllByTarget(op);
       const a = (Math.PI * 2 * i) / n + (i % 2 ? 0.16 : -0.12);
@@ -512,19 +540,28 @@ export class CeremonyView extends Component {
       node.active = true;
       node.setPosition(0, 0, 0);
       node.setScale(0.2, 0.2, 1);
+      node.angle = 0;
       op.opacity = 255;
       const tx = Math.cos(a) * dist;
       const ty = Math.sin(a) * dist;
+      // Per-shard stagger so the burst blooms outward in a wave, not one block.
+      const lead = (i % 6) * 0.018;
       tween(node)
-        .to(0.12, { scale: new Vec3(1.15, 1.15, 1) }, { easing: 'backOut' })
-        .to(0.5, { scale: new Vec3(0.7, 0.7, 1) }, { easing: 'sineOut' })
+        .delay(lead)
+        .to(0.12, { scale: new Vec3(1.18, 1.18, 1) }, { easing: 'backOut' })
+        .to(0.52, { scale: new Vec3(0.62, 0.62, 1) }, { easing: 'sineOut' })
         .start();
+      // expoOut launch, then a gentle gravity drift down on settle (secondary motion).
       tween(node)
+        .delay(lead)
         .to(0.6, { position: new Vec3(tx, ty, 0) }, { easing: 'expoOut' })
+        .to(0.5, { position: new Vec3(tx * 1.04, ty - 26, 0) }, { easing: 'sineIn' })
         .start();
+      // Tumble: boxes/stars spin hard, rombs drift — gives the confetti life.
+      tween(node).delay(lead).by(0.85, { angle: spin }, { easing: 'quadOut' }).start();
       tween(op)
-        .delay(0.22)
-        .to(0.42, { opacity: 0 }, { easing: 'quadIn' })
+        .delay(0.24 + lead)
+        .to(0.46, { opacity: 0 }, { easing: 'quadIn' })
         .call(() => {
           if (node.isValid) node.active = false;
         })
