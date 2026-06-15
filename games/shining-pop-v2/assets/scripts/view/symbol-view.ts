@@ -37,6 +37,7 @@ export class SymbolView extends Component {
 
   private happyFace: Node | null = null;
   private happyFaceOp: UIOpacity | null = null;
+  private landRest: Vec3 | null = null;
   private size = 90;
 
   private homeParent: Node | null = null;
@@ -660,12 +661,24 @@ export class SymbolView extends Component {
     }
   }
 
-  playLand(squashY: number): void {
+  // Per-symbol landing impact merged into the reel stop: the symbol dips a touch
+  // under its own weight and squashes, then springs back with an overshoot
+  // (backOut). Staggered across rows by the caller, this turns a rigid strip stop
+  // into a top-level "symbols settle into place" landing.
+  playLand(cell: number, dipFrac: number, sqFrac: number, durMs: number): void {
     Tween.stopAllByTarget(this.node);
+    // Cache the true rest slot once, so an interrupted landing can never leave
+    // the symbol permanently dipped (it always springs back to this baseline).
+    if (!this.landRest) this.landRest = this.node.position.clone();
+    const home = this.landRest;
+    const d = Math.max(0.05, durMs / 1000);
+    this.node.setPosition(home);
     this.node.setScale(1, 1, 1);
+    const dip = new Vec3(home.x, home.y - cell * dipFrac, home.z);
+    const squash = new Vec3(1 + sqFrac, 1 - sqFrac, 1);
     tween(this.node)
-      .to(0.06, { scale: new Vec3(1 + (1 - squashY), squashY, 1) }, { easing: 'quadOut' })
-      .to(0.13, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .to(d * 0.3, { position: dip, scale: squash }, { easing: 'quadOut' })
+      .to(d * 0.7, { position: home, scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .start();
   }
 

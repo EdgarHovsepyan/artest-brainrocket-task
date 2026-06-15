@@ -103,6 +103,20 @@ test('win anticipation dip is a brief, real squash (never inverted or sluggish)'
   assert.equal(typeof a.enabled, 'boolean');
 });
 
+test('per-symbol reel-landing config is sane across speed modes', () => {
+  const L = VIEW_CONFIG.land;
+  for (const key of ['off', 'turbo', 'max'] as const) {
+    // a landing dip + squash must be a small positive fraction (a subtle settle,
+    // not a second full bounce) and the per-row duration/stagger must be positive.
+    assert.ok(L.landDip[key] > 0 && L.landDip[key] < 0.2, `${key} landDip out of (0,0.2)`);
+    assert.ok(L.landSq[key] > 0 && L.landSq[key] < 0.2, `${key} landSq out of (0,0.2)`);
+    assert.ok(L.symDurMs[key] > 0, `${key} symDurMs must be positive`);
+    assert.ok(L.symStagMs[key] >= 0, `${key} symStagMs must be >= 0`);
+  }
+  // faster modes settle quicker: max is snappier than off (less sluggish landing).
+  assert.ok(L.symDurMs.max <= L.symDurMs.off, 'max-speed landing must not be slower than off');
+});
+
 test('resolveBigWinTier maps win multiples to the right tier band', () => {
   assert.equal(resolveBigWinTier(0), null, 'no ceremony for a 0x win');
   assert.equal(resolveBigWinTier(9), null, 'below the BIG floor → no named tier');
