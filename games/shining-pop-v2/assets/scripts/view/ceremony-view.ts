@@ -123,23 +123,11 @@ export class CeremonyView extends Component {
     this.buildSparkles();
 
     const ground = this.mk('ground', 10, 10, ov).addComponent(Graphics);
-    ground.fillColor = new Color(255, 0, 127, 34);
-    ground.moveTo(0, -120);
-    ground.lineTo(330, -10);
-    ground.lineTo(0, 100);
-    ground.lineTo(-330, -10);
-    ground.close();
-    ground.fill();
+    this.drawGlowWedge(ground, 255, 0, 127, 34);
 
     const panelLightNode = this.mk('panelLight', 10, 10, ov);
     const panelLight = panelLightNode.addComponent(Graphics);
-    panelLight.fillColor = new Color(255, 186, 92, 110);
-    panelLight.moveTo(0, -120);
-    panelLight.lineTo(330, -10);
-    panelLight.lineTo(0, 100);
-    panelLight.lineTo(-330, -10);
-    panelLight.close();
-    panelLight.fill();
+    this.drawGlowWedge(panelLight, 255, 186, 92, 110);
     this.panelLightOp = panelLightNode.addComponent(UIOpacity);
     this.panelLightOp.opacity = 0;
 
@@ -181,6 +169,14 @@ export class CeremonyView extends Component {
       fg.close();
       fg.fill();
     }
+    // Crisp bright core so the detonation reads as a hard "bang", not just a bloom.
+    fg.fillColor = new Color(255, 255, 255, 210);
+    fg.moveTo(0, 150);
+    fg.lineTo(150, 0);
+    fg.lineTo(0, -150);
+    fg.lineTo(-150, 0);
+    fg.close();
+    fg.fill();
     this.flashOp = flashNode.addComponent(UIOpacity);
     this.flashOp.opacity = 0;
     flashNode.active = false;
@@ -415,6 +411,25 @@ export class CeremonyView extends Component {
     this.shake(12);
     tween(this.dim).to(0.1, { opacity: 130 }).start();
     this.scheduleOnce(() => this.hide(), 1.6);
+  }
+
+  // Soft volumetric stage-light wedge: concentric lens shapes from wide+faint
+  // (outer) to narrow+bright (inner) so the glow has a gradient falloff instead
+  // of one flat shape — the difference between a stage light and a paper cutout.
+  private drawGlowWedge(g: Graphics, r: number, gg: number, b: number, peak: number): void {
+    const LAYERS = 5;
+    for (let i = 0; i < LAYERS; i++) {
+      const t = i / (LAYERS - 1); // 0 outer → 1 inner
+      const s = 1 - t * 0.55;
+      const a = Math.round(peak * (0.22 + 0.78 * t));
+      g.fillColor = new Color(r, gg, b, a);
+      g.moveTo(0, -120 * s);
+      g.lineTo(330 * s, -10 * s);
+      g.lineTo(0, 100 * s);
+      g.lineTo(-330 * s, -10 * s);
+      g.close();
+      g.fill();
+    }
   }
 
   private drawRays(count: number, len: number, alpha: number, tint?: Color): void {
