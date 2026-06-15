@@ -125,7 +125,7 @@ export const VIEW_CONFIG = {
     },
 
     bounce: {
-      overtravelFrac: 0.07,
+      overtravelFrac: 0,
       bounceMs: 170,
       easing: 'backOut',
       weight: 1.05,
@@ -359,7 +359,7 @@ export const VIEW_CONFIG = {
   land: {
     armAt: 0.965,
     symDurMs: { off: 250, turbo: 165, max: 130 },
-    symStagMs: { off: 40, turbo: 26, max: 18 },
+    symStagMs: { off: 16, turbo: 11, max: 7 },
     landDip: { off: 0.052, turbo: 0.038, max: 0.03 },
     landSq: { off: 0.055, turbo: 0.042, max: 0.034 },
   },
