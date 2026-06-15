@@ -609,6 +609,9 @@ export class SlotController extends Component {
       this.bar.setSpinning(false);
       this.view.setInteractable(true);
       this.view.setBuyFabVisible(true);
+      // The bar was hidden when the buy menu opened (overlay gate); the bonus
+      // flow never re-syncs it, so reveal it explicitly when we return to idle.
+      if (this.barNode && this.barNode.isValid) this.barNode.active = true;
       this.refreshBuyAffordability();
     }, 0.4);
   }

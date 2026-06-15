@@ -194,6 +194,9 @@ export class SlotView extends Component {
   private soundBtn: DeckButton | null = null;
   private buyMenu: Node | null = null;
   private buyModal: BuyBonusModal | null = null;
+  // Explicit open-state: the modal's close() only flips node.active after a fade,
+  // so anyOverlayOpen() can't read node.active synchronously. This tracks intent.
+  private buyMenuOpen = false;
   private buyFab: Node | null = null;
   private buyBetStepCb: ((dir: number) => void) | null = null;
   private autoplayPanel: Node | null = null;
@@ -2045,13 +2048,16 @@ export class SlotView extends Component {
       host.setSiblingIndex(root.children.length - 1);
       this.buyModal = host.addComponent(BuyBonusModal);
       this.buyModal.on('buy', (mode) => {
+        this.buyMenuOpen = false;
         this.buyModal?.close();
         this.buyCb?.(mode as string);
       });
       this.buyModal.on('bet:inc', () => this.buyBetStepCb?.(1));
       this.buyModal.on('bet:dec', () => this.buyBetStepCb?.(-1));
       this.buyModal.on('ui:click', () => this.audio.click());
-
+      // Scrim tap / cancel / close-X all emit 'cancel' and self-close the modal;
+      // route through closeBuyMenu so the buy FAB + betting bar are restored.
+      this.buyModal.on('cancel', () => this.closeBuyMenu());
       this.buyModal.on('buy:blocked', () => this.audio.click());
     }
     const tiers: BuyTier[] = options.map((o, i) => {
@@ -2094,16 +2100,22 @@ export class SlotView extends Component {
   }
 
   closeBuyMenu(): void {
+    this.buyMenuOpen = false;
     this.buyModal?.close();
     this.setBuyFabVisible(true);
+    // Re-sync the overlay gate so the betting bar comes back (the bug: the modal
+    // self-closing on cancel never told the controller the overlay was gone).
+    this.scheduleOverlaySync();
   }
 
   openBuyMenu(): void {
     this.closeOverlays();
+    this.buyMenuOpen = true;
     this.fitBuyModal();
     this.buyModal?.open();
     this.audio.buyOpen();
     this.setBuyFabVisible(false);
+    this.scheduleOverlaySync();
   }
 
   private fitBuyModal(): void {
@@ -2593,7 +2605,7 @@ export class SlotView extends Component {
       on(this.quickBetPanel)
     )
       return true;
-    if (this.buyModal && this.buyModal.isValid && this.buyModal.node.active) return true;
+    if (this.buyMenuOpen) return true;
     if (this.node.parent?.getChildByName('rcModal')) return true;
     return false;
   }
