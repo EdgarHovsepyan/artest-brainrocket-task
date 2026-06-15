@@ -509,7 +509,15 @@ export class BuyBonusModal extends Component {
   fit(viewW: number, viewH: number, bottomInset = 0): void {
     const margin = 36;
     const availH = Math.max(220, viewH - bottomInset - margin);
-    const s = Math.min(1, (viewW - margin) / CARD_W, availH / CARD_H);
+    // PORTRAIT (owner: "buy bonus too small on mobile") — in a tall viewport the
+    // old `min(1, …)` cap left the card tiny (it only filled the landscape width).
+    // In portrait, fill ~92% of the WIDTH instead (height is never the constraint
+    // on a tall screen), so the modal is big and readable. Landscape keeps the
+    // original height-constrained fit capped at 1.
+    const portrait = viewH > viewW;
+    const s = portrait
+      ? Math.min((viewW * 0.92) / CARD_W, availH / CARD_H)
+      : Math.min(1, (viewW - margin) / CARD_W, availH / CARD_H);
     this.cardScale = s;
     if (this.card) {
       this.card.setScale(s, s, 1);
