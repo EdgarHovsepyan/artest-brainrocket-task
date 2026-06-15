@@ -15,8 +15,13 @@ import { cpSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// ROOT (where the games live) is resolved from THIS file, so the sources are found
+// no matter what working directory invokes the script. The OUTPUT, however, is
+// written relative to the CURRENT working directory so Vercel finds `public/`
+// regardless of whether its Root Directory is the repo root or a subfolder (the
+// "Cannot find module …/games/shining-pop/scripts/assemble-demo.mjs" deploy bug).
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'public');
+const OUT = path.join(process.cwd(), 'public');
 
 const GAMES = [
   { slug: 'shining-pop', src: 'games/shining-pop/dist' },

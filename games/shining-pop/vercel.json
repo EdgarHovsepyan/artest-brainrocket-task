@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "node scripts/assemble-demo.mjs || node ../../scripts/assemble-demo.mjs",
+  "buildCommand": "node ../../scripts/assemble-demo.mjs",
   "outputDirectory": "public",
   "trailingSlash": true,
   "framework": null,
