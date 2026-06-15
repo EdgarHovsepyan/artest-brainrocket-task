@@ -2101,13 +2101,14 @@ export class SlotView extends Component {
 
   closeBuyMenu(): void {
     this.buyMenuOpen = false;
-    this.buyModal?.close();
+    // Restore the bar + FAB FIRST (synchronous), so even if the modal close below
+    // ever throws, the UI can never be stranded hidden — this is the root of the
+    // "betting panel stays hidden after exiting buy bonus" report. Also re-synced
+    // next frame to cover any tail state.
     this.setBuyFabVisible(true);
-    // Restore the betting bar BOTH now (synchronous — reliable regardless of the
-    // close fade or scheduler) and next frame (covers any tail state), so closing
-    // the buy popup can never leave the bar + FAB stuck hidden.
     this.onOverlay?.(this.anyOverlayOpen());
     this.scheduleOverlaySync();
+    this.buyModal?.close();
   }
 
   openBuyMenu(): void {
