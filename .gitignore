@@ -31,3 +31,6 @@ packages/*/dist/
 /public/
 
 .vercel
+
+# Playwright capture output (verify-the-built-thing screenshots) — never committed
+/tmp/
