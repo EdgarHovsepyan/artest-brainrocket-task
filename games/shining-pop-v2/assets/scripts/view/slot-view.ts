@@ -1867,7 +1867,7 @@ export class SlotView extends Component {
   // Candy-wipe + soft-bloom — one reusable cinematic transition fired on
   // every major state change (intro->game, base<->bonus, free-spins, round end).
   cinematicWipe(core: Color, halo: Color, dir = 1, intensity = 1): void {
-    this.cinematicBloom(0.8 * intensity);
+    // No full-screen bloom here — it washed the board out; the translucent band carries the sweep.
     const wipe = this.cineWipe;
     const op = this.cineWipeOp;
     const band = this.cineWipeBand;
@@ -1913,23 +1913,25 @@ export class SlotView extends Component {
     const H = 2800;
     const a = Math.min(1, Math.max(0.4, intensity));
     g.clear();
-    // Feathered candy band: wide soft halo -> bright core, all centred on x=0.
+    // Feathered candy band: wide soft halo -> brighter core, centred on x=0.
+    // Kept TRANSLUCENT on purpose — the board must read through the sweep so a
+    // transition never washes the reels/symbols out. Max core alpha ~110/255.
     const layers: [number, Color, number][] = [
-      [620, halo, 36 * a],
-      [400, halo, 70 * a],
-      [220, core, 150 * a],
-      [96, core, 230 * a],
+      [560, halo, 16 * a],
+      [320, halo, 42 * a],
+      [180, core, 78 * a],
+      [80, core, 110 * a],
     ];
     for (const [w, col, alpha] of layers) {
       g.fillColor = new Color(col.r, col.g, col.b, Math.round(alpha));
       g.rect(-w / 2, -H / 2, w, H);
       g.fill();
     }
-    // Two thin peppermint stripes riding the core for the candy read.
-    g.fillColor = new Color(255, 255, 255, Math.round(200 * a));
-    g.rect(-150, -H / 2, 10, H);
+    // Two thin peppermint glints riding the core for the candy read.
+    g.fillColor = new Color(255, 255, 255, Math.round(120 * a));
+    g.rect(-128, -H / 2, 8, H);
     g.fill();
-    g.rect(120, -H / 2, 10, H);
+    g.rect(104, -H / 2, 8, H);
     g.fill();
   }
 
