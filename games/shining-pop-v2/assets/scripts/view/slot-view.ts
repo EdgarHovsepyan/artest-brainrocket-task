@@ -906,6 +906,12 @@ export class SlotView extends Component {
     // "show bigger only the symbols, not cropping under reels"). Created right after
     // the reels so it sits just above them but below the cinematic/ceremony layers.
     this.winLift = this.mkNode('winLift', 10, 10, this.node);
+    // REEL TAP → reveal all paylines with the candy bloom for 1s, then reset (owner:
+    // "click the reels to show the win-combination lines, shader bloom, hide 1s").
+    // An invisible catcher over the reel window; only fires when no win is on screen.
+    const tap = this.mkNode('paylineTap', this.gw, this.gh, this.node);
+    tap.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    tap.on(Node.EventType.TOUCH_END, () => this.showAllPaylines());
     this.buildCinematicBloom(); // transient win bloom-flash (opacity 0 at rest)
 
     this.winLineG = this.mkNode('winLines', 10, 10, this.node).addComponent(Graphics);
@@ -3633,6 +3639,30 @@ export class SlotView extends Component {
    *  reads the win PATH. Pure Graphics + one pooled spark; cleared in clearWins. */
   private candyLinePts: Vec3[][] = [];
   private tickCandyLine = (): void => this.paintCandyLines();
+
+  /** REEL TAP — reveal ALL paylines (the candy bloom + peppermint ribbon) for one
+   *  second so the player can read the win-combination patterns, then reset. No-op
+   *  while a real win is on screen (it owns the line layer). */
+  private showAllPaylines(): void {
+    if (this.winLines.length > 0) return;
+    const all = PAYLINES.map((_, i) => ({ lineIndex: i, count: GRID.reels }));
+    if (VIEW_CONFIG.win.beams.enabled) this.showWinBeams(all);
+    this.drawCandyWinLines(all);
+    this.unschedule(this.hidePaylines);
+    this.scheduleOnce(this.hidePaylines, 1.0);
+  }
+
+  private hidePaylines = (): void => {
+    if (this.winLines.length > 0) return; // a win arrived meanwhile — don't wipe it
+    this.unschedule(this.tickCandyLine);
+    this.candyLinePts = [];
+    this.winLineG?.clear();
+    this.hideWinBeams();
+    if (this.candySpark) {
+      Tween.stopAllByTarget(this.candySpark);
+      this.candySpark.active = false;
+    }
+  };
 
   /** CANDY-MATERIAL win line (owner: "candy material, red + whitesmoke, bloom, all
    *  lines, master level"). Collects EVERY winning line's cell-centre path, then

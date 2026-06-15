@@ -9,8 +9,10 @@
 [![PixiJS](https://img.shields.io/badge/PixiJS-v8-e91e63?logo=javascript&logoColor=white)](games/shining-pop)
 [![Cocos Creator](https://img.shields.io/badge/Cocos%20Creator-3.8.8-55c2e1?logo=cocos&logoColor=white)](games/shining-pop-v2)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](#engineering-standards)
-[![Tests](https://img.shields.io/badge/tests-73%2F73%20passing-2ea043)](#quality-gates)
+[![Tests](https://img.shields.io/badge/tests-91%2F91%20passing-2ea043)](#quality-gates)
 [![RTP](https://img.shields.io/badge/RTP-~97%25%20sim--anchored-f5a623)](#developer-quick-start)
+[![CI](https://img.shields.io/badge/CI-green-2ea043?logo=githubactions&logoColor=white)](#quality-gates)
+[![Live](https://img.shields.io/badge/play-live%20demo-ff2d78?logo=vercel&logoColor=white)](https://artest-brainrocket-task.vercel.app/)
 
 _Two production slot games on one deterministic, sim-anchored math core —
 designed, built and verified end-to-end by a single developer._
@@ -25,6 +27,17 @@ designed, built and verified end-to-end by a single developer._
 | ------------------------------------------ | ------------------- | ------------------------------------ | ------- | ------------------------------ |
 | **[shining-pop](games/shining-pop)**       | PixiJS v8           | Vite · GSAP · Spine · Web Audio      | ~97 %   | flagship — submission-ready    |
 | **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC · 9 CCEffect shaders | ~97.5 % | parity port + shader VFX suite |
+
+> Two games, one candy slot. **No other variations** — the PixiJS flagship and the Cocos parity port share a single deterministic math core.
+
+## ✨ The craft
+
+This is built to an **awards-tier** bar, not a template floor:
+
+- 🍬 **Material, not decoration** — peppermint candy-material win line (GLSL specular gloss), symbol-shaped additive halos clipped to the candy alpha, a 3D card-turn pop on winning symbols lifted above the reel mask. No stroked boxes, no diagonal CSS sheens.
+- 🎯 **Readable by design** — win-focus dim, left→right reveal cadence, tap-the-reels to flash every payline, panels that hand the screen cleanly to the player on mobile.
+- 📱 **Mobile-first responsiveness** — transparent floating bars, glyphs oversampled to stay crisp at any scale, safe-area decks, capped device-pixel-ratio for crisp-yet-60fps.
+- 🔒 **Provably correct** — one sim-anchored math core, 91 passing unit tests, an RTP economy guard in CI, server-authoritative crediting.
 
 ## ▶ Live demo
 
