@@ -244,6 +244,10 @@ export class SlotView extends Component {
   private infoPanel: Node | null = null;
   private infoTab: 'rules' | 'paytable' | 'info' = 'rules';
   private quickBetPanel: Node | null = null;
+  /** Set by the controller to hide the betting bar while ANY panel/modal is open
+   *  (the bar renders on a separate z and was poking THROUGH the panels on mobile —
+   *  owner: "panels overlap the bar, crushing the game"). */
+  onOverlay: ((open: boolean) => void) | null = null;
   private betSelectCb: ((cents: number) => void) | null = null;
   private reducedFx = false;
   private bonusHud: Node | null = null;
@@ -892,7 +896,10 @@ export class SlotView extends Component {
     this.buildBackground();
     this.buildTitle();
     this.buildFrame();
-    this.buildCosmicShimmer(); // subtle deep-space twinkle inside the reel window
+    // Cosmic-shimmer DISABLED 2026-06-15 (owner: "what are these diamond/star
+    // elements in the reels, looks CSS — remove"). The diamond-shaped twinkles read
+    // as basic geometry, not authored art. The reel window now reads clean: the glass
+    // portal well + the painted candy world bleeding through the transparency.
     this.buildReels();
     // WIN-LIFT overlay — winning symbols reparent here during the celebration so
     // they pop BIGGER + tilt in 3D ABOVE the per-reel mask, fully uncropped (owner:
@@ -2954,6 +2961,7 @@ export class SlotView extends Component {
         node.active = false;
         node.setScale(1, 1, 1);
         op.opacity = 255;
+        this.onOverlay?.(this.anyOverlayOpen()); // reshow the bar once nothing's open
       })
       .start();
   }
@@ -2965,6 +2973,29 @@ export class SlotView extends Component {
     this.popClose(this.menuHub);
     this.popClose(this.infoPanel);
     this.popClose(this.quickBetPanel);
+    this.scheduleOverlaySync();
+  }
+
+  /** True while any panel/modal is on screen. */
+  private anyOverlayOpen(): boolean {
+    const on = (n: Node | null): boolean => !!(n && n.isValid && n.active);
+    if (
+      on(this.autoplayPanel) ||
+      on(this.settingsPanel) ||
+      on(this.menuHub) ||
+      on(this.infoPanel) ||
+      on(this.quickBetPanel)
+    )
+      return true;
+    if (this.buyModal && this.buyModal.isValid && this.buyModal.node.active) return true;
+    if (this.node.parent?.getChildByName('rcModal')) return true;
+    return false;
+  }
+
+  /** Notify the controller (next frame, once active states settle) so it can hide/
+   *  show the betting bar in lockstep with the overlays. */
+  private scheduleOverlaySync(): void {
+    this.scheduleOnce(() => this.onOverlay?.(this.anyOverlayOpen()), 0);
   }
 
   // ---- QUICK BET panel (master parity: preset stake grid, not raw arithmetic) --

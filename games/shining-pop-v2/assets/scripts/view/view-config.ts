@@ -348,7 +348,16 @@ export const VIEW_CONFIG = {
      *  envHoldOpacity = the per-symbol fade-in + sustained opacity envelope;
      *  scale = overlay size vs the symbol (1.06 gives the rim a hair of room). */
     symbolFx: {
-      enabled: true,
+      // DISABLED 2026-06-15 (owner: "win shows a colored RECTANGLE / bounding box
+      // around symbols, effect only on the texture"). This overlay sets a RANDOM
+      // per-symbol sprite colour on a 1.06× quad + a diagonal specular sweep; the
+      // reel mask used to clip it to the cell, but the new win-LIFT (symbol pops
+      // ABOVE the mask, uncropped) unclips it → a randomly-coloured rectangle shows
+      // around each winner, and the diagonal sweep is itself owner-rejected. The win
+      // now reads PURELY from the symbol-SHAPED halo (svarka, alpha-clipped) + the
+      // scale pop + 3D tilt + candy star/heart pop — all on/around the texture, never
+      // a box. Re-enable only if the shader is reworked to clip hard to the alpha.
+      enabled: false,
       intensity: 1.45,
       rimWidth: 0.035,
       sweepSpeed: 0.85,

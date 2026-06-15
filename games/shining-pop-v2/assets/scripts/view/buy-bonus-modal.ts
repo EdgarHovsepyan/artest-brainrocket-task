@@ -516,7 +516,7 @@ export class BuyBonusModal extends Component {
     // original height-constrained fit capped at 1.
     const portrait = viewH > viewW;
     const s = portrait
-      ? Math.min((viewW * 0.92) / CARD_W, availH / CARD_H)
+      ? Math.min((viewW * 0.97) / CARD_W, availH / CARD_H) // near-full width on mobile
       : Math.min(1, (viewW - margin) / CARD_W, availH / CARD_H);
     this.cardScale = s;
     if (this.card) {

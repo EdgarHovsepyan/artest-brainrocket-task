@@ -93,6 +93,12 @@ export class SlotController extends Component {
     const viewNode = new Node('SlotView');
     this.node.addChild(viewNode);
     this.view = viewNode.addComponent(SlotView);
+    // Hide the betting bar while any panel/modal is open — the bar renders on a
+    // separate z and was poking THROUGH the panels on mobile. References this.barNode
+    // live so it survives an orientation rebar.
+    this.view.onOverlay = (open: boolean): void => {
+      if (this.barNode && this.barNode.isValid) this.barNode.active = !open;
+    };
     void this.boot();
   }
 

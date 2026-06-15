@@ -129,7 +129,11 @@ canvas{display:block;
 <main aria-label="Shining Pop slot game">
 <div id="loader">
   <div class="lwrap">
-    <div class="llogo" style="display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-weight:800;letter-spacing:2px;color:#eaff00;font-size:34px;text-align:center;">ARTEST<span style="color:#9a8d6f;font-weight:600;">&nbsp;| BrainRocket</span></div>
+    <!-- 2026-06-15 (owner: loader showed ARTEST|BrainRocket text that broke the
+         responsive layout) — replaced with the GAME's OWN logo, centred + fully
+         responsive via the .llogo rule (min(70vw,420px), max-height 50vh, contain,
+         screen-blend so the jpg's dark bg drops out on the black loader). -->
+    <img class="llogo" src="assets/images/logo.jpg" alt="Shining Pop" />
     <div class="lgroup">
       <div class="lbar"><div class="lfill" id="lfill"></div><i class="lshine"></i></div>
       <div class="lp" id="lprog">LOADING</div>
