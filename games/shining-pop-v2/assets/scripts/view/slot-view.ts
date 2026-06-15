@@ -1842,7 +1842,7 @@ export class SlotView extends Component {
     const H = 2200;
     const bloom = this.mkNode('cineBloom', W, H, this.node);
     const bg = bloom.addComponent(Graphics);
-    bg.fillColor = new Color(255, 238, 205, 255);
+    bg.fillColor = new Color(255, 195, 135, 255);
     bg.rect(-W / 2, -H / 2, W, H);
     bg.fill();
     this.cineBloomOp = bloom.addComponent(UIOpacity);
@@ -1851,7 +1851,7 @@ export class SlotView extends Component {
 
   cinematicBloom(intensity = 1): void {
     if (!this.cineBloomOp || this.reducedFx) return;
-    const peak = Math.round(34 + 60 * Math.min(1, Math.max(0, intensity)));
+    const peak = Math.round(20 + 32 * Math.min(1, Math.max(0, intensity)));
     Tween.stopAllByTarget(this.cineBloomOp);
     this.cineBloomOp.opacity = 0;
     tween(this.cineBloomOp)
@@ -1948,8 +1948,8 @@ export class SlotView extends Component {
   wipeTones = {
     fs: { core: new Color(255, 150, 205, 255), halo: new Color(255, 92, 158, 255) },
     bonus: { core: new Color(255, 120, 235, 255), halo: new Color(196, 70, 230, 255) },
-    win: { core: new Color(255, 238, 205, 255), halo: new Color(255, 184, 90, 255) },
-    intro: { core: new Color(255, 244, 222, 255), halo: new Color(255, 170, 120, 255) },
+    win: { core: new Color(255, 206, 140, 255), halo: new Color(255, 158, 86, 255) },
+    intro: { core: new Color(255, 178, 206, 255), halo: new Color(255, 126, 164, 255) },
   } as const;
 
   wipe(tone: keyof SlotView['wipeTones'], dir = 1, intensity = 1): void {

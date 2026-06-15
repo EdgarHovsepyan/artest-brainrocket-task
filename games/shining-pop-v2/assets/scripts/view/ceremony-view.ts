@@ -130,18 +130,18 @@ export class CeremonyView extends Component {
 
     const flashNode = this.mk('detoFlash', 4000, 4000, this.node);
     const fg = flashNode.addComponent(Graphics);
-    const BLOOM = 22;
+    // Warm CANDY bloom — never white. A gentle gold pop, not a screen-washing flash.
+    const BLOOM = 18;
     for (let i = BLOOM; i > 0; i--) {
       const t = i / BLOOM;
-      const rad = 150 + t * 1130;
-      const a = Math.round((1 - t) * (1 - t) * 60);
-      fg.fillColor = new Color(255, 244, 214, a);
+      const rad = 120 + t * 720;
+      const a = Math.round((1 - t) * (1 - t) * 26);
+      fg.fillColor = new Color(255, 188, 120, a);
       fg.circle(0, 0, rad);
       fg.fill();
     }
-    // Bright soft core so the detonation reads as a warm bloom, not a hard shape.
-    fg.fillColor = new Color(255, 255, 255, 200);
-    fg.circle(0, 0, 170);
+    fg.fillColor = new Color(255, 214, 158, 80);
+    fg.circle(0, 0, 120);
     fg.fill();
     this.flashOp = flashNode.addComponent(UIOpacity);
     this.flashOp.opacity = 0;
@@ -406,7 +406,7 @@ export class CeremonyView extends Component {
     Tween.stopAllByTarget(this.flashOp);
     this.flashNode.active = true;
     this.flashOp.opacity = 0;
-    const peak = Math.round(90 + 110 * Math.min(1, intensity));
+    const peak = Math.round(26 + 38 * Math.min(1, intensity));
     const beats = VIEW_CONFIG.ceremony.beats;
     tween(this.flashOp)
       .to(beats.detonationFlashInMs / 1000, { opacity: peak }, { easing: 'quadOut' })
