@@ -102,3 +102,23 @@ export class VfxGovernor {
     return Math.max(floor, Math.round(base * this._scale));
   }
 }
+
+// A frame snapshot for the dev HUD (Gregory — approval #41: "frame-time dev HUD,
+// toggled by a debug key"). Kept as a plain shape so it serialises straight into
+// the `?debug` window hook and unit-tests without any `cc` import.
+export interface VfxStats {
+  fps: number; // smoothed (governor EMA) frames-per-second
+  scale: number; // live density multiplier in [minScale, 1]
+  live: number; // particle shards currently alive
+  cap: number; // hard pool ceiling (poolCap)
+}
+
+// One-line HUD readout, e.g. "58fps  vfx 92%  37/96". Pure string formatting so a
+// careless rounding regression fails in plain Node, not silently on a device.
+export function formatVfxHud(s: VfxStats): string {
+  const fps = Math.max(0, Math.round(s.fps));
+  const pct = Math.round(Math.min(1, Math.max(0, s.scale)) * 100);
+  const live = Math.max(0, Math.round(s.live));
+  const cap = Math.max(0, Math.round(s.cap));
+  return `${fps}fps  vfx ${pct}%  ${live}/${cap}`;
+}

@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { VfxGovernor, DEFAULT_VFX_QUALITY } from '../assets/scripts/view/perf';
+import { VfxGovernor, DEFAULT_VFX_QUALITY, formatVfxHud } from '../assets/scripts/view/perf';
 import { VIEW_CONFIG } from '../assets/scripts/view/view-config';
 
 // Advance the governor by `seconds` of real time in steady frames of `dt`.
@@ -86,6 +86,18 @@ test('count() rounds, honours the floor, and never goes negative', () => {
   assert.equal(gov.count(8, 5), 5, 'floor wins when the scaled count is lower');
   assert.ok(gov.count(72) > 0);
   assert.equal(gov.count(0), 0);
+});
+
+test('formatVfxHud renders a stable, clamped one-line readout (approval #41)', () => {
+  assert.equal(
+    formatVfxHud({ fps: 58.4, scale: 0.92, live: 37, cap: 96 }),
+    '58fps  vfx 92%  37/96',
+  );
+  // full quality reads as 100%, floors clamp, over-range scale never exceeds 100%
+  assert.equal(formatVfxHud({ fps: 60, scale: 1, live: 0, cap: 96 }), '60fps  vfx 100%  0/96');
+  assert.equal(formatVfxHud({ fps: 1.2, scale: 1.5, live: 5.6, cap: 96 }), '1fps  vfx 100%  6/96');
+  // negatives (a transient bad read) never escape as garbage
+  assert.equal(formatVfxHud({ fps: -3, scale: -0.2, live: -1, cap: 96 }), '0fps  vfx 0%  0/96');
 });
 
 test('view-config exposes a well-formed vfx.quality block the governor can consume', () => {

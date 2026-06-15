@@ -1,7 +1,7 @@
 import { _decorator, Color, Component, tween, Vec3 } from 'cc';
 import { ParticlePool, PoolShard } from './particle-pool';
 import { VIEW_CONFIG } from './view-config';
-import { VfxGovernor } from './perf';
+import { VfxGovernor, VfxStats } from './perf';
 
 const { ccclass } = _decorator;
 const WHITE = new Color(255, 255, 255, 255);
@@ -52,6 +52,17 @@ export class ParticleLayer extends Component {
   // live, so it is the honest sampling point for the frame-time EMA.
   update(dt: number): void {
     this.gov.sample(dt);
+  }
+
+  // Live VFX telemetry for the ?debug HUD (approval #41). Read-only snapshot —
+  // the governor and pool stay the single owners of these numbers.
+  vfxStats(): VfxStats {
+    return {
+      fps: this.gov.emaFps,
+      scale: this.gov.scale,
+      live: this.pool?.live ?? 0,
+      cap: VIEW_CONFIG.particles.poolCap,
+    };
   }
 
   private spawnPhys(

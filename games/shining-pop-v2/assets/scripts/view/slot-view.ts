@@ -42,6 +42,7 @@ import { CeremonyView } from './ceremony-view';
 import { AnticipationLayer } from './anticipation-layer';
 import { ParticleLayer } from './particle-layer';
 import { ParticlePool } from './particle-pool';
+import { formatVfxHud } from './perf';
 import { AudioManager } from './audio-manager';
 import { applyFont, loadFonts } from './fonts';
 import { PAL } from './palette';
@@ -3559,6 +3560,11 @@ export class SlotView extends Component {
 
   setVolume(v: number): void {
     this.audio.setVolume(v);
+  }
+
+  // ?debug HUD line for the adaptive VFX governor (approval #41): "58fps vfx 92% 37/96".
+  vfxHud(): string {
+    return formatVfxHud(this.particles.vfxStats());
   }
 
   private cellCenter(reel: number, row: number): Vec3 {

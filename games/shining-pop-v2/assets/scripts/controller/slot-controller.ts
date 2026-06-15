@@ -168,6 +168,7 @@ export class SlotController extends Component {
             this.view.playCeremony(this.model.bet * mult, this.model.bet, wild),
           feature: (name = 'STICKY WILDS') => this.view.showFeatureUnlocked(name),
           buy: (mode: BonusMode = 'reels') => void this.onBuy(mode),
+          vfx: () => this.view.vfxHud(),
         };
       }
     } catch {}
