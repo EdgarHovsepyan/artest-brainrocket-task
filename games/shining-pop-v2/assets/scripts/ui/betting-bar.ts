@@ -104,6 +104,11 @@ export class BettingBarMobile extends Component {
   private events = new EventTarget();
   private g!: Graphics; // static decoration layer
   private labels: Record<string, Label> = {};
+  /** Glyph oversample factor = ceil(bar fit-scale). Labels rasterise at fontSize×
+   *  boost and the node counter-scales by 1/boost, so text is rendered at its FINAL
+   *  on-screen pixel size instead of being bilinearly upscaled by fit() → crisp on
+   *  mobile (owner: "bar numbers blurry"). 1 = no oversample. */
+  private uiBoost = 1;
   // Display currency for every money readout (symbol-prefixed via formatMoney).
   private currency = 'USD';
 
@@ -754,6 +759,7 @@ export class BettingBarMobile extends Component {
     const lab = n.addComponent(Label);
     lab.fontSize = size;
     lab.lineHeight = size + 2;
+    (n as unknown as { __baseFs: number }).__baseFs = size; // base for the oversample
     lab.color = col(color);
     lab.isBold = true;
     applyFont(lab, color === C.value ? 'display' : 'body');
@@ -842,7 +848,28 @@ export class BettingBarMobile extends Component {
     // Bottom edge sits `safe` px above the screen bottom; centred horizontally
     // (centred → the gap from the screen edges is symmetric when s shrinks the bar).
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + safe + H * s, 0));
+    this.applyTextScale(s); // crisp glyphs at the final scale (anti-blur)
     return safe + (H - BAND_TOP) * s;
+  }
+
+  /** Re-rasterise every label at its FINAL on-screen pixel size: when the bar
+   *  scales UP (~2× on portrait phones) a design-fontSize glyph texture is
+   *  bilinearly stretched → blur. Oversample fontSize by ceil(scale) and
+   *  counter-scale the node by 1/boost so on-screen size is unchanged but the
+   *  texture has enough pixels. Re-run AFTER this in syncHud → fitValue (which is
+   *  boost-aware). Negligible atlas cost (~15 small labels). */
+  private applyTextScale(s: number): void {
+    const boost = Math.min(3, Math.max(1, Math.ceil(s)));
+    if (boost === this.uiBoost) return;
+    this.uiBoost = boost;
+    for (const l of Object.values(this.labels)) {
+      const node = l.node as unknown as { __baseFs?: number };
+      const base = node.__baseFs ?? l.fontSize;
+      node.__baseFs = base;
+      l.fontSize = Math.round(base * boost);
+      l.lineHeight = Math.round((base + 2) * boost);
+      l.node.setScale(1 / boost, 1 / boost, 1);
+    }
   }
   private fmt(n: number): string {
     // Currency-aware money render: symbol-prefixed ("$1.00"), per-currency decimals,
@@ -857,12 +884,16 @@ export class BettingBarMobile extends Component {
   private fitValue(name: string, maxW: number): void {
     const lab = this.labels[name];
     if (!lab) return;
-    lab.node.setScale(1, 1, 1);
+    // Boost-aware: the glyph width is now fontSize×boost, so the node carries a
+    // 1/boost counter-scale and the shrink-to-fit composes with it (k/boost).
+    const b = this.uiBoost;
+    lab.node.setScale(1 / b, 1 / b, 1);
     lab.updateRenderData(true);
-    const w = lab.node.getComponent(UITransform)!.width;
-    if (w > maxW && maxW > 4) {
-      const k = maxW / w;
-      lab.node.setScale(k, k, 1);
+    const w = lab.node.getComponent(UITransform)!.width; // boosted glyph width
+    const designW = w / b;
+    if (designW > maxW && maxW > 4) {
+      const k = maxW / designW;
+      lab.node.setScale(k / b, k / b, 1);
     }
   }
   setBalance(n: number): void {
