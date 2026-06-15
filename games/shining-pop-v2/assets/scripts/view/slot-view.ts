@@ -42,6 +42,7 @@ import { CeremonyView } from './ceremony-view';
 import { AnticipationLayer } from './anticipation-layer';
 import { ParticleLayer } from './particle-layer';
 import { ParticlePool } from './particle-pool';
+import { formatVfxHud } from './perf';
 import { AudioManager } from './audio-manager';
 import { applyFont, loadFonts } from './fonts';
 import { PAL } from './palette';
@@ -1397,16 +1398,21 @@ export class SlotView extends Component {
     const op = n.getComponent(UIOpacity);
     if (!op) return;
     Tween.stopAllByTarget(op);
+    Tween.stopAllByTarget(n);
+    const dur = cfg.ms / 1000;
     op.opacity = 0;
     n.setPosition(0, ((this.gh + 12) / 2) * cfg.dir, 0);
-    n.setScale(1, 0.2, 1);
+    // Start as a tight leading line that snaps open — a sharp sweep reads as
+    // intent, a slow grow reads as a loading bar. expoOut launch + backOut settle.
+    n.setScale(1, 0.06, 1);
     tween(op)
-      .to(cfg.ms / 1000 / 2, { opacity: 230 }, { easing: 'sineOut' })
-      .to(cfg.ms / 1000 / 2, { opacity: 0 }, { easing: 'sineIn' })
+      .to(dur * 0.22, { opacity: 255 }, { easing: 'quadOut' }) // bright leading edge punches in
+      .to(dur * 0.62, { opacity: 0 }, { easing: 'sineIn' }) // then blooms away as the board takes over
       .call(() => (n.active = false))
       .start();
     tween(n)
-      .to(cfg.ms / 1000, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
+      .to(dur * 0.55, { scale: new Vec3(1, 1.06, 1) }, { easing: 'expoOut' }) // snap open past full
+      .to(dur * 0.45, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // settle back
       .start();
   }
 
@@ -3559,6 +3565,11 @@ export class SlotView extends Component {
 
   setVolume(v: number): void {
     this.audio.setVolume(v);
+  }
+
+  // ?debug HUD line for the adaptive VFX governor (approval #41): "58fps vfx 92% 37/96".
+  vfxHud(): string {
+    return formatVfxHud(this.particles.vfxStats());
   }
 
   private cellCenter(reel: number, row: number): Vec3 {

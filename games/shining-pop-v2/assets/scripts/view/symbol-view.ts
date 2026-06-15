@@ -34,6 +34,9 @@ export class SymbolView extends Component {
   private halo: Node | null = null;
   private haloOp: UIOpacity | null = null;
   private haloSp: Sprite | null = null;
+
+  private happyFace: Node | null = null;
+  private happyFaceOp: UIOpacity | null = null;
   private size = 90;
 
   private homeParent: Node | null = null;
@@ -195,6 +198,86 @@ export class SymbolView extends Component {
     this.haloOp = op;
   }
 
+  // Cute happy face for the WILD gingerbread character on a win: sparkly eyes,
+  // a big open grin, rosy cheeks. Drawn once procedurally over the head; shown
+  // on win, hidden on clear. Built lazily so non-WILD symbols pay nothing.
+  private ensureHappyFace(): void {
+    if (this.happyFace || !this.art) return;
+    const cfg = VIEW_CONFIG.win.wildHappyFace;
+    const n = new Node('happyFace');
+    n.layer = this.node.layer;
+    n.addComponent(UITransform).setContentSize(this.size, this.size);
+    this.art.addChild(n);
+    n.setPosition(0, this.size * cfg.offsetYFrac, 0);
+    n.setScale(cfg.scale, cfg.scale, 1);
+
+    const g = n.addComponent(Graphics);
+    const eyeY = 5;
+    const eyeX = 11;
+    // Rosy cheeks (soft pink, behind the features).
+    g.fillColor = new Color(255, 130, 170, 120);
+    g.circle(-eyeX - 6, -3, 5.5);
+    g.circle(eyeX + 6, -3, 5.5);
+    g.fill();
+    // Eyes — big dark rounds with a bright sparkle (cute, alive).
+    g.fillColor = new Color(40, 22, 14, 255);
+    g.circle(-eyeX, eyeY, 4.2);
+    g.circle(eyeX, eyeY, 4.2);
+    g.fill();
+    g.fillColor = new Color(255, 255, 255, 255);
+    g.circle(-eyeX + 1.5, eyeY + 1.5, 1.5);
+    g.circle(eyeX + 1.5, eyeY + 1.5, 1.5);
+    g.fill();
+    // Big open grin — a filled parabola mouth with a little tongue.
+    g.fillColor = new Color(70, 30, 18, 255);
+    const w = 15;
+    const depth = 13;
+    g.moveTo(-w, -3);
+    for (let i = 1; i <= 14; i++) {
+      const x = -w + (2 * w * i) / 14;
+      const y = -3 - depth * (1 - (x / w) * (x / w));
+      g.lineTo(x, y);
+    }
+    g.lineTo(w, -3);
+    g.close();
+    g.fill();
+    g.fillColor = new Color(255, 120, 150, 255);
+    g.circle(0, -3 - depth * 0.62, 3.4);
+    g.fill();
+
+    const op = n.addComponent(UIOpacity);
+    op.opacity = 0;
+    n.active = false;
+    this.happyFace = n;
+    this.happyFaceOp = op;
+  }
+
+  private showHappyFace(delay: number): void {
+    if (!VIEW_CONFIG.win.wildHappyFace.enabled) return;
+    if (this._currentId !== SYMBOLS.WILD) return;
+    this.ensureHappyFace();
+    if (!this.happyFace || !this.happyFaceOp) return;
+    const ms = VIEW_CONFIG.win.wildHappyFace.fadeMs / 1000;
+    Tween.stopAllByTarget(this.happyFaceOp);
+    Tween.stopAllByTarget(this.happyFace);
+    this.happyFace.active = true;
+    this.happyFaceOp.opacity = 0;
+    this.happyFace.setScale(0.6, 0.6, 1);
+    tween(this.happyFaceOp).delay(delay).to(ms, { opacity: 255 }).start();
+    tween(this.happyFace)
+      .delay(delay)
+      .to(ms, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .start();
+  }
+
+  private hideHappyFace(): void {
+    if (!this.happyFace || !this.happyFaceOp) return;
+    Tween.stopAllByTarget(this.happyFaceOp);
+    Tween.stopAllByTarget(this.happyFace);
+    this.happyFaceOp.opacity = 0;
+    this.happyFace.active = false;
+  }
+
   private liftForWin(overlay: Node, worldCenter: Vec3): void {
     if (this.homeParent) return;
     this.homeParent = this.node.parent;
@@ -235,14 +318,24 @@ export class SymbolView extends Component {
     const bhalfBeat = bhalf * beatScale;
     const haloHalf = half * beatScale;
 
-    tween(this.node)
-      .delay(delay)
+    // Anticipation: a brief squash before the spring so the pop lands as an
+    // impact. Deeper on hotter symbols. Everything that should fire ON the pop
+    // (bounce, tilt, halo, sparkles) is shifted past the dip by `popStart`.
+    const ant = VIEW_CONFIG.win.winAnticipation;
+    const antDur = ant?.enabled ? ant.ms / 1000 : 0;
+    const antDip = ant?.enabled ? 1 - (1 - ant.dip) * heat : 1;
+    const popStart = delay + antDur;
+
+    const popTween = tween(this.node).delay(delay);
+    if (antDur > 0)
+      popTween.to(antDur, { scale: new Vec3(antDip, antDip, 1) }, { easing: 'quadOut' });
+    popTween
       .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
       .to(half, { scale: new Vec3(zoom, zoom, 1) }, { easing: 'quadIn' })
       .start();
     if (bnc.enabled) {
       tween(this.node)
-        .delay(delay + half * 2)
+        .delay(popStart + half * 2)
         .to(bhalfBeat, { scale: bUp }, { easing: 'backOut' })
         .to(bhalfBeat, { scale: bDn }, { easing: 'quadIn' })
         .union()
@@ -255,7 +348,7 @@ export class SymbolView extends Component {
       const td = tlt.ms / 1000;
       this.node.eulerAngles = new Vec3(0, 0, 0);
       tween(this.node)
-        .delay(delay + half * 2)
+        .delay(popStart + half * 2)
         .to(td, { eulerAngles: new Vec3(0, tlt.deg, 0) }, { easing: 'sineInOut' })
         .to(td, { eulerAngles: new Vec3(0, -tlt.deg, 0) }, { easing: 'sineInOut' })
         .union()
@@ -274,6 +367,12 @@ export class SymbolView extends Component {
     if (haloFrame) this.ensureHalo();
     if (haloFrame && this.halo && this.haloOp && this.haloSp) {
       this.haloSp.spriteFrame = haloFrame;
+      // Tier warmth: lerp the halo tint from cool (low symbols) to warm-gold
+      // (premiums) by heat, so a glance at the glow reads the symbol's value.
+      const ht = VIEW_CONFIG.win.haloTint;
+      const span = Math.max(0.0001, ht.hotHeat - ht.coldHeat);
+      const t = Math.min(1, Math.max(0, (heat - ht.coldHeat) / span));
+      this.haloSp.color = new Color().fromHEX(ht.cold).lerp(new Color().fromHEX(ht.hot), t);
       Tween.stopAllByTarget(this.halo);
       Tween.stopAllByTarget(this.haloOp);
       this.halo.active = true;
@@ -281,14 +380,14 @@ export class SymbolView extends Component {
       this.haloOp.opacity = 0;
       const haloPeak = Math.min(210, Math.round(135 * heat));
       tween(this.haloOp)
-        .delay(delay)
+        .delay(popStart)
         .to(haloHalf, { opacity: haloPeak }, { easing: 'sineOut' })
         .to(haloHalf, { opacity: Math.round(haloPeak * 0.42) }, { easing: 'sineIn' })
         .union()
         .repeatForever()
         .start();
       tween(this.halo)
-        .delay(delay)
+        .delay(popStart)
         .to(haloHalf, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'sineInOut' })
         .to(haloHalf, { scale: new Vec3(1.12, 1.12, 1) }, { easing: 'sineInOut' })
         .union()
@@ -297,15 +396,18 @@ export class SymbolView extends Component {
     }
     if (rich) {
       if (winMat && VIEW_CONFIG.win.symbolFx.enabled) {
-        this.playWinShader(delay, winMat);
+        this.playWinShader(popStart, winMat);
 
-        this.playSparkles(delay);
+        this.playSparkles(popStart);
       } else {
-        this.playSparkles(delay);
+        this.playSparkles(popStart);
       }
 
-      this.playStarPop(delay, heat);
+      this.playStarPop(popStart, heat);
     }
+
+    // The WILD character beams a happy grin as it pops.
+    this.showHappyFace(popStart);
   }
 
   private playWinShader(delay: number, mat: Material): void {
@@ -599,6 +701,7 @@ export class SymbolView extends Component {
     }
     this.node.setScale(1, 1, 1);
     this.node.eulerAngles = new Vec3(0, 0, 0);
+    this.hideHappyFace();
     this.setDimmed(false);
     if (this.glow) {
       Tween.stopAllByTarget(this.glow);

@@ -1,5 +1,23 @@
 export const VIEW_CONFIG = {
-  vfx: { materialsEnabled: true },
+  vfx: {
+    materialsEnabled: true,
+
+    // Adaptive VFX density (see view/perf.ts — VfxGovernor). The board samples
+    // frame-time every frame; particle spawn counts are multiplied by the
+    // resulting scale so a capable GPU gets the full cinematic density and a
+    // strained one holds its frame budget instead of dropping frames mid-win.
+    quality: {
+      targetFps: 60,
+      emaAlpha: 0.1,
+      warmupFrames: 30,
+      minScale: 0.45,
+      upShiftMs: 18,
+      downShiftMs: 32,
+      recoverPerSec: 0.25,
+      shedPerSec: 2.0,
+      stallClampMs: 100,
+    },
+  },
 
   layout: {
     cell: 96,
@@ -122,6 +140,11 @@ export const VIEW_CONFIG = {
     symbolPulseScale: 1.3,
     symbolPulseMs: 240,
 
+    // Anticipation before the win pop (Swink — game feel; Emil Kowalski — motion):
+    // a brief squash-down before the symbol springs up so the pop reads as an
+    // impact, not a teleport. Tiny + snappy so the win never feels sluggish.
+    winAnticipation: { enabled: true, dip: 0.9, ms: 80 },
+
     highlightWaveStagger: 0.085,
 
     symbolProfiles: {
@@ -142,6 +165,17 @@ export const VIEW_CONFIG = {
     winSustainScale: 1.16,
 
     winTilt: { enabled: true, deg: 13, ms: 540 },
+
+    // Per-tier halo warmth (Koster — tiers must be discriminable at a glance):
+    // premium symbols glow warm-gold, low symbols cool-blue. Tints stay near-white
+    // so the halo only warms/cools, never muddies. Lerped by the symbol's heat.
+    haloTint: { hot: '#fff0c8', cold: '#c8e1ff', hotHeat: 1.3, coldHeat: 0.9 },
+
+    // The WILD gingerbread character beams a cute happy face on a win (sparkly
+    // eyes, big grin, rosy cheeks). Drawn procedurally over the character's head.
+    // offset/scale are tunable so the face can be nudged onto the art after a
+    // Cocos rebuild. fitsCharacter at art-local coords; +Y is up toward the head.
+    wildHappyFace: { enabled: true, offsetYFrac: 0.17, scale: 1.0, fadeMs: 160 },
 
     loserDimOpacity: 95,
 

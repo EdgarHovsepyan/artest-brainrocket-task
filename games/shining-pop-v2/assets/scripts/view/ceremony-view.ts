@@ -32,10 +32,15 @@ export class CeremonyView extends Component {
   private overlay!: Node;
   private raysNode!: Node;
   private raysG!: Graphics;
+  private raysNode2!: Node;
+  private raysG2!: Graphics;
   private shockNode!: Node;
   private shockG!: Graphics;
+  private shockRingNode!: Node;
+  private shockRingG!: Graphics;
+  private shockRingOp!: UIOpacity;
   private sparkleRoot!: Node;
-  private sparkles: { node: Node; op: UIOpacity }[] = [];
+  private sparkles: { node: Node; op: UIOpacity; spin: number }[] = [];
   private panelLightOp!: UIOpacity;
   private headerLabel!: Label;
   private amountLabel!: Label;
@@ -99,30 +104,30 @@ export class CeremonyView extends Component {
     this.raysNode = this.mk('rays', 10, 10, ov);
     this.raysG = this.raysNode.addComponent(Graphics);
 
+    // Second, thinner ray fan offset half a sector and counter-rotating, for
+    // parallax depth — a single fan reads flat, two crossing fans feel volumetric.
+    this.raysNode2 = this.mk('rays2', 10, 10, ov);
+    this.raysG2 = this.raysNode2.addComponent(Graphics);
+
     this.shockNode = this.mk('shock', 10, 10, ov);
     this.shockG = this.shockNode.addComponent(Graphics);
+
+    // Leading shock ring (stroked romb) that races ahead of the filled core so
+    // the blast has a crisp expanding edge, not just a growing blob.
+    this.shockRingNode = this.mk('shockRing', 10, 10, ov);
+    this.shockRingG = this.shockRingNode.addComponent(Graphics);
+    this.shockRingOp = this.shockRingNode.addComponent(UIOpacity);
+    this.shockRingOp.opacity = 0;
 
     this.sparkleRoot = this.mk('sparkles', 10, 10, ov);
     this.buildSparkles();
 
     const ground = this.mk('ground', 10, 10, ov).addComponent(Graphics);
-    ground.fillColor = new Color(255, 0, 127, 34);
-    ground.moveTo(0, -120);
-    ground.lineTo(330, -10);
-    ground.lineTo(0, 100);
-    ground.lineTo(-330, -10);
-    ground.close();
-    ground.fill();
+    this.drawGlowWedge(ground, 255, 0, 127, 34);
 
     const panelLightNode = this.mk('panelLight', 10, 10, ov);
     const panelLight = panelLightNode.addComponent(Graphics);
-    panelLight.fillColor = new Color(255, 186, 92, 110);
-    panelLight.moveTo(0, -120);
-    panelLight.lineTo(330, -10);
-    panelLight.lineTo(0, 100);
-    panelLight.lineTo(-330, -10);
-    panelLight.close();
-    panelLight.fill();
+    this.drawGlowWedge(panelLight, 255, 186, 92, 110);
     this.panelLightOp = panelLightNode.addComponent(UIOpacity);
     this.panelLightOp.opacity = 0;
 
@@ -164,6 +169,14 @@ export class CeremonyView extends Component {
       fg.close();
       fg.fill();
     }
+    // Crisp bright core so the detonation reads as a hard "bang", not just a bloom.
+    fg.fillColor = new Color(255, 255, 255, 210);
+    fg.moveTo(0, 150);
+    fg.lineTo(150, 0);
+    fg.lineTo(0, -150);
+    fg.lineTo(-150, 0);
+    fg.close();
+    fg.fill();
     this.flashOp = flashNode.addComponent(UIOpacity);
     this.flashOp.opacity = 0;
     flashNode.active = false;
@@ -278,8 +291,13 @@ export class CeremonyView extends Component {
           this.fireShock(240 + 200 * tx);
           this.drawRays(Math.round(8 + 12 * tx), 300 + 320 * tx, 0.5 + 0.5 * t);
           this.raysNode.angle = 0;
+          this.raysNode2.angle = 0;
           tween(this.raysNode)
             .by(6, { angle: 14 + 12 * tx })
+            .repeatForever()
+            .start();
+          tween(this.raysNode2)
+            .by(6, { angle: -(10 + 8 * tx) })
             .repeatForever()
             .start();
         }
@@ -380,7 +398,10 @@ export class CeremonyView extends Component {
     ov.active = true;
     ov.setScale(0.6, 0.6, 1);
     this.drawRays(12, 380, 0.7, rgb ? modeCol : undefined);
+    this.raysNode.angle = 0;
+    this.raysNode2.angle = 0;
     tween(this.raysNode).by(6, { angle: 18 }).repeatForever().start();
+    tween(this.raysNode2).by(6, { angle: -13 }).repeatForever().start();
     this.fireShock(280);
     this.fireSparkleBurst();
     this.fireDetonationFlash(0.6);
@@ -392,31 +413,58 @@ export class CeremonyView extends Component {
     this.scheduleOnce(() => this.hide(), 1.6);
   }
 
+  // Soft volumetric stage-light wedge: concentric lens shapes from wide+faint
+  // (outer) to narrow+bright (inner) so the glow has a gradient falloff instead
+  // of one flat shape — the difference between a stage light and a paper cutout.
+  private drawGlowWedge(g: Graphics, r: number, gg: number, b: number, peak: number): void {
+    const LAYERS = 5;
+    for (let i = 0; i < LAYERS; i++) {
+      const t = i / (LAYERS - 1); // 0 outer → 1 inner
+      const s = 1 - t * 0.55;
+      const a = Math.round(peak * (0.22 + 0.78 * t));
+      g.fillColor = new Color(r, gg, b, a);
+      g.moveTo(0, -120 * s);
+      g.lineTo(330 * s, -10 * s);
+      g.lineTo(0, 100 * s);
+      g.lineTo(-330 * s, -10 * s);
+      g.close();
+      g.fill();
+    }
+  }
+
   private drawRays(count: number, len: number, alpha: number, tint?: Color): void {
-    const g = this.raysG;
+    // Primary fan: broad, full length. Secondary fan: thinner, shorter, phase-
+    // shifted half a sector — the two counter-rotate for a volumetric god-ray look.
+    this.drawRayFan(this.raysG, count, len, alpha, 1, 0, tint);
+    this.drawRayFan(this.raysG2, count, len * 0.78, alpha * 0.7, 0.5, Math.PI / count, tint);
+  }
+
+  private drawRayFan(
+    g: Graphics,
+    count: number,
+    len: number,
+    alpha: number,
+    widthMul: number,
+    phase: number,
+    tint?: Color,
+  ): void {
     g.clear();
     for (let i = 0; i < count; i++) {
-      const a = (Math.PI * 2 * i) / count;
+      const a = (Math.PI * 2 * i) / count + phase;
       const cos = Math.cos(a);
       const sin = Math.sin(a);
-      const w = 14 + (i % 3) * 6;
+      const w = (14 + (i % 3) * 6) * widthMul;
 
       if (tint) {
         g.fillColor =
           i % 2
             ? new Color(255, 255, 255, Math.round(24 * alpha + (i % 3) * 6))
             : new Color(tint.r, tint.g, tint.b, Math.round(36 * alpha + (i % 3) * 8));
-        g.moveTo(cos * 70, sin * 70);
-        g.lineTo(cos * len * 0.5 - sin * w, sin * len * 0.5 + cos * w);
-        g.lineTo(cos * len, sin * len);
-        g.lineTo(cos * len * 0.5 + sin * w, sin * len * 0.5 - cos * w);
-        g.close();
-        g.fill();
-        continue;
+      } else {
+        const gch = i % 2 ? 150 : 205;
+        const bch = i % 2 ? 40 : 90;
+        g.fillColor = new Color(255, gch, bch, Math.round(30 * alpha + (i % 3) * 7));
       }
-      const gch = i % 2 ? 150 : 205;
-      const bch = i % 2 ? 40 : 90;
-      g.fillColor = new Color(255, gch, bch, Math.round(30 * alpha + (i % 3) * 7));
       g.moveTo(cos * 70, sin * 70);
       g.lineTo(cos * len * 0.5 - sin * w, sin * len * 0.5 + cos * w);
       g.lineTo(cos * len, sin * len);
@@ -469,6 +517,31 @@ export class CeremonyView extends Component {
       .to(0.42, { scale: new Vec3(size / 78, size / 78, 1) }, { easing: 'expoOut' })
       .start();
     tween(op).to(0.12, { opacity: 255 }).to(0.42, { opacity: 0 }, { easing: 'quadOut' }).start();
+
+    this.fireShockRing(size * 1.4);
+  }
+
+  // A thin stroked romb that expands faster and further than the filled core —
+  // the crisp leading edge of the blast (Swink — a transient reads as a hit).
+  private fireShockRing(size: number): void {
+    const g = this.shockRingG;
+    g.clear();
+    g.lineWidth = 6;
+    g.strokeColor = new Color(255, 255, 255, 255);
+    g.moveTo(0, 78);
+    g.lineTo(78, 0);
+    g.lineTo(0, -78);
+    g.lineTo(-78, 0);
+    g.close();
+    g.stroke();
+    this.shockRingNode.setScale(0.3, 0.3, 1);
+    Tween.stopAllByTarget(this.shockRingNode);
+    Tween.stopAllByTarget(this.shockRingOp);
+    this.shockRingOp.opacity = 255;
+    tween(this.shockRingNode)
+      .to(0.34, { scale: new Vec3(size / 78, size / 78, 1) }, { easing: 'expoOut' })
+      .start();
+    tween(this.shockRingOp).to(0.34, { opacity: 0 }, { easing: 'quadOut' }).start();
   }
 
   private buildSparkles(): void {
@@ -476,8 +549,11 @@ export class CeremonyView extends Component {
       [255, 255, 255],
       [255, 158, 208],
       [255, 206, 71],
+      [150, 215, 255],
     ];
-    const diamond = (g: Graphics, r: number): void => {
+    // Three crisp confetti silhouettes — romb (diamond), box (square), star — so
+    // the unlock burst reads as varied jewellery, not a cloud of identical dots.
+    const romb = (g: Graphics, r: number): void => {
       g.moveTo(0, r);
       g.lineTo(r, 0);
       g.lineTo(0, -r);
@@ -485,26 +561,51 @@ export class CeremonyView extends Component {
       g.close();
       g.fill();
     };
-    for (let i = 0; i < 18; i++) {
-      const n = this.mk('spk', 18, 18, this.sparkleRoot);
+    const box = (g: Graphics, r: number): void => {
+      const s = r * 0.82;
+      g.rect(-s, -s, s * 2, s * 2);
+      g.fill();
+    };
+    const star = (g: Graphics, r: number): void => {
+      const inner = r * 0.46;
+      for (let k = 0; k < 10; k++) {
+        const rad = k % 2 ? inner : r;
+        const a = -Math.PI / 2 + (k * Math.PI) / 5;
+        const x = Math.cos(a) * rad;
+        const y = Math.sin(a) * rad;
+        if (k === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.close();
+      g.fill();
+    };
+    const shapes = [romb, box, star];
+    const COUNT = 24;
+    for (let i = 0; i < COUNT; i++) {
+      const n = this.mk('spk', 22, 22, this.sparkleRoot);
       n.layer = this.sparkleRoot.layer;
       const g = n.addComponent(Graphics);
       const [cr, cg, cb] = palette[i % palette.length];
-      g.fillColor = new Color(cr, cg, cb, 64);
-      diamond(g, 9);
-      g.fillColor = new Color(cr, cg, cb, 255);
-      diamond(g, 4.4);
+      const shape = shapes[i % shapes.length];
+      // Size variety so the burst has near/far depth, not one flat scale.
+      const r = 8 + (i % 4) * 2.4;
+      g.fillColor = new Color(cr, cg, cb, 64); // soft outer glow
+      shape(g, r);
+      g.fillColor = new Color(cr, cg, cb, 255); // bright core
+      shape(g, r * 0.5);
       const op = n.addComponent(UIOpacity);
       op.opacity = 0;
       n.active = false;
-      this.sparkles.push({ node: n, op });
+      // Boxes and stars spin; rombs read cleaner mostly upright. Alternate sign.
+      const spin = (shape === box ? 220 : shape === star ? 300 : 120) * (i % 2 ? 1 : -1);
+      this.sparkles.push({ node: n, op, spin });
     }
   }
 
   private fireSparkleBurst(): void {
     const n = this.sparkles.length;
     for (let i = 0; i < n; i++) {
-      const { node, op } = this.sparkles[i];
+      const { node, op, spin } = this.sparkles[i];
       Tween.stopAllByTarget(node);
       Tween.stopAllByTarget(op);
       const a = (Math.PI * 2 * i) / n + (i % 2 ? 0.16 : -0.12);
@@ -512,19 +613,28 @@ export class CeremonyView extends Component {
       node.active = true;
       node.setPosition(0, 0, 0);
       node.setScale(0.2, 0.2, 1);
+      node.angle = 0;
       op.opacity = 255;
       const tx = Math.cos(a) * dist;
       const ty = Math.sin(a) * dist;
+      // Per-shard stagger so the burst blooms outward in a wave, not one block.
+      const lead = (i % 6) * 0.018;
       tween(node)
-        .to(0.12, { scale: new Vec3(1.15, 1.15, 1) }, { easing: 'backOut' })
-        .to(0.5, { scale: new Vec3(0.7, 0.7, 1) }, { easing: 'sineOut' })
+        .delay(lead)
+        .to(0.12, { scale: new Vec3(1.18, 1.18, 1) }, { easing: 'backOut' })
+        .to(0.52, { scale: new Vec3(0.62, 0.62, 1) }, { easing: 'sineOut' })
         .start();
+      // expoOut launch, then a gentle gravity drift down on settle (secondary motion).
       tween(node)
+        .delay(lead)
         .to(0.6, { position: new Vec3(tx, ty, 0) }, { easing: 'expoOut' })
+        .to(0.5, { position: new Vec3(tx * 1.04, ty - 26, 0) }, { easing: 'sineIn' })
         .start();
+      // Tumble: boxes/stars spin hard, rombs drift — gives the confetti life.
+      tween(node).delay(lead).by(0.85, { angle: spin }, { easing: 'quadOut' }).start();
       tween(op)
-        .delay(0.22)
-        .to(0.42, { opacity: 0 }, { easing: 'quadIn' })
+        .delay(0.24 + lead)
+        .to(0.46, { opacity: 0 }, { easing: 'quadIn' })
         .call(() => {
           if (node.isValid) node.active = false;
         })
@@ -535,6 +645,7 @@ export class CeremonyView extends Component {
   private hide(): void {
     if (!this.overlay) return;
     Tween.stopAllByTarget(this.raysNode);
+    Tween.stopAllByTarget(this.raysNode2);
     tween(this.dim).to(0.3, { opacity: 0 }).start();
 
     if (this.panelLightOp) {
@@ -665,19 +776,28 @@ export class CeremonyView extends Component {
   };
 
   private landingPop(): void {
+    // Tier-scaled settle overshoot (Swink — sub-frame settle; Sylvester — bigger
+    // wins savour harder): the final lock punches by landingPopScale, amplified
+    // by the active tier's textPop, then springs back via backOut.
+    const { landingPopScale, landingPopMs } = VIEW_CONFIG.counter;
+    const over = 1 + landingPopScale * Math.max(1, this.currentTextPop);
+    const up = (landingPopMs / 1000) * 0.37;
+    const down = (landingPopMs / 1000) * 0.63;
+    const overV = new Vec3(over, over, 1);
+
     const n = this.amountLabel.node;
     n.setScale(1, 1, 1);
     tween(n)
-      .to(0.14, { scale: new Vec3(1.36, 1.36, 1) }, { easing: 'quadOut' })
-      .to(0.26, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .to(up, { scale: overV }, { easing: 'quadOut' })
+      .to(down, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .start();
 
     if (this.amountShadow) {
       const s = this.amountShadow.node;
       s.setScale(1, 1, 1);
       tween(s)
-        .to(0.14, { scale: new Vec3(1.36, 1.36, 1) }, { easing: 'quadOut' })
-        .to(0.26, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .to(up, { scale: overV.clone() }, { easing: 'quadOut' })
+        .to(down, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
         .start();
     }
 
@@ -745,7 +865,9 @@ export class CeremonyView extends Component {
     if (this.dim) Tween.stopAllByTarget(this.dim);
     if (this.overlay) Tween.stopAllByTarget(this.overlay);
     if (this.raysNode) Tween.stopAllByTarget(this.raysNode);
+    if (this.raysNode2) Tween.stopAllByTarget(this.raysNode2);
     if (this.shockNode) Tween.stopAllByTarget(this.shockNode);
+    if (this.shockRingNode) Tween.stopAllByTarget(this.shockRingNode);
 
     for (const s of this.sparkles) {
       Tween.stopAllByTarget(s.node);

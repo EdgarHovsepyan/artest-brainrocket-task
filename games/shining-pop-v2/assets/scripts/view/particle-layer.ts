@@ -1,6 +1,7 @@
 import { _decorator, Color, Component, tween, Vec3 } from 'cc';
 import { ParticlePool, PoolShard } from './particle-pool';
 import { VIEW_CONFIG } from './view-config';
+import { VfxGovernor, VfxStats } from './perf';
 
 const { ccclass } = _decorator;
 const WHITE = new Color(255, 255, 255, 255);
@@ -39,8 +40,29 @@ export class ParticleLayer extends Component {
   private phys: PhysParticle[] = [];
   private physOn = false;
 
+  // Frame-time governor: sampled every frame (update), read by every spawn path
+  // to scale density to the live frame budget. Rich when smooth, lean when not.
+  private readonly gov = new VfxGovernor(VIEW_CONFIG.vfx.quality);
+
   onLoad(): void {
     this.pool = this.node.getComponent(ParticlePool) ?? this.node.addComponent(ParticlePool);
+  }
+
+  // Cocos ticks update() every frame regardless of whether physics shards are
+  // live, so it is the honest sampling point for the frame-time EMA.
+  update(dt: number): void {
+    this.gov.sample(dt);
+  }
+
+  // Live VFX telemetry for the ?debug HUD (approval #41). Read-only snapshot —
+  // the governor and pool stay the single owners of these numbers.
+  vfxStats(): VfxStats {
+    return {
+      fps: this.gov.emaFps,
+      scale: this.gov.scale,
+      live: this.pool?.live ?? 0,
+      cap: VIEW_CONFIG.particles.poolCap,
+    };
   }
 
   private spawnPhys(
@@ -95,7 +117,8 @@ export class ParticleLayer extends Component {
   burst(centers: Vec3[], multiple: number): void {
     const { baseCount, perMultiple, maxCount } = VIEW_CONFIG.particles;
     const big = multiple >= VIEW_CONFIG.ceremony.showMinMultiple;
-    const count = Math.min(maxCount, Math.round(baseCount + multiple * perMultiple));
+    const raw = Math.min(maxCount, Math.round(baseCount + multiple * perMultiple));
+    const count = this.gov.count(raw, big ? 8 : 4);
     const pts = centers.length ? centers : [new Vec3(0, VIEW_CONFIG.layout.reelCenterY, 0)];
     for (let i = 0; i < count; i++) {
       const p = pts[i % pts.length];
@@ -112,9 +135,12 @@ export class ParticleLayer extends Component {
       new Color(140, 240, 200, 255),
       new Color(255, 250, 250, 255),
     ];
+    // The ignite ring is the signature "pop"; keep a floor of 5 so it always reads.
+    const ringCount = this.gov.count(8, 5);
+    const cellCount = this.gov.count(cfg.perCell, 3);
     for (const c of centers) {
-      for (let i = 0; i < 8; i++) {
-        const ang = (i / 8) * Math.PI * 2 + Math.random() * 0.4;
+      for (let i = 0; i < ringCount; i++) {
+        const ang = (i / ringCount) * Math.PI * 2 + Math.random() * 0.4;
         const v = 240 + Math.random() * 120;
         this.spawnPhys(
           c.x,
@@ -129,7 +155,7 @@ export class ParticleLayer extends Component {
         );
       }
 
-      for (let i = 0; i < cfg.perCell; i++) {
+      for (let i = 0; i < cellCount; i++) {
         const hot = i % 4 === 3;
         this.spawnPhys(
           c.x + (Math.random() - 0.5) * cfg.spreadPx,
@@ -151,7 +177,8 @@ export class ParticleLayer extends Component {
     const color = new Color().fromHEX(cfg.sparkColor);
     const life = cfg.sparkLifeMs / 1000;
     const g = cfg.sparkGravity;
-    for (let i = 0; i < cfg.sparkPerStep; i++) {
+    const sparks = this.gov.count(cfg.sparkPerStep, 1);
+    for (let i = 0; i < sparks; i++) {
       const slot = this.pool.get(x, y, color, 0.6 + Math.random() * 0.4);
       if (!slot) return;
       const vx = (Math.random() - 0.5) * 200;
@@ -166,7 +193,8 @@ export class ParticleLayer extends Component {
     const cfg = VIEW_CONFIG.particles.coin;
     const spread = (cfg.spreadDeg * Math.PI) / 180;
     const pool = this.pool;
-    for (let i = 0; i < cfg.count; i++) {
+    const coins = this.gov.count(cfg.count, 8);
+    for (let i = 0; i < coins; i++) {
       const slot = pool.get(originX, originY, COIN, 1.2);
       if (!slot) return;
       const ang = -Math.PI / 2 + (Math.random() - 0.5) * spread;
