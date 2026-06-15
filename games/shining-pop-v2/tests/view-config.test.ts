@@ -117,6 +117,16 @@ test('per-symbol reel-landing config is sane across speed modes', () => {
   assert.ok(L.symDurMs.max <= L.symDurMs.off, 'max-speed landing must not be slower than off');
 });
 
+test('anticipation thresholds + aura are well-formed', () => {
+  const a = VIEW_CONFIG.anticipation;
+  assert.ok(Number.isInteger(a.minEarlyWilds) && a.minEarlyWilds > 0);
+  assert.ok(Number.isInteger(a.minEarlyScatters) && a.minEarlyScatters > 0);
+  assert.ok(a.extraSeconds > 0, 'anticipation must add real hang time');
+  assert.equal(typeof a.showAura, 'boolean');
+  assert.match(a.auraColor, /^#[0-9a-fA-F]{6}$/, 'aura colour must be hex');
+  assert.ok(a.boltCount >= 0 && a.reStrikeMs > 0);
+});
+
 test('resolveBigWinTier maps win multiples to the right tier band', () => {
   assert.equal(resolveBigWinTier(0), null, 'no ceremony for a 0x win');
   assert.equal(resolveBigWinTier(9), null, 'below the BIG floor → no named tier');

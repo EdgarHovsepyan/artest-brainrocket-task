@@ -20,7 +20,7 @@ import {
   Vec3,
   view,
 } from 'cc';
-import { BONUS_MODES, BonusMode, GRID, PAYLINES, SYMBOLS } from '../logic/game-config';
+import { BONUS_MODES, BonusMode, GRID, PAYLINES, SCATTER, SYMBOLS } from '../logic/game-config';
 import { formatMoney } from '../logic/money';
 import {
   CONTROLS_LINES,
@@ -2986,11 +2986,22 @@ export class SlotView extends Component {
 
   async playSpin(grid: number[][], speedMul = 1): Promise<void> {
     const { minSpinMs, reelStopStaggerMs } = VIEW_CONFIG.spin;
-    const { minEarlyWilds, extraSeconds } = VIEW_CONFIG.anticipation;
+    const { minEarlyWilds, minEarlyScatters, extraSeconds } = VIEW_CONFIG.anticipation;
 
+    // Tension on the last reels when the early reels (0-2) already tease a feature:
+    // enough wilds for a WILD STRIKE, or enough scatters for the free-spins trigger
+    // (scatters pay from anywhere, so a 3rd is live). Koster — vary anticipation by
+    // trigger type; the bonus tease is the highest-tension moment in the game.
     let earlyWilds = 0;
-    for (let r = 0; r < 3; r++) for (const id of grid[r]) if (id === SYMBOLS.WILD) earlyWilds++;
-    const antic = earlyWilds >= minEarlyWilds && !this.reducedFx;
+    let earlyScatters = 0;
+    for (let r = 0; r < 3; r++) {
+      for (const id of grid[r]) {
+        if (id === SYMBOLS.WILD) earlyWilds++;
+        else if (id === SCATTER) earlyScatters++;
+      }
+    }
+    const antic =
+      (earlyWilds >= minEarlyWilds || earlyScatters >= minEarlyScatters) && !this.reducedFx;
     const turbo = speedMul <= VIEW_CONFIG.turbo.turbo;
 
     const cadence = this.reducedFx ? [0, 1, 2, 3, 4] : VIEW_CONFIG.spin.stopCadence;
