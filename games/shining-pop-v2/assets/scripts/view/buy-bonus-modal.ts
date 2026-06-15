@@ -54,7 +54,6 @@ const C = {
   buy: '#ff5ab0',
   buyHi: '#ffd9f4',
   cancel: '#241a3a',
-  dark: '#1a0820',
 };
 function col(hex: string, a?: number): Color {
   const c = new Color();
@@ -175,14 +174,24 @@ export class BuyBonusModal extends Component {
 
   /** Faceted candy gem medallion (no sprite frame supplied). */
   private gem(g: Graphics, cx: number, cy: number, rad: number, accent: string): void {
-    g.fillColor = col(accent, 0.9);
+    // Bright candy BASE under the accent so a dim/missing accent can NEVER read as
+    // a black diamond (owner: "color bug, not black in the bonus"). The accent tints
+    // on top; a bright core + rim keep it glossy.
+    g.fillColor = col('#ff8ad0', 0.9);
     g.moveTo(cx, cy + rad);
     g.lineTo(cx + rad * 0.82, cy);
     g.lineTo(cx, cy - rad);
     g.lineTo(cx - rad * 0.82, cy);
     g.close();
     g.fill();
-    g.fillColor = col('#ffffff', 0.4);
+    g.fillColor = col(accent, 0.78);
+    g.moveTo(cx, cy + rad);
+    g.lineTo(cx + rad * 0.82, cy);
+    g.lineTo(cx, cy - rad);
+    g.lineTo(cx - rad * 0.82, cy);
+    g.close();
+    g.fill();
+    g.fillColor = col('#ffffff', 0.55);
     g.moveTo(cx, cy + rad * 0.5);
     g.lineTo(cx + rad * 0.36, cy);
     g.lineTo(cx, cy - rad * 0.5);
@@ -289,7 +298,9 @@ export class BuyBonusModal extends Component {
       this.text(tile, `${tier.spins} FREE SPINS`, 0, -16, 13, C.label);
       const cost = this.text(tile, tier.costText, 0, -52, 26, C.value, true);
       cost.name = 'cost';
-      this.text(tile, tier.special, 0, -92, 11, C.muted);
+      // Only render the special caption when there IS one — an empty string left a
+      // dead/empty row (owner: "not empty flexible dynamic").
+      if (tier.special) this.text(tile, tier.special, 0, -92, 11, C.muted);
 
       this.pressFx(tile, [tile], () => this.select(i), false);
     });

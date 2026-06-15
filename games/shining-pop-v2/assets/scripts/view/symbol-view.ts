@@ -45,6 +45,12 @@ export class SymbolView extends Component {
   private haloOp: UIOpacity | null = null;
   private haloSp: Sprite | null = null;
   private size = 90;
+  // WIN LIFT — while this cell is a winner its node is reparented to a top overlay
+  // (above the reel mask) so the enlarged 3D pop renders uncropped. These remember
+  // where to put it back on clear.
+  private homeParent: Node | null = null;
+  private homeSibling = 0;
+  private homePos: Vec3 | null = null;
   /** Current symbol id — set by setSymbol, read by ReelView's spin-mask logic
    *  so it can paint off-screen buffer cells with the SAME symbols currently in
    *  the window. Prevents the launch-frame visible-content swap that the user
@@ -255,8 +261,31 @@ export class SymbolView extends Component {
     this.haloOp = op;
   }
 
-  playWin(delay = 0, rich = true, winMat: Material | null = null): void {
+  /** Reparent this winning cell to the top overlay so its enlarged 3D pop renders
+   *  ABOVE the per-reel mask, uncropped. Remembers home parent/sibling/local-pos so
+   *  clear() can put it back. worldCenter is board-local — and the overlay sits at
+   *  the board origin — so the symbol lands pixel-identical to its strip position. */
+  private liftForWin(overlay: Node, worldCenter: Vec3): void {
+    if (this.homeParent) return; // already lifted (re-win before clear) — keep home
+    this.homeParent = this.node.parent;
+    this.homeSibling = this.node.getSiblingIndex();
+    this.homePos = this.node.position.clone();
+    this.node.setParent(overlay, false);
+    this.node.setPosition(worldCenter);
+  }
+
+  playWin(
+    delay = 0,
+    rich = true,
+    winMat: Material | null = null,
+    lift: Node | null = null,
+    worldCenter: Vec3 | null = null,
+  ): void {
     this.ensureBurst();
+    // LIFT above the reel mask FIRST (synchronously) so the enlarged 3D pop is never
+    // clipped by the per-reel window. Reparented immediately; the scale/tilt tweens
+    // below carry the stagger delay. Restored in clear() before the next spin.
+    if (lift && worldCenter) this.liftForWin(lift, worldCenter);
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
     // PER-SYMBOL WIN IDENTITY — scale the whole celebration by this symbol's heat
     // so a Wild win EXPLODES and a low-pays win is a polite bump (heat 1.0 = the
@@ -266,8 +295,12 @@ export class SymbolView extends Component {
     // pop, it ZOOMS IN and STAYS enlarged through its win (owner: "zoom effects on
     // the wild scale"). The attack settles to `zoom` (not 1.0) and the jelly
     // oscillates around it, so the Wild reads bigger/forward the whole celebration.
-    // Modest 1.08 sustain so it never collides hard with neighbours.
-    const zoom = this._currentId === 0 ? 1.08 : 1.0;
+    // SUSTAINED ENLARGE — now that the winner is LIFTED out of the mask, it can
+    // safely settle BIGGER and STAY big through the celebration (owner: "show
+    // bigger only the symbols"). The Wild goes a touch larger still; lightly
+    // heat-scaled so a hot win reads a hair bolder. Was a flat 1.08-Wild / 1.0.
+    const sustain = VIEW_CONFIG.win.winSustainScale ?? 1.0;
+    const zoom = (this._currentId === 0 ? sustain + 0.06 : sustain) * (0.96 + 0.04 * heat);
     const half = symbolPulseMs / 2 / 1000; // ms → s, two halves
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
@@ -299,6 +332,23 @@ export class SymbolView extends Component {
         .delay(delay + half * 2) // begin after the attack lands
         .to(bhalfBeat, { scale: bUp }, { easing: 'backOut' }) // pop UP
         .to(bhalfBeat, { scale: bDn }, { easing: 'quadIn' }) // settle DOWN
+        .union()
+        .repeatForever()
+        .start();
+    }
+    // CUTE 3D CARD-TURN — a gentle Y-axis tilt swing so the winning candy "turns
+    // toward camera" (owner: "some 3d effect, cute"). Cocos 3.8 UI nodes are real
+    // 3D transforms, so eulerAngles.y gives true perspective foreshortening. Runs
+    // on a SEPARATE property (eulerAngles) from the scale tweens, so it composes.
+    // Only meaningful once lifted (uncropped); capped small so it never goes thin.
+    const tlt = VIEW_CONFIG.win.winTilt;
+    if (tlt?.enabled && bnc.enabled) {
+      const td = tlt.ms / 1000;
+      this.node.eulerAngles = new Vec3(0, 0, 0);
+      tween(this.node)
+        .delay(delay + half * 2)
+        .to(td, { eulerAngles: new Vec3(0, tlt.deg, 0) }, { easing: 'sineInOut' })
+        .to(td, { eulerAngles: new Vec3(0, -tlt.deg, 0) }, { easing: 'sineInOut' })
         .union()
         .repeatForever()
         .start();
@@ -727,8 +777,16 @@ export class SymbolView extends Component {
 
   clear(): void {
     Tween.stopAllByTarget(this.node);
+    // UN-LIFT: return this cell to its reel strip BEFORE the next spin repaints it.
+    if (this.homeParent) {
+      this.node.setParent(this.homeParent, false);
+      this.node.setSiblingIndex(this.homeSibling);
+      if (this.homePos) this.node.setPosition(this.homePos);
+      this.homeParent = null;
+      this.homePos = null;
+    }
     this.node.setScale(1, 1, 1);
-    this.node.angle = 0; // reset the win shimmy so a cleared symbol is never tilted
+    this.node.eulerAngles = new Vec3(0, 0, 0); // reset win tilt/shimmy on ALL axes
     this.setDimmed(false);
     if (this.glow) {
       Tween.stopAllByTarget(this.glow);

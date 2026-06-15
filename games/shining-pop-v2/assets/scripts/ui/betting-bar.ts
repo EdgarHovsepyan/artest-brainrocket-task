@@ -297,14 +297,20 @@ export class BettingBarMobile extends Component {
     const g = this.g;
     const Y = this.Y.bind(this);
 
-    // Opaque ONLY from BAND_TOP down — the reels show through / sit above the
-    // transparent upper region (was a full-surface fill that covered the board).
-    this.rr(g, 0, BAND_TOP, W, H - BAND_TOP, 0);
-    g.fillColor = col(C.stage, 0.9); // slightly translucent deck (owner: less opaque bg)
-    g.fill();
-    this.rr(g, 0, 300, W, 384, 0);
-    g.fillColor = col('#000000', 0.12);
-    g.fill();
+    // TRANSPARENT mobile bar (owner: "remove the background, transparent bg on the
+    // bet panel"). The full-width deck slab + black scrim are gated on the config
+    // bandAlpha (now 0) — when 0 nothing full-surface is painted and the reels/bg
+    // show fully through. The per-control panels (banners/stepper/balance) below
+    // keep their own fills for local contrast, so the controls still read.
+    const bandAlpha = VIEW_CONFIG.bar.mobile.bandAlpha;
+    if (bandAlpha > 0) {
+      this.rr(g, 0, BAND_TOP, W, H - BAND_TOP, 0);
+      g.fillColor = col(C.stage, bandAlpha);
+      g.fill();
+      this.rr(g, 0, 300, W, 384, 0);
+      g.fillColor = col('#000000', 0.12);
+      g.fill();
+    }
     // Candy-pink top rim that lifts the band off the reels above (web-bar parity).
     g.rect(0, Y(BAND_TOP), W, 2);
     g.fillColor = col(C.edge, 0.55);

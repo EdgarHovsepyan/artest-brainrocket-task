@@ -294,8 +294,17 @@ export class ReelView extends Component {
   /** Pulse the given window rows (cells in a winning line), offset by `delay`
    *  seconds so the controller can stagger reels into an L->R wave blink. `rich`
    *  enables the in-cell sheen/sparkle (focused wins only — off for dense wins). */
-  highlight(rows: number[], delay = 0, rich = true, winMat: Material | null = null): void {
-    rows.forEach((row, i) => this.cells[row]?.playWin(delay + i * 0.04, rich, winMat));
+  highlight(
+    rows: number[],
+    delay = 0,
+    rich = true,
+    winMat: Material | null = null,
+    lift: Node | null = null,
+    centerOf?: (row: number) => Vec3,
+  ): void {
+    rows.forEach((row, i) =>
+      this.cells[row]?.playWin(delay + i * 0.04, rich, winMat, lift, centerOf?.(row) ?? null),
+    );
     // WIN FOCUS — every cell that isn't part of the win dims back so the winners
     // pop instantly (clearHighlight → cell.clear() restores full opacity).
     this.cells.forEach((c, row) => {

@@ -104,7 +104,19 @@ export class AudioManager {
    *  download (master parity: the whole game otherwise stays on synth). */
   unlock(): void {
     if (!this.ensure() || !this.ctx) return;
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    // ALWAYS attempt the resume on a gesture (not gated on `unlocked`): a context
+    // can still be suspended when the buffers land, so a later gesture must be able
+    // to kick it. When the resume resolves, start the music if it's loaded but idle.
+    if (this.ctx.state === 'suspended') {
+      void this.ctx
+        .resume()
+        .then(() => {
+          if (this.musicId && this.buffers[this.musicId] && !this.musicSrc) {
+            this.playMusic(this.musicId);
+          }
+        })
+        .catch(() => undefined);
+    }
     if (this.unlocked) return;
     this.unlocked = true;
     this.loadBank();
@@ -113,8 +125,13 @@ export class AudioManager {
   private loadBank(): void {
     if (this.loading || !this.ctx) return;
     this.loading = true;
+    // Resolve the clip URL against the document base so it works under a deploy
+    // sub-path (e.g. /shining-pop-v2/) even when the URL has no trailing slash —
+    // a bare 'audio/x.mp3' would otherwise 404 against the domain root and the
+    // whole game would run silent. document.baseURI carries the correct prefix.
+    const base = typeof document !== 'undefined' ? document.baseURI : '';
     for (const id of BANK) {
-      fetch(`audio/${id}.mp3`)
+      fetch(base ? new URL(`audio/${id}.mp3`, base).href : `audio/${id}.mp3`)
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
         .then((ab) => this.ctx!.decodeAudioData(ab))
         .then((buf) => {

@@ -15,7 +15,7 @@ export const VIEW_CONFIG = {
     /** Symbol art fill fraction of the cell. Bumped 0.92→0.99 (2026-06-12) so
      *  symbols fill nearly the whole cell — kills the big vertical gap the user
      *  saw between rows (symbols read bigger + more compact). */
-    symbolFill: 0.99,
+    symbolFill: 0.94,
     /** Gap between cells (and between reels). Tightened 8→5 for a more compact
      *  reel (less dead space between symbols vertically + horizontally). */
     gap: 5,
@@ -254,6 +254,17 @@ export const VIEW_CONFIG = {
      *  bounce, not the opposing-axis squash-and-stretch the parallel branch used
      *  (which reads as a skew). jelly = bounce amplitude; ms = one full cycle. */
     winBounceLoop: { enabled: true, jelly: 0.15, ms: 290, heatTempo: 0.6 },
+    /** Winning symbols LIFT out of the reel mask and stay ENLARGED through the
+     *  celebration (owner: "in the win show bigger only the symbols, not cropping
+     *  under reels"). winSustainScale = the settled size winners hold; the Wild
+     *  goes a touch bigger. The lift (symbol reparented above the mask) makes the
+     *  enlarged symbol render fully uncropped. */
+    winSustainScale: 1.16,
+    /** Cute 3D card-turn on winning symbols (owner: "some 3d effect, cute"). A
+     *  gentle Y-axis tilt swing — real perspective foreshortening on the Cocos 3D
+     *  UI node. Capped small so the candy never goes razor-thin edge-on. Skipped
+     *  under reducedFx. */
+    winTilt: { enabled: true, deg: 13, ms: 540 },
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
@@ -296,14 +307,20 @@ export const VIEW_CONFIG = {
     // halo, the bouncy pop, the corner sparkles + the per-line ×N pops — no band,
     // no laser, no rainbow, nothing on the cell box.
     beams: {
-      enabled: false,
-      heightPx: 36,
+      // RE-ENABLED 2026-06-15 as the GLOSSY CANDY MATERIAL win line (owner: "win
+      // line look like shader expert level, yummy material"). The win-beam.effect
+      // is now a PEPPERMINT material (red+whitesmoke stripe + sliding specular
+      // gloss, re-skinned in the .effect frag) layered UNDER the crisp Graphics
+      // candy-cane core — gloss halo + readable line. Tuned DOWN (intensity 1.3,
+      // height 30) so it reads as wet candy gloss, never the rejected magenta band.
+      enabled: true,
+      heightPx: 30,
       maxSegments: 16,
       fadeInMs: 150,
-      holdOpacity: 245,
+      holdOpacity: 235,
       revealStaggerMs: 70,
-      intensity: 1.55,
-      flowSpeed: 2.8,
+      intensity: 1.3,
+      flowSpeed: 2.4,
     },
 
     /** CINEMA WAVE — soft-burst.effect replaces the 10-layer Graphics radial glow
@@ -714,12 +731,16 @@ export const VIEW_CONFIG = {
         // Defaults match the legacy betting-bar-web literals — designers
         // tweak here, never in code (Task 2.3).
         cellW: 132,
-        // Mask-local centre = (SW-24)/2 = (460-24)/2 = 218 (was 388 for SW=800).
-        // Keeps the active cell aligned under the centred pill after the carousel
-        // was narrowed to kill the empty-void (betting-bar-web buildCarousel).
-        pillCenterX: 218,
-        fadeScale: [1.0, 0.74, 0.56, 0.5] as readonly number[],
-        fadeOpacity: [255, 185, 95, 0] as readonly number[],
+        // Mask-local centre = (SW-24)/2 = (800-24)/2 = 388. 2026-06-15: REVERTED
+        // the narrow-window experiment (SW=460/pcx=218) — a narrow centred window
+        // ALWAYS shows a void at the ladder ends (default bet = index 0), which
+        // was exactly the owner's "empty carousel" screenshot. Back to the wide
+        // reference window: all 6 levels visible, active pill centred, no void.
+        pillCenterX: 388,
+        // Edge cells FADE but never vanish (floor 120 ≈ reference alpha 0.6) so the
+        // window always reads full, never empty at the extremes.
+        fadeScale: [1.0, 0.82, 0.74, 0.7] as readonly number[],
+        fadeOpacity: [255, 200, 150, 120] as readonly number[],
       },
       buttonBevel: {
         shadowAlpha: 0.45,
@@ -727,7 +748,10 @@ export const VIEW_CONFIG = {
       },
     },
     mobile: {
-      bandAlpha: 0.9,
+      // 0 = TRANSPARENT mobile bar (owner: "remove the background, transparent bg
+      // on the bet panel"). The full-width deck slab + black scrim are gated on
+      // this in betting-bar.drawDecor; per-control panels stay for contrast.
+      bandAlpha: 0.0,
       fadeAboveBandPx: 24,
     },
     buttons: {

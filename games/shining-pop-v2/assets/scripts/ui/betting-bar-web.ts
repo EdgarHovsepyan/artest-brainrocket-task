@@ -546,14 +546,15 @@ export class BettingBarWeb extends Component {
   }
 
   private buildCarousel(): void {
-    // 2026-06-15 (owner: "carousel empty part, needs centering") — the 800px-wide
-    // container only ever showed ~3 cells (the rest fade to 0), leaving a big empty
-    // void to the right. Narrowed to tightly frame the active pill + one neighbour
-    // each side, and shifted right so the active bet sits at the SAME centre (x1500)
-    // — no void, properly centred. (Pair: view-config bar.web.carousel.pillCenterX
-    // = (SW-24)/2 so the cell-align centre tracks the new mask centre.)
-    const SX = 1270;
-    const SW = 460;
+    // 2026-06-15 v2 (owner: "carousel STILL empty / not centred") — the narrow
+    // window (SW=460) was the WRONG fix: a narrow centred window mathematically
+    // ALWAYS shows a void when the active bet is near a ladder end, and the default
+    // bet IS index 0, so half the window was always empty. Reverted to the WIDE
+    // reference window: SW=800 (mask 776 ≈ all 6 levels visible at once) + edge
+    // cells that fade-but-never-vanish (view-config fadeOpacity floor 120). Now the
+    // window always reads FULL with the active pill centred — no void at any index.
+    const SX = 1080;
+    const SW = 800;
     const g = this.gfx('selector');
     this.panel(g, SX, 148, SW, 76, 38);
     g.fillColor = col(C.activeLo);

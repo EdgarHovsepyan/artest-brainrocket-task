@@ -77,7 +77,9 @@ export class SlotController extends Component {
 
   private state: FlowState = 'idle';
   private canStop = false;
-  private turboMode: 0 | 1 | 2 = 0;
+  // TURBO ON by default (owner: "turbo first state active"). 1 = TURBO (fast spins
+  // out of the box); the bar toggle still cycles TURBO → MEGA → OFF from here.
+  private turboMode: 0 | 1 | 2 = 1;
   private reducedFx = false;
   private autoplay: AutoplayState = idleAutoplay();
   private muted = false;
@@ -235,7 +237,9 @@ export class SlotController extends Component {
       this.bar.setCurrency('USD');
       this.syncHud();
       this.bar.setLastWin(0);
-      this.bar.setTurbo(this.turboMode);
+      // Route the boot default through the single setter so the bar glyph, the view
+      // turbo visual AND the settings panel all reflect TURBO-on from the first frame.
+      this.setTurboMode(this.turboMode);
       this.bar.setSoundOn(!this.muted);
       this.bar.setReducedFx(this.reducedFx); // re-built bar inherits the WCAG setting
       this.bar.setAutoplay(this.autoplay.active ? this.autoplay.remaining : null);

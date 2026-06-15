@@ -34,6 +34,8 @@ import {
   paytableRows,
   RTP_DISPLAY,
   RULES_LINES,
+  SCATTER_LINES,
+  SCATTER_TEASER,
   VOLATILITY_DISPLAY,
 } from '../logic/info-content';
 import { createRng } from '../logic/rng';
@@ -144,6 +146,9 @@ export class SlotView extends Component {
   private winLabel: Label | null = null;
   private bannerLabel: Label | null = null;
   private winLineG: Graphics | null = null;
+  /** Overlay above the reels where winning symbols are reparented during a win so
+   *  their enlarged 3D pop renders uncropped (escapes the per-reel mask). */
+  private winLift!: Node;
   private winSpark: Node | null = null;
   // Task 4.1 — additive payline-glow segments tracing the same polyline as the
   // Graphics stroke. The Graphics stroke stays as the always-on fallback; if
@@ -890,6 +895,11 @@ export class SlotView extends Component {
     this.buildFrame();
     this.buildCosmicShimmer(); // subtle deep-space twinkle inside the reel window
     this.buildReels();
+    // WIN-LIFT overlay — winning symbols reparent here during the celebration so
+    // they pop BIGGER + tilt in 3D ABOVE the per-reel mask, fully uncropped (owner:
+    // "show bigger only the symbols, not cropping under reels"). Created right after
+    // the reels so it sits just above them but below the cinematic/ceremony layers.
+    this.winLift = this.mkNode('winLift', 10, 10, this.node);
     this.buildCinematicBloom(); // transient win bloom-flash (opacity 0 at rest)
 
     this.winLineG = this.mkNode('winLines', 10, 10, this.node).addComponent(Graphics);
@@ -1419,34 +1429,12 @@ export class SlotView extends Component {
     if (this.reducedFx) return;
     const cfg = VIEW_CONFIG.win.beams;
     const staggerS = (cfg.revealStaggerMs ?? 0) / 1000;
-    // Core line — full payline, both strokes, regardless of shader support. It
-    // fades in over the same window the beams DRAW across, so the thin gold trace
-    // arrives WITH the progressive ribbon rather than snapping on instantly.
-    const cg = this.winCoreG;
-    if (cg) {
-      cg.clear();
-      for (const w of lineWins) {
-        const pts = this.linePts(w);
-        if (pts.length < 2) continue;
-        // Per-line colour identity (WL6): each payline traces in its own hue so a
-        // multi-line win reads as distinct ribbons, not one gold jumble. A hot
-        // white hairline rides the centre to keep the core crisp and bright.
-        const hue = LINE_HUES[w.lineIndex % LINE_HUES.length];
-        for (const [width, color] of [
-          // Per-line hue CORE (color identity, "our palette") under the candy-pink
-          // additive bloom (win-beam.effect). Thin trace (not a heavy stroke) +
-          // a hot white hairline keep it elegant, not a hard magenta line.
-          [3, new Color(hue.r, hue.g, hue.b, 205)],
-          [1.2, new Color(255, 250, 252, 255)],
-        ] as [number, Color][]) {
-          cg.lineWidth = width;
-          cg.strokeColor = color;
-          cg.moveTo(pts[0].x, pts[0].y);
-          for (let i = 1; i < pts.length; i++) cg.lineTo(pts[i].x, pts[i].y);
-          cg.stroke();
-        }
-      }
-    }
+    // 2026-06-15: the per-line-HUE winCoreG core is NEUTERED — the readable core is
+    // now the red+whitesmoke candy-cane drawn by paintCandyLines (drawCandyWinLines),
+    // so the win line stays ONE cohesive candy identity. The win-beam ribbon below
+    // is the glossy PEPPERMINT MATERIAL halo around that candy-cane. Drawing the hue
+    // core here too would triple the line (candy-cane + hue core + ribbon) = a jumble.
+    if (this.winCoreG) this.winCoreG.clear();
     if (!this.winBeams.length) return;
     let b = 0;
     for (const w of lineWins) {
@@ -1894,8 +1882,11 @@ export class SlotView extends Component {
 
   private buildFrame(): void {
     const { reelCenterY } = VIEW_CONFIG.layout;
-    const w = this.gw + 24;
-    const h = this.gh + 24;
+    // 2026-06-15 (owner: "gap in the border and reels — clean") — frame pad
+    // tightened 24→14 (7px each side) so the bright rim HUGS the reels instead of
+    // sitting in a 12px dead band. The inset stack below is shrunk to match.
+    const w = this.gw + 14;
+    const h = this.gh + 14;
     const frame = this.mkNode('frame', w, h, this.node);
     frame.setPosition(0, reelCenterY, 0);
     // 2026-06-13 PORTAL REDESIGN — the old frame was a flat dark rounded-rect with
@@ -1948,15 +1939,15 @@ export class SlotView extends Component {
     g.fillColor = new Color(14, 7, 26, 158);
     g.roundRect(-w / 2, -h / 2, w, h, 14);
     g.fill();
-    for (let i = 1; i <= 5; i++) {
-      const inset = i * 9;
-      g.fillColor = new Color(7, 3, 16, 16);
+    for (let i = 1; i <= 3; i++) {
+      const inset = i * 5; // shrunk (was i*9, i<=5) so the thinner frame's
+      g.fillColor = new Color(7, 3, 16, 14); // centre-darkening can't dim edge cells
       g.roundRect(
         -w / 2 + inset,
         -h / 2 + inset,
         w - inset * 2,
         h - inset * 2,
-        Math.max(2, 14 - i * 2),
+        Math.max(2, 12 - i * 2),
       );
       g.fill();
     }
@@ -1973,31 +1964,19 @@ export class SlotView extends Component {
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
     const sg = sep.addComponent(Graphics);
-    // Polish 2026-06-11 — per-REEL column plates (5 total) instead of per-cell
-    // (15 total). The per-cell version drew a visible cream border around each
-    // cell, making the matrix read as a grid of 15 separate tiles rather than 5
-    // continuous reels. AAA slot convention is continuous reels (Lightning,
-    // Reactoonz, Gates, etc.) — symbols flow as one unbroken column. The faint
-    // fill + soft column rim keep the glass-panel cue without the grid noise.
+    // 2026-06-15 (owner: "boxes pixel designed? remove it, focus on the reel
+    // borders") — DROPPED the per-column cream rim STROKE + gloss sheen that drew
+    // a rounded box around each of the 5 columns (read as a pixel/grid design).
+    // The reels now flow as 5 CONTINUOUS columns over the portal well + cosmic
+    // shimmer, framed by the ONE clean bright frame rim — no column boxes, no grid.
+    // Only a whisper-faint glass fill remains so each column still catches a touch
+    // of light (edge-to-edge, no inset gap so symbols reach the frame cleanly).
     const { cell, gap } = VIEW_CONFIG.layout;
     for (let r = 0; r < GRID.reels; r++) {
-      const x = -this.gw / 2 + r * this.pitch + 3;
-      const y = -this.gh / 2 + 3;
-      const colW = cell - 6;
-      const colH = this.gh - 6;
-      // Soft glass fill — single column, not stacked tiles.
-      sg.fillColor = new Color(255, 255, 255, 8);
-      sg.roundRect(x, y, colW, colH, 12);
-      sg.fill();
-      // Subtle column rim — cream candy at low alpha so the reel reads as
-      // a glass panel, not a hard frame.
-      sg.lineWidth = 1.5;
-      sg.strokeColor = new Color(244, 228, 205, 60);
-      sg.roundRect(x, y, colW, colH, 12);
-      sg.stroke();
-      // Top sheen swept across the full column for the gloss.
-      sg.fillColor = new Color(255, 255, 255, 10);
-      sg.roundRect(x + 3, y + colH - 18, colW - 6, 12, 8);
+      const x = -this.gw / 2 + r * this.pitch;
+      const y = -this.gh / 2;
+      sg.fillColor = new Color(255, 255, 255, 6);
+      sg.roundRect(x, y, cell, this.gh, 10);
       sg.fill();
     }
     void gap;
@@ -2747,6 +2726,14 @@ export class SlotView extends Component {
         y -= 30;
       }
       wrapLine('Pays are line-bet multiples.', y - 6, info.captionSize);
+      // SCATTER + free-spins documentation (the new feature). Rendered under the
+      // line-pay table so players see the rainbow-lollipop scatter pays + free-spin
+      // award that the line table deliberately omits.
+      y -= 30;
+      for (const line of SCATTER_LINES) {
+        const ht = wrapLine(line, y, info.captionSize, line.startsWith('   ') ? MUTED : ACID);
+        y -= ht + info.lineGap;
+      }
     } else {
       let y = top;
       const stat = (label: string, value: string) => {
@@ -3274,6 +3261,9 @@ export class SlotView extends Component {
       new Color(255, 150, 200, 255),
       peek,
     );
+    // SCATTER teaser (owner: "update the intro with the new scatter") — the
+    // headline new feature on the very first screen, read-only from the math.
+    this.mkLabel(SCATTER_TEASER, 0, -106, 12, new Color(191, 232, 255, 255), peek);
     tween(peekOp).delay(0.6).to(0.5, { opacity: 235 }).start();
 
     // Screen-fit the gate (it's a Canvas overlay now, not board-space): scale so
@@ -3283,7 +3273,7 @@ export class SlotView extends Component {
     const vis = view.getVisibleSize();
     // Taller content band now (logo → peek → CTA), so fit to ~880 of height so
     // the bottom CTA never clips on a short/portrait viewport.
-    const introS = Math.min(vis.width / 480, vis.height / 880, 1.3);
+    const introS = Math.min(vis.width / 480, vis.height / 920, 1.3);
     ov.setScale(introS, introS, 1);
     ov.setPosition(0, 0, 0);
     const raise = (): void => {
@@ -3530,7 +3520,11 @@ export class SlotView extends Component {
     // material's u_time globally (one stepper, all overlays animate in sync).
     const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
     const waveStagger = VIEW_CONFIG.win.highlightWaveStagger;
-    this.reels.forEach((reel, i) => reel.highlight(byReel[i] ?? [], i * waveStagger, rich, winMat));
+    this.reels.forEach((reel, i) =>
+      reel.highlight(byReel[i] ?? [], i * waveStagger, rich, winMat, this.winLift, (row) =>
+        this.cellCenter(i, row),
+      ),
+    );
     // Win-wave AUDIO arpeggio — a rising-pitch tick per WINNING reel as the L→R
     // highlight wave sweeps across, so the (previously silent) blink-wave becomes a
     // building arpeggio that resolves into the win sting. Pitch climbs with the
