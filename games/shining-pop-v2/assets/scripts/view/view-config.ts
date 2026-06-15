@@ -1,5 +1,23 @@
 export const VIEW_CONFIG = {
-  vfx: { materialsEnabled: true },
+  vfx: {
+    materialsEnabled: true,
+
+    // Adaptive VFX density (see view/perf.ts — VfxGovernor). The board samples
+    // frame-time every frame; particle spawn counts are multiplied by the
+    // resulting scale so a capable GPU gets the full cinematic density and a
+    // strained one holds its frame budget instead of dropping frames mid-win.
+    quality: {
+      targetFps: 60,
+      emaAlpha: 0.1,
+      warmupFrames: 30,
+      minScale: 0.45,
+      upShiftMs: 18,
+      downShiftMs: 32,
+      recoverPerSec: 0.25,
+      shedPerSec: 2.0,
+      stallClampMs: 100,
+    },
+  },
 
   layout: {
     cell: 96,
