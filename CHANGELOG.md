@@ -49,11 +49,6 @@ integrator · Spine hero + procedural fallback · reduced-motion fallback on eve
 VFX · interruptible (tap-to-skip) ceremonies · `view-config` knobs over magic
 numbers.
 
-### Docs
-
-- `games/ROADMAP-LEGENDARY.md` — 100 prioritized, codebase-grounded improvements
-  (P0→P3) to take both engines to best-in-class.
-
 ### Note
 
 The Cocos `build/web-mobile` review build must be regenerated in Cocos Creator

@@ -34,3 +34,11 @@ packages/*/dist/
 
 # Playwright capture output (verify-the-built-thing screenshots) — never committed
 /tmp/
+
+# AI tooling + session planning docs — keep out of the clean product repo
+.claude/
+games/ARCHITECTURE-STRATEGY.md
+games/BOOK-PLAYBOOK.md
+games/PARITY-MATRIX.md
+games/ROADMAP-LEGENDARY.md
+games/VFX-BUSTING-WORKFLOW.md
