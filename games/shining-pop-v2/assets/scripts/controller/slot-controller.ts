@@ -123,6 +123,7 @@ export class SlotController extends Component {
 
     this.view.buildIntro(() => {
       this.introActive = false;
+      this.view.wipe('intro', 1, 1.15); // cinematic candy sweep into the game
       if (this.barNode && this.barNode.isValid) this.barNode.active = true; // reveal the bar
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');
@@ -479,6 +480,7 @@ export class SlotController extends Component {
     if (outcome.wildStrike > 1) this.view.setBanner(`WILD ×${outcome.wildStrike}`);
 
     if (outcome.freeSpins) {
+      this.view.wipe('fs', 1, 1.1);
       this.view.showFeatureUnlocked('FREE SPINS');
       this.view.setBanner(`FREE SPINS ×${outcome.result.freeSpins}`);
     }
@@ -548,6 +550,7 @@ export class SlotController extends Component {
     this.view.setWin(0);
     this.view.setBanner(BONUS_MODES[mode].name);
 
+    this.view.wipe('bonus', 1, 1.1);
     this.view.showFeatureUnlocked(BONUS_MODES[mode].name, mode);
     this.view.setBonusAtmosphere(mode);
 
@@ -595,6 +598,7 @@ export class SlotController extends Component {
 
     this.view.audio.bonusEnd();
     this.view.setBonusHud(null, 0, 0);
+    this.view.wipe('bonus', -1, 1);
     this.view.setBonusAtmosphere('idle');
     this.view.countUp(outcome.winCents);
 

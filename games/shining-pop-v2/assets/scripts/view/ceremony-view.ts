@@ -65,6 +65,7 @@ export class CeremonyView extends Component {
   private countElapsed = 0;
 
   onDetonate: ((tierName: string) => void) | null = null;
+  onDismiss: (() => void) | null = null;
   onCountPip: (() => void) | null = null;
 
   onCoinGeyser: (() => void) | null = null;
@@ -662,6 +663,7 @@ export class CeremonyView extends Component {
 
   private hide(): void {
     if (!this.overlay) return;
+    if (this.overlay.active) this.onDismiss?.();
     Tween.stopAllByTarget(this.raysNode);
     Tween.stopAllByTarget(this.raysNode2);
     tween(this.dim).to(0.3, { opacity: 0 }).start();

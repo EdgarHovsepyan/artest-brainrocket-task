@@ -172,6 +172,10 @@ export class SlotView extends Component {
   private preloadedSpines: Record<string, sp.SkeletonData> = {};
 
   private cineBloomOp: UIOpacity | null = null;
+  private cineWipe: Node | null = null;
+  private cineWipeOp: UIOpacity | null = null;
+  private cineWipeBand: Node | null = null;
+  private cineWipeG: Graphics | null = null;
 
   private parallaxLayers: { node: Node; depth: number; baseX: number; baseY: number }[] = [];
   private pxLean = 0;
@@ -801,6 +805,7 @@ export class SlotView extends Component {
     tap.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     tap.on(Node.EventType.TOUCH_END, () => this.showAllPaylines());
     this.buildCinematicBloom();
+    this.buildCinematicWipe();
 
     this.winLineG = this.mkNode('winLines', 10, 10, this.node).addComponent(Graphics);
 
@@ -1844,6 +1849,101 @@ export class SlotView extends Component {
       .to(0.08, { opacity: peak }, { easing: 'quadOut' })
       .to(0.5, { opacity: 0 }, { easing: 'quadIn' })
       .start();
+  }
+
+  private buildCinematicWipe(): void {
+    const wipe = this.mkNode('cineWipe', 2600, 2200, this.node);
+    this.cineWipe = wipe;
+    this.cineWipeOp = wipe.addComponent(UIOpacity);
+    this.cineWipeOp.opacity = 0;
+    wipe.active = false;
+
+    const band = this.mkNode('cineWipeBand', 1200, 2800, wipe);
+    band.eulerAngles = new Vec3(0, 0, 16);
+    this.cineWipeBand = band;
+    this.cineWipeG = band.addComponent(Graphics);
+  }
+
+  // Candy-wipe + soft-bloom — one reusable cinematic transition fired on
+  // every major state change (intro->game, base<->bonus, free-spins, round end).
+  cinematicWipe(core: Color, halo: Color, dir = 1, intensity = 1): void {
+    this.cinematicBloom(0.8 * intensity);
+    const wipe = this.cineWipe;
+    const op = this.cineWipeOp;
+    const band = this.cineWipeBand;
+    const g = this.cineWipeG;
+    if (!wipe || !op || !band || !g) return;
+
+    if (this.reducedFx) {
+      // Accessible fallback: a brief candy luminance pulse, no sweep.
+      wipe.active = true;
+      wipe.setSiblingIndex(this.node.children.length - 1);
+      band.setPosition(0, 0, 0);
+      this.paintWipeBand(g, core, halo, 1);
+      Tween.stopAllByTarget(op);
+      op.opacity = 0;
+      tween(op)
+        .to(0.12, { opacity: 150 }, { easing: 'quadOut' })
+        .to(0.26, { opacity: 0 }, { easing: 'quadIn' })
+        .call(() => (wipe.active = false))
+        .start();
+      return;
+    }
+
+    this.paintWipeBand(g, core, halo, intensity);
+    const span = 2200;
+    wipe.active = true;
+    wipe.setSiblingIndex(this.node.children.length - 1);
+    Tween.stopAllByTarget(op);
+    Tween.stopAllByTarget(band);
+    op.opacity = 0;
+    band.setPosition(-dir * span, 0, 0);
+    tween(band)
+      .to(0.46, { position: new Vec3(dir * span, 0, 0) }, { easing: 'quartOut' })
+      .start();
+    tween(op)
+      .to(0.1, { opacity: 255 }, { easing: 'quadOut' })
+      .delay(0.12)
+      .to(0.22, { opacity: 0 }, { easing: 'cubicIn' })
+      .call(() => (wipe.active = false))
+      .start();
+  }
+
+  private paintWipeBand(g: Graphics, core: Color, halo: Color, intensity: number): void {
+    const H = 2800;
+    const a = Math.min(1, Math.max(0.4, intensity));
+    g.clear();
+    // Feathered candy band: wide soft halo -> bright core, all centred on x=0.
+    const layers: [number, Color, number][] = [
+      [620, halo, 36 * a],
+      [400, halo, 70 * a],
+      [220, core, 150 * a],
+      [96, core, 230 * a],
+    ];
+    for (const [w, col, alpha] of layers) {
+      g.fillColor = new Color(col.r, col.g, col.b, Math.round(alpha));
+      g.rect(-w / 2, -H / 2, w, H);
+      g.fill();
+    }
+    // Two thin peppermint stripes riding the core for the candy read.
+    g.fillColor = new Color(255, 255, 255, Math.round(200 * a));
+    g.rect(-150, -H / 2, 10, H);
+    g.fill();
+    g.rect(120, -H / 2, 10, H);
+    g.fill();
+  }
+
+  /** Named candy tones so callers stay declarative. */
+  wipeTones = {
+    fs: { core: new Color(255, 150, 205, 255), halo: new Color(255, 92, 158, 255) },
+    bonus: { core: new Color(255, 120, 235, 255), halo: new Color(196, 70, 230, 255) },
+    win: { core: new Color(255, 238, 205, 255), halo: new Color(255, 184, 90, 255) },
+    intro: { core: new Color(255, 244, 222, 255), halo: new Color(255, 170, 120, 255) },
+  } as const;
+
+  wipe(tone: keyof SlotView['wipeTones'], dir = 1, intensity = 1): void {
+    const t = this.wipeTones[tone];
+    this.cinematicWipe(t.core, t.halo, dir, intensity);
   }
 
   private buildHud(): void {
@@ -3558,6 +3658,8 @@ export class SlotView extends Component {
     this.ceremony.onCoinGeyser = () => {
       if (!this.reducedFx) this.particles.coinGeyser();
     };
+    // Candy wipe as the big-win ceremony settles back to the base game.
+    this.ceremony.onDismiss = () => this.wipe('win', -1, 0.8);
     return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }
 
