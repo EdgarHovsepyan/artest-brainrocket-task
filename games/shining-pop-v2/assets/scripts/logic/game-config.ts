@@ -79,6 +79,11 @@ export const BONUS_MODES: Record<BonusMode, { name: string; spins: number; cost:
   reels: { name: 'WILD REELS', spins: 8, cost: 33.64 },
 };
 
+// Buy-bonus display order: cheapest -> most expensive (sorted by value).
+export const BONUS_MODES_BY_VALUE: BonusMode[] = (Object.keys(BONUS_MODES) as BonusMode[]).sort(
+  (a, b) => BONUS_MODES[a].cost - BONUS_MODES[b].cost,
+);
+
 export const SCATTER = 8;
 
 export const SCATTER_MIN = 3;

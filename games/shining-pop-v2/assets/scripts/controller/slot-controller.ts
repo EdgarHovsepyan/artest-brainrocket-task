@@ -37,7 +37,7 @@ import {
 } from '../logic/compliance';
 import { formatMoney } from '../logic/money';
 import { installLifecycle, LifecycleHandle } from './lifecycle';
-import { BONUS_MODES, BonusMode, SETTINGS } from '../logic/game-config';
+import { BONUS_MODES, BONUS_MODES_BY_VALUE, BonusMode, SETTINGS } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
 
@@ -92,7 +92,7 @@ export class SlotController extends Component {
     this.view.showGrid(this.model.idleGrid());
     this.view.onBuyClicked((mode) => void this.onBuy(mode as BonusMode));
     this.view.configureBuyMenu(
-      (Object.keys(BONUS_MODES) as BonusMode[]).map((mode) => ({
+      BONUS_MODES_BY_VALUE.map((mode) => ({
         mode,
         name: BONUS_MODES[mode].name,
         costText: this.fmt(this.model.bonusCost(mode)),
@@ -264,9 +264,7 @@ export class SlotController extends Component {
   }
 
   private refreshBuyMenu(): void {
-    const costs = (Object.keys(BONUS_MODES) as BonusMode[]).map((m) =>
-      this.fmt(this.model.bonusCost(m)),
-    );
+    const costs = BONUS_MODES_BY_VALUE.map((m) => this.fmt(this.model.bonusCost(m)));
     this.view.refreshBuyCosts(costs);
     this.view.setBuyBet(this.fmt(this.model.bet));
     this.refreshBuyAffordability();
@@ -274,9 +272,7 @@ export class SlotController extends Component {
 
   private refreshBuyAffordability(): void {
     this.view.setBuyAffordable(
-      (Object.keys(BONUS_MODES) as BonusMode[]).map(
-        (m) => this.model.balance >= this.model.bonusCost(m),
-      ),
+      BONUS_MODES_BY_VALUE.map((m) => this.model.balance >= this.model.bonusCost(m)),
     );
   }
 

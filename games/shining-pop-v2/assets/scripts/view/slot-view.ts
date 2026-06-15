@@ -228,6 +228,7 @@ export class SlotView extends Component {
   private autoCb: (() => void) | null = null;
   private soundCb: (() => void) | null = null;
 
+  private bgArt: Node | null = null;
   private gw = 0;
   private gh = 0;
   private pitch = 0;
@@ -361,6 +362,25 @@ export class SlotView extends Component {
 
   refit(): void {
     this.fit();
+  }
+
+  // object-fit: cover for the background photo. The board content is scaled by
+  // `s` to fit the reels; the bg must NOT inherit that — it scales independently
+  // to always FILL the screen (preserve aspect, crop overflow), centred on the
+  // screen, so no dark gaps show on any device aspect.
+  private fitBackgroundCover(s: number, vis: { width: number; height: number }): void {
+    if (!this.bgArt || s <= 0) return;
+    const ut = this.bgArt.getComponent(UITransform);
+    if (!ut) return;
+    const ratio = 2752 / 1536;
+    const overscan = VIEW_CONFIG.layout.bgCoverOverscan;
+    // Screen size expressed in this.node's local units (the node is scaled by s).
+    const localW = vis.width / s;
+    const localH = vis.height / s;
+    const w = Math.max(localW, localH * ratio) * overscan;
+    ut.setContentSize(w, w / ratio);
+    // Re-centre on the screen (canvas centre 0,0; this.node sits at 0,posY).
+    this.bgArt.setPosition(0, -this.node.position.y / s, 0);
   }
 
   getBrandFrame(key: string): SpriteFrame | null {
@@ -1492,6 +1512,7 @@ export class SlotView extends Component {
       photo.getComponent(UITransform)!.setContentSize(w, w / ratio);
       const op = photo.addComponent(UIOpacity);
       op.opacity = 235;
+      this.bgArt = photo;
     } else {
       bg.fillColor = new Color(40, 22, 78, 70);
       bg.rect(-1300, -120, 2600, 620);
@@ -1515,11 +1536,7 @@ export class SlotView extends Component {
       dg.fillColor = warm
         ? new Color(255, 90, 156, Math.round(10 + rng() * 22))
         : new Color(120, 200, 255, Math.round(8 + rng() * 16));
-      dg.moveTo(x, y - r);
-      dg.lineTo(x + r, y);
-      dg.lineTo(x, y + r);
-      dg.lineTo(x - r, y);
-      dg.close();
+      dg.circle(x, y, r);
       dg.fill();
     }
     tween(dots)
@@ -2039,6 +2056,8 @@ export class SlotView extends Component {
     this.node.setScale(s, s, 1);
 
     this.node.setPosition(0, this.bottomInset / 2 - contentCenter * s, 0);
+
+    this.fitBackgroundCover(s, vis);
 
     if (this.logoNode) {
       if (isLandscape) {
