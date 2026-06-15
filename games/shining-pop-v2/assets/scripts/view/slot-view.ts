@@ -173,7 +173,6 @@ export class SlotView extends Component {
   private reelPortalBottom: Node | null = null;
   private gridMergeNode: Node | null = null;
   // Task 4.5 — Buy-Bonus ambient: Graphics glint sheen + optional plasma sprite.
-  private buyGlint: Node | null = null;
   private buyPlasma: Node | null = null;
   // Task 1.2 — stacked-alpha feather over reel window mask top/bottom.
   private windowFeatherTop: Node | null = null;
@@ -1108,37 +1107,9 @@ export class SlotView extends Component {
     if (this.reducedFx) return;
     const cfg = VIEW_CONFIG.buy.ambient;
 
-    // Glint: a tilted bright-white parallelogram swept from L→R behind the art.
-    // The fab clips its children (the buy art covers most of the surface), so a
-    // sheen that slides across reads as a moving highlight, not a separate node.
-    const glintNode = this.mkNode('buyGlint', fabW, fabW, fabPress);
-    glintNode.setSiblingIndex(0); // behind the art sprite
-    const gg = glintNode.addComponent(Graphics);
-    gg.fillColor = new Color(255, 255, 255, 60);
-    const gw = fabW * 0.22;
-    const gh = fabW * 1.4;
-    gg.moveTo(-gw, gh / 2);
-    gg.lineTo(gw, gh / 2);
-    gg.lineTo(gw + 24, -gh / 2);
-    gg.lineTo(-gw + 24, -gh / 2);
-    gg.close();
-    gg.fill();
-    glintNode.angle = -22;
-    glintNode.setPosition(-fabW * 0.7, 0, 0);
-    const gop = glintNode.addComponent(UIOpacity);
-    gop.opacity = 0;
-    const sweepDur = cfg.glintSweepMs / 1000;
-    const gapDur = cfg.glintGapMs / 1000;
-    tween(glintNode)
-      .call(() => glintNode.setPosition(-fabW * 0.7, 0, 0))
-      .delay(gapDur)
-      .call(() => (gop.opacity = 220))
-      .to(sweepDur, { position: new Vec3(fabW * 0.7, 0, 0) }, { easing: 'sineInOut' })
-      .call(() => (gop.opacity = 0))
-      .union()
-      .repeatForever()
-      .start();
-    this.buyGlint = glintNode;
+    // No diagonal glint sweep across the FAB (owner rejects diagonal shine). The
+    // buy-plasma additive material + the soft radial buyGlow pulse carry the FAB's
+    // "alive" cue — a glossy candy breathing in place, not a swept sheen bar.
 
     // Plasma: a Sprite filling the fab face, clipped by the art layer. Material
     // is the additive overlay; without it the sprite is a low-alpha tinted plate.

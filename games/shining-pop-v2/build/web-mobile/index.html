@@ -234,5 +234,47 @@
       setTimeout(function () { clearInterval(poll); }, 6000); // safety stop
     })();
   </script>
+  <script>
+    /* CRISPER RENDER (owner: "4K / device pixel ratio 3+"). Cocos 3.8.8 hard-caps
+       the backing-store DPR at min(devicePixelRatio, 2) via a read-only getter, so
+       3x phones render at 2x and the browser upscales the rest (the softness). The
+       supported lever is cc.screen.resolutionScale, which multiplies the framebuffer
+       (effective DPR = min(dpr,2) x resolutionScale) and feeds the custom pipeline +
+       all .effect shaders. We raise it to 1.25 (effective DPR 2.5) on capable
+       devices only — cost is QUADRATIC, so it's GPU-gated + capped to protect 60fps
+       on the multi-shader win ceremony. Reversible: ?crisp=1 forces it off; deleting
+       this block returns the build to stock. */
+    (function () {
+      function tier() {
+        try {
+          var dpr = window.devicePixelRatio || 1;
+          if (dpr <= 1.0) return 1; // desktop @1x: nothing to gain
+          var weak = false;
+          try {
+            var gl = document.createElement('canvas').getContext('webgl');
+            var dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+            var r = dbg ? ('' + gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)).toLowerCase() : '';
+            weak = /mali-4|adreno [23]|powervr|swiftshader|llvmpipe|software/.test(r);
+          } catch (e) {}
+          if (weak) return 1; // protect low-end GPUs
+          var longEdge = Math.max(window.innerWidth, window.innerHeight) * dpr;
+          if (longEdge > 3400) return 1.15; // huge panels: cap fill-rate harder
+          return 1.25; // effective DPR = 2 x 1.25 = 2.5
+        } catch (e) { return 1; }
+      }
+      function apply() {
+        try {
+          if (!(window.cc && cc.screen && typeof cc.screen.resolutionScale !== 'undefined')) return;
+          var m = /[?&]crisp=([0-9.]+)/.exec(location.search);
+          var s = m ? parseFloat(m[1]) : tier();
+          if (s && s !== 1) cc.screen.resolutionScale = s;
+        } catch (e) {}
+      }
+      var p = setInterval(function () {
+        if (window.cc && cc.director && cc.director.getScene()) { apply(); clearInterval(p); }
+      }, 120);
+      setTimeout(function () { clearInterval(p); }, 6000);
+    })();
+  </script>
 </body>
 </html>

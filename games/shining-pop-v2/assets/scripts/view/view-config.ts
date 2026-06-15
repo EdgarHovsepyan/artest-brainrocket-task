@@ -140,11 +140,11 @@ export const VIEW_CONFIG = {
      *  tap can't both start and stop a spin. Scales with turbo (shorter spin →
      *  arms sooner) so rapid multi-clicks chain stop→spin without dropping. */
     quickStopArmMs: { off: 180, turbo: 110, max: 70 },
-    /** Anticipatory wind-up kick before launch (OFF mode only). The launch
-     *  anticipation is now POSITION-ONLY (a small up-kick before the down
-     *  launch) — windupSquash 1.0 disables the Y-scale entirely so NO vertical
-     *  scaling ever touches the symbols (user-rejected all vertical effects). */
-    windupMs: 120,
+    /** Wind-up DISABLED 2026-06-15 (owner: reels "slow / not snappy"). The 120ms
+     *  up-drift before launch (OFF mode only) made the reel hesitate/drift UP
+     *  before spinning — a sluggish start, and it diverged from the now-default
+     *  TURBO launch which has none. 0 = snap straight into the spin, both modes. */
+    windupMs: 0,
     windupAmpFrac: 0.85, // × CELL × 0.15 multiplier in reel-view.spinTo()
     windupSquash: 1.0, // 1.0 = no Y squash (position kick carries the wind-up)
     /** Velocity-coupled vertical motion-blur streak. DISABLED 2026-06-11:
@@ -198,17 +198,18 @@ export const VIEW_CONFIG = {
      *  on the SECOND segment's .call so the squash coincides with rest. Designers
      *  tune weight/elasticity/speed live; reducedMotion disables the bounce. */
     bounce: {
-      // Bouncier DROP (owner: "bouncing on the drop case"; Swink land-weight #61).
-      // Boosted the UNIFIED strip over-travel — overshoot = CELL * overtravelFrac *
-      // elasticity, so 0.08→0.12 + elasticity 1→1.1 ≈ 65% more dip-and-spring, plus
-      // a touch more settle weight. This stays the ONE source of impact (no rejected
-      // per-cell wobble); reducedMotion still disables it.
-      overtravelFrac: 0.12,
-      bounceMs: 200,
+      // 2026-06-15 SMOOTH-SETTLE (owner: reels "glitchy, not smooth"). The big
+      // overshoot (12.7px) meant the strip decelerated to a FULL STOP at the dip
+      // then got yanked back by backOut — a velocity discontinuity the eye read as
+      // a wobble/glitch. Halved the dip (overtravelFrac 0.12→0.07, elasticity
+      // 1.1→1.0 → ~6.7px) and snappier recovery (200→170) so it still BOUNCES on
+      // the drop (owner wants that) but lands clean, not janky.
+      overtravelFrac: 0.07,
+      bounceMs: 170,
       easing: 'backOut',
-      weight: 1.08,
+      weight: 1.05,
       speed: 1,
-      elasticity: 1.1,
+      elasticity: 1.0,
       /** Heavy-landing RECOIL — peak UNIFORM scale "thunk" on the whole strip when a
        *  WILD lands on that reel, beat-locked to the reel-stop audio transient. 1.0
        *  disables it; uniform both-axes so it never reads as squash/skew. */

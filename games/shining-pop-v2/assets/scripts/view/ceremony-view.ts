@@ -852,43 +852,9 @@ export class CeremonyView extends Component {
         .to(0.34, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
         .start();
     }
-    // VISUAL BUST (WC9) — a bright specular streak sweeps across the number on
-    // landing, like light catching polished gold. A tilted white parallelogram
-    // masked to the label width, swept L→R once, then destroyed.
-    this.fireNumberSheen();
-  }
-
-  /** WC9 — one-shot specular sweep across the win number (gold-object feel). */
-  private numberSheen: Node | null = null;
-  private fireNumberSheen(): void {
-    const parent = this.amountLabel.node;
-    if (this.numberSheen && this.numberSheen.isValid) this.numberSheen.destroy();
-    const w = 360;
-    const h = 90;
-    const n = new Node('numSheen');
-    n.addComponent(UITransform).setContentSize(40, h);
-    n.layer = parent.layer;
-    parent.addChild(n);
-    const g = n.addComponent(Graphics);
-    g.fillColor = new Color(255, 255, 255, 150);
-    g.moveTo(-14, h / 2);
-    g.lineTo(14, h / 2);
-    g.lineTo(26, -h / 2);
-    g.lineTo(-2, -h / 2);
-    g.close();
-    g.fill();
-    n.angle = -16;
-    n.setPosition(-w / 2, 0, 0);
-    const op = n.addComponent(UIOpacity);
-    op.opacity = 0;
-    tween(op).to(0.06, { opacity: 220 }).to(0.34, { opacity: 0 }).start();
-    tween(n)
-      .to(0.4, { position: new Vec3(w / 2, 0, 0) }, { easing: 'sineInOut' })
-      .call(() => {
-        if (n.isValid) n.destroy();
-      })
-      .start();
-    this.numberSheen = n;
+    // No diagonal specular sweep across the number (owner rejects diagonal shine).
+    // The landing scale-pop + the warm emissive glow flare carry the "catches the
+    // light" beat on its own.
   }
 
   /** WC9/RQ7 — warm-gold emissive lens behind the number. Stacked-alpha filled

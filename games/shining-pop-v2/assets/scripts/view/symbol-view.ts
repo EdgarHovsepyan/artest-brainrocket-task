@@ -60,7 +60,6 @@ export class SymbolView extends Component {
     return this._currentId;
   }
   // Win-VFX layers (slot-vfx artist): built lazily on first win, killed in clear.
-  private sheen: Node | null = null;
   private sparkles: Node[] = [];
   // CUTE REWARD POP — little candy STARS that burst outward off a winning symbol
   // (the gamified "yay!" pop), pooled + re-popped on a gentle loop.
@@ -403,7 +402,8 @@ export class SymbolView extends Component {
         // on) win silently lost them. Pooled + killed in stopWinFx.
         this.playSparkles(delay);
       } else {
-        this.playSheen(delay);
+        // No diagonal SHEEN fallback (owner rejects diagonal shine). The symbol-shaped
+        // halo + corner sparkles + star-pop + jelly bounce carry the no-shader win read.
         this.playSparkles(delay);
       }
       // CUTE REWARD POP — a ring of candy stars bursts off the winning candy (the
@@ -453,52 +453,6 @@ export class SymbolView extends Component {
     tween(op)
       .delay(delay)
       .to(cfg.envInMs / 1000, { opacity: cfg.envHoldOpacity }, { easing: 'sineOut' })
-      .start();
-  }
-
-  /** SHEEN SWEEP (slot-vfx Layer 7): a bright diagonal specular streak rakes
-   *  top->bottom across the symbol face, looping — reads as light catching a
-   *  glossy candy surface. Built lazily on first win. */
-  private playSheen(delay: number): void {
-    if (!this.sheen) {
-      const s = this.size;
-      const n = new Node('sheen');
-      n.addComponent(UITransform).setContentSize(s, s);
-      this.node.addChild(n);
-      const g = n.addComponent(Graphics);
-      // thin bright parallelogram (diagonal streak), no circles
-      g.fillColor = new Color(255, 236, 248, 40); // candy-white, low alpha (stack-safe)
-      g.moveTo(-s * 0.12, s * 0.6);
-      g.lineTo(s * 0.06, s * 0.6);
-      g.lineTo(-s * 0.06, -s * 0.6);
-      g.lineTo(-s * 0.24, -s * 0.6);
-      g.close();
-      g.fill();
-      n.addComponent(UIOpacity).opacity = 0;
-      this.sheen = n;
-    }
-    const sheen = this.sheen;
-    const s = this.size;
-    const op = sheen.getComponent(UIOpacity)!;
-    Tween.stopAllByTarget(sheen);
-    Tween.stopAllByTarget(op);
-    sheen.setPosition(-s * 0.55, s * 0.5, 0);
-    op.opacity = 0;
-    // sweep position L->R, fade in/out at the ends; loop until cleared.
-    tween(sheen)
-      .delay(delay)
-      .to(0.55, { position: new Vec3(s * 0.55, -s * 0.5, 0) }, { easing: 'sineInOut' })
-      .delay(0.7)
-      .union()
-      .repeatForever()
-      .start();
-    tween(op)
-      .delay(delay)
-      .to(0.18, { opacity: 95 })
-      .to(0.37, { opacity: 0 })
-      .delay(0.7)
-      .union()
-      .repeatForever()
       .start();
   }
 
@@ -661,14 +615,6 @@ export class SymbolView extends Component {
       Tween.stopAllByTarget(this.winOverlayOp);
       this.winOverlayOp.opacity = 0;
       this.winOverlay.active = false;
-    }
-    if (this.sheen) {
-      Tween.stopAllByTarget(this.sheen);
-      const op = this.sheen.getComponent(UIOpacity);
-      if (op) {
-        Tween.stopAllByTarget(op);
-        op.opacity = 0;
-      }
     }
     this.sparkles.forEach((n) => {
       Tween.stopAllByTarget(n);

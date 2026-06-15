@@ -65,10 +65,12 @@ export class AnticipationLayer extends Component {
     columnG.fillColor = fillTint(54);
     columnG.roundRect(-w / 2 + 12, -h / 2 + 12, w - 24, h - 24, 6);
     columnG.fill();
-    columnG.lineWidth = 3;
-    columnG.strokeColor = new Color(auraCol.r, auraCol.g, auraCol.b, 220);
-    columnG.roundRect(-w / 2, -h / 2, w, h, 10);
-    columnG.stroke();
+    columnG.fillColor = fillTint(70);
+    columnG.roundRect(-w / 2 + 18, -h / 2 + 18, w - 36, h - 36, 5);
+    columnG.fill();
+    // 2026-06-15 (owner: "no stroked boxes") — DROPPED the hard 3px stroked outline
+    // that boxed the column. The stacked-alpha fills (now 4 deep) give a soft glowing
+    // energy column whose edge dissolves, never an outlined box.
 
     // Lightning bolt overlay — its own Graphics so we can clear+redraw without
     // wiping the column. Sibling node so it inherits the same opacity envelope.
