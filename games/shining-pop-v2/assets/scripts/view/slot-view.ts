@@ -819,19 +819,11 @@ export class SlotView extends Component {
 
     const spark = this.mkNode('winSpark', 26, 26, this.node);
     const sg = spark.addComponent(Graphics);
-    sg.fillColor = new Color(255, 255, 255, 235);
-    sg.moveTo(0, 12);
-    sg.lineTo(8, 0);
-    sg.lineTo(0, -12);
-    sg.lineTo(-8, 0);
-    sg.close();
-    sg.fill();
     sg.fillColor = new Color(255, 220, 245, 120);
-    sg.moveTo(0, 20);
-    sg.lineTo(5, 0);
-    sg.lineTo(0, -20);
-    sg.lineTo(-5, 0);
-    sg.close();
+    sg.circle(0, 0, 13);
+    sg.fill();
+    sg.fillColor = new Color(255, 255, 255, 235);
+    sg.circle(0, 0, 7);
     sg.fill();
     spark.active = false;
     this.winSpark = spark;
@@ -1114,11 +1106,7 @@ export class SlotView extends Component {
       const r = 18 - i * 4;
       const alpha = 60 + i * 50;
       g.fillColor = new Color(127, 231, 255, alpha);
-      g.moveTo(0, r);
-      g.lineTo(r, 0);
-      g.lineTo(0, -r);
-      g.lineTo(-r, 0);
-      g.close();
+      g.circle(0, 0, r);
       g.fill();
       this.plasmaDiscs.push(disc);
     }
@@ -1551,11 +1539,7 @@ export class SlotView extends Component {
       const w = 620 * t;
       const h = 470 * t;
       gg.fillColor = new Color(255, 90, 156, Math.round(2 + (1 - t) * 7));
-      gg.moveTo(0, -h);
-      gg.lineTo(w, 0);
-      gg.lineTo(0, h);
-      gg.lineTo(-w, 0);
-      gg.close();
+      gg.ellipse(0, 0, w, h);
       gg.fill();
     }
     tween(glow)
@@ -2576,18 +2560,10 @@ export class SlotView extends Component {
       const accent = new Color().fromHEX(present.accent);
       accent.a = Math.round(cfg.accentAlpha * 255);
       gg.fillColor = accent;
-      gg.moveTo(0, cfg.gemSize);
-      gg.lineTo(cfg.gemSize, 0);
-      gg.lineTo(0, -cfg.gemSize);
-      gg.lineTo(-cfg.gemSize, 0);
-      gg.close();
+      gg.circle(0, 0, cfg.gemSize);
       gg.fill();
       gg.fillColor = new Color(255, 255, 255, 180);
-      gg.moveTo(0, cfg.gemSize * 0.5);
-      gg.lineTo(cfg.gemSize * 0.32, 0);
-      gg.lineTo(0, -cfg.gemSize * 0.5);
-      gg.lineTo(-cfg.gemSize * 0.32, 0);
-      gg.close();
+      gg.circle(0, 0, cfg.gemSize * 0.42);
       gg.fill();
 
       const labelNode = this.mkNode('label', rowW * 0.7, cfg.labelSize + 4, row);
@@ -2812,11 +2788,7 @@ export class SlotView extends Component {
       const w = 520 * t;
       const h = 360 * t;
       gg.fillColor = new Color(255, 90, 156, Math.round(3 + (1 - t) * 9));
-      gg.moveTo(0, -h);
-      gg.lineTo(w, 0);
-      gg.lineTo(0, h);
-      gg.lineTo(-w, 0);
-      gg.close();
+      gg.ellipse(0, 0, w, h);
       gg.fill();
     }
     tween(glow)
@@ -3267,11 +3239,7 @@ export class SlotView extends Component {
       ] as number[][]
     ).forEach(([r, cr, cg, cb, a]) => {
       g.fillColor = new Color(cr, cg, cb, a);
-      g.moveTo(0, r);
-      g.lineTo(r, 0);
-      g.lineTo(0, -r);
-      g.lineTo(-r, 0);
-      g.close();
+      g.circle(0, 0, r);
       g.fill();
     });
     n.addComponent(UIOpacity);

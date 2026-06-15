@@ -30,15 +30,6 @@ const fmt = (cents: number) => formatMoney((Number.isFinite(cents) ? cents : 0) 
 @ccclass('CeremonyView')
 export class CeremonyView extends Component {
   private overlay!: Node;
-  private raysNode!: Node;
-  private raysG!: Graphics;
-  private raysNode2!: Node;
-  private raysG2!: Graphics;
-  private shockNode!: Node;
-  private shockG!: Graphics;
-  private shockRingNode!: Node;
-  private shockRingG!: Graphics;
-  private shockRingOp!: UIOpacity;
   private sparkleRoot!: Node;
   private sparkles: { node: Node; op: UIOpacity; spin: number }[] = [];
   private panelLightOp!: UIOpacity;
@@ -102,33 +93,15 @@ export class CeremonyView extends Component {
     ov.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     ov.active = false;
 
-    this.raysNode = this.mk('rays', 10, 10, ov);
-    this.raysG = this.raysNode.addComponent(Graphics);
-
-    // Second, thinner ray fan offset half a sector and counter-rotating, for
-    // parallax depth — a single fan reads flat, two crossing fans feel volumetric.
-    this.raysNode2 = this.mk('rays2', 10, 10, ov);
-    this.raysG2 = this.raysNode2.addComponent(Graphics);
-
-    this.shockNode = this.mk('shock', 10, 10, ov);
-    this.shockG = this.shockNode.addComponent(Graphics);
-
-    // Leading shock ring (stroked romb) that races ahead of the filled core so
-    // the blast has a crisp expanding edge, not just a growing blob.
-    this.shockRingNode = this.mk('shockRing', 10, 10, ov);
-    this.shockRingG = this.shockRingNode.addComponent(Graphics);
-    this.shockRingOp = this.shockRingNode.addComponent(UIOpacity);
-    this.shockRingOp.opacity = 0;
-
     this.sparkleRoot = this.mk('sparkles', 10, 10, ov);
     this.buildSparkles();
 
     const ground = this.mk('ground', 10, 10, ov).addComponent(Graphics);
-    this.drawGlowWedge(ground, 255, 0, 127, 34);
+    this.drawSoftGlow(ground, 255, 96, 172, 30, 360);
 
     const panelLightNode = this.mk('panelLight', 10, 10, ov);
     const panelLight = panelLightNode.addComponent(Graphics);
-    this.drawGlowWedge(panelLight, 255, 186, 92, 110);
+    this.drawSoftGlow(panelLight, 255, 206, 150, 96, 300);
     this.panelLightOp = panelLightNode.addComponent(UIOpacity);
     this.panelLightOp.opacity = 0;
 
@@ -160,23 +133,15 @@ export class CeremonyView extends Component {
     const BLOOM = 22;
     for (let i = BLOOM; i > 0; i--) {
       const t = i / BLOOM;
-      const half = 120 + t * 1160;
+      const rad = 150 + t * 1130;
       const a = Math.round((1 - t) * (1 - t) * 60);
       fg.fillColor = new Color(255, 244, 214, a);
-      fg.moveTo(0, half);
-      fg.lineTo(half, 0);
-      fg.lineTo(0, -half);
-      fg.lineTo(-half, 0);
-      fg.close();
+      fg.circle(0, 0, rad);
       fg.fill();
     }
-    // Crisp bright core so the detonation reads as a hard "bang", not just a bloom.
-    fg.fillColor = new Color(255, 255, 255, 210);
-    fg.moveTo(0, 150);
-    fg.lineTo(150, 0);
-    fg.lineTo(0, -150);
-    fg.lineTo(-150, 0);
-    fg.close();
+    // Bright soft core so the detonation reads as a warm bloom, not a hard shape.
+    fg.fillColor = new Color(255, 255, 255, 200);
+    fg.circle(0, 0, 170);
     fg.fill();
     this.flashOp = flashNode.addComponent(UIOpacity);
     this.flashOp.opacity = 0;
@@ -309,23 +274,7 @@ export class CeremonyView extends Component {
         this.winSpine.node.active = false;
       }
       if (!reduced) {
-        if (!useSpine) {
-          this.fireDetonationFlash(tx);
-          this.fireShock(240 + 200 * tx);
-          this.drawRays(Math.round(8 + 12 * tx), 300 + 320 * tx, 0.5 + 0.5 * t);
-          this.raysNode.angle = 0;
-          this.raysNode2.angle = 0;
-          tween(this.raysNode)
-            .by(6, { angle: 14 + 12 * tx })
-            .repeatForever()
-            .start();
-          tween(this.raysNode2)
-            .by(6, { angle: -(10 + 8 * tx) })
-            .repeatForever()
-            .start();
-          this.breatheRays();
-        }
-
+        if (!useSpine) this.fireDetonationFlash(tx);
         this.shake(Math.min(tier.shakeAmp * 1.8, tier.shakeAmp + 14 * tx));
       }
 
@@ -421,13 +370,6 @@ export class CeremonyView extends Component {
     const ov = this.overlay;
     ov.active = true;
     ov.setScale(0.6, 0.6, 1);
-    this.drawRays(12, 380, 0.7, rgb ? modeCol : undefined);
-    this.raysNode.angle = 0;
-    this.raysNode2.angle = 0;
-    tween(this.raysNode).by(6, { angle: 18 }).repeatForever().start();
-    tween(this.raysNode2).by(6, { angle: -13 }).repeatForever().start();
-    this.breatheRays();
-    this.fireShock(280);
     this.fireSparkleBurst();
     this.fireDetonationFlash(0.6);
     tween(ov)
@@ -438,79 +380,23 @@ export class CeremonyView extends Component {
     this.scheduleOnce(() => this.hide(), 1.6);
   }
 
-  // Soft volumetric stage-light wedge: concentric lens shapes from wide+faint
-  // (outer) to narrow+bright (inner) so the glow has a gradient falloff instead
-  // of one flat shape — the difference between a stage light and a paper cutout.
-  private drawGlowWedge(g: Graphics, r: number, gg: number, b: number, peak: number): void {
-    const LAYERS = 5;
+  // Soft radial light: concentric circles, faint+wide (outer) to bright+tight
+  // (inner), for an ambient stage glow with no hard-edged geometry.
+  private drawSoftGlow(
+    g: Graphics,
+    r: number,
+    gg: number,
+    b: number,
+    peak: number,
+    radius: number,
+  ): void {
+    const LAYERS = 9;
     for (let i = 0; i < LAYERS; i++) {
       const t = i / (LAYERS - 1); // 0 outer → 1 inner
-      const s = 1 - t * 0.55;
-      const a = Math.round(peak * (0.22 + 0.78 * t));
+      const rad = radius * (1 - t * 0.84);
+      const a = Math.round(peak * (0.1 + 0.9 * t) * (0.45 + 0.55 * t));
       g.fillColor = new Color(r, gg, b, a);
-      g.moveTo(0, -120 * s);
-      g.lineTo(330 * s, -10 * s);
-      g.lineTo(0, 100 * s);
-      g.lineTo(-330 * s, -10 * s);
-      g.close();
-      g.fill();
-    }
-  }
-
-  // Organic breathing so the ray fans feel like living light shafts, not rigid
-  // cardboard cutouts spinning on a pivot (master brief #4) — a slow sine swell
-  // layered on top of the rotation.
-  private breatheRays(): void {
-    for (const n of [this.raysNode, this.raysNode2]) {
-      if (!n) continue;
-      n.setScale(1, 1, 1);
-      tween(n)
-        .to(1.7, { scale: new Vec3(1.07, 1.07, 1) }, { easing: 'sineInOut' })
-        .to(1.7, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
-        .union()
-        .repeatForever()
-        .start();
-    }
-  }
-
-  private drawRays(count: number, len: number, alpha: number, tint?: Color): void {
-    // Primary fan: broad, full length. Secondary fan: thinner, shorter, phase-
-    // shifted half a sector — the two counter-rotate for a volumetric god-ray look.
-    this.drawRayFan(this.raysG, count, len, alpha, 1, 0, tint);
-    this.drawRayFan(this.raysG2, count, len * 0.78, alpha * 0.7, 0.5, Math.PI / count, tint);
-  }
-
-  private drawRayFan(
-    g: Graphics,
-    count: number,
-    len: number,
-    alpha: number,
-    widthMul: number,
-    phase: number,
-    tint?: Color,
-  ): void {
-    g.clear();
-    for (let i = 0; i < count; i++) {
-      const a = (Math.PI * 2 * i) / count + phase;
-      const cos = Math.cos(a);
-      const sin = Math.sin(a);
-      const w = (14 + (i % 3) * 6) * widthMul;
-
-      if (tint) {
-        g.fillColor =
-          i % 2
-            ? new Color(255, 255, 255, Math.round(24 * alpha + (i % 3) * 6))
-            : new Color(tint.r, tint.g, tint.b, Math.round(36 * alpha + (i % 3) * 8));
-      } else {
-        const gch = i % 2 ? 150 : 205;
-        const bch = i % 2 ? 40 : 90;
-        g.fillColor = new Color(255, gch, bch, Math.round(30 * alpha + (i % 3) * 7));
-      }
-      g.moveTo(cos * 70, sin * 70);
-      g.lineTo(cos * len * 0.5 - sin * w, sin * len * 0.5 + cos * w);
-      g.lineTo(cos * len, sin * len);
-      g.lineTo(cos * len * 0.5 + sin * w, sin * len * 0.5 - cos * w);
-      g.close();
+      g.circle(0, 0, rad);
       g.fill();
     }
   }
@@ -531,60 +417,6 @@ export class CeremonyView extends Component {
       .start();
   }
 
-  private fireShock(size: number): void {
-    const g = this.shockG;
-    g.clear();
-
-    const layers: Array<[number, number, number, number, number]> = [
-      [78, 255, 90, 176, 26],
-      [54, 255, 140, 200, 50],
-      [32, 255, 210, 240, 110],
-      [16, 255, 255, 255, 220],
-    ];
-    for (const [rad, cr, cg, cb, ca] of layers) {
-      g.fillColor = new Color(cr, cg, cb, ca);
-      g.moveTo(0, rad);
-      g.lineTo(rad, 0);
-      g.lineTo(0, -rad);
-      g.lineTo(-rad, 0);
-      g.close();
-      g.fill();
-    }
-    this.shockNode.setScale(0.35, 0.35, 1);
-    const op = this.shockNode.getComponent(UIOpacity) ?? this.shockNode.addComponent(UIOpacity);
-    op.opacity = 255;
-
-    tween(this.shockNode)
-      .to(0.42, { scale: new Vec3(size / 78, size / 78, 1) }, { easing: 'expoOut' })
-      .start();
-    tween(op).to(0.12, { opacity: 255 }).to(0.42, { opacity: 0 }, { easing: 'quadOut' }).start();
-
-    this.fireShockRing(size * 1.4);
-  }
-
-  // A thin stroked romb that expands faster and further than the filled core —
-  // the crisp leading edge of the blast (Swink — a transient reads as a hit).
-  private fireShockRing(size: number): void {
-    const g = this.shockRingG;
-    g.clear();
-    g.lineWidth = 6;
-    g.strokeColor = new Color(255, 255, 255, 255);
-    g.moveTo(0, 78);
-    g.lineTo(78, 0);
-    g.lineTo(0, -78);
-    g.lineTo(-78, 0);
-    g.close();
-    g.stroke();
-    this.shockRingNode.setScale(0.3, 0.3, 1);
-    Tween.stopAllByTarget(this.shockRingNode);
-    Tween.stopAllByTarget(this.shockRingOp);
-    this.shockRingOp.opacity = 255;
-    tween(this.shockRingNode)
-      .to(0.34, { scale: new Vec3(size / 78, size / 78, 1) }, { easing: 'expoOut' })
-      .start();
-    tween(this.shockRingOp).to(0.34, { opacity: 0 }, { easing: 'quadOut' }).start();
-  }
-
   private buildSparkles(): void {
     const palette: [number, number, number][] = [
       [255, 255, 255],
@@ -592,35 +424,12 @@ export class CeremonyView extends Component {
       [255, 206, 71],
       [150, 215, 255],
     ];
-    // Three crisp confetti silhouettes — romb (diamond), box (square), star — so
-    // the unlock burst reads as varied jewellery, not a cloud of identical dots.
-    const romb = (g: Graphics, r: number): void => {
-      g.moveTo(0, r);
-      g.lineTo(r, 0);
-      g.lineTo(0, -r);
-      g.lineTo(-r, 0);
-      g.close();
+    // Soft round sparkle dots — no hard-edged silhouettes.
+    const dot = (g: Graphics, r: number): void => {
+      g.circle(0, 0, r);
       g.fill();
     };
-    const box = (g: Graphics, r: number): void => {
-      const s = r * 0.82;
-      g.rect(-s, -s, s * 2, s * 2);
-      g.fill();
-    };
-    const star = (g: Graphics, r: number): void => {
-      const inner = r * 0.46;
-      for (let k = 0; k < 10; k++) {
-        const rad = k % 2 ? inner : r;
-        const a = -Math.PI / 2 + (k * Math.PI) / 5;
-        const x = Math.cos(a) * rad;
-        const y = Math.sin(a) * rad;
-        if (k === 0) g.moveTo(x, y);
-        else g.lineTo(x, y);
-      }
-      g.close();
-      g.fill();
-    };
-    const shapes = [romb, box, star];
+    const shapes = [dot];
     const COUNT = 24;
     for (let i = 0; i < COUNT; i++) {
       const n = this.mk('spk', 22, 22, this.sparkleRoot);
@@ -637,9 +446,7 @@ export class CeremonyView extends Component {
       const op = n.addComponent(UIOpacity);
       op.opacity = 0;
       n.active = false;
-      // Boxes and stars spin; rombs read cleaner mostly upright. Alternate sign.
-      const spin = (shape === box ? 220 : shape === star ? 300 : 120) * (i % 2 ? 1 : -1);
-      this.sparkles.push({ node: n, op, spin });
+      this.sparkles.push({ node: n, op, spin: 0 });
     }
   }
 
@@ -686,8 +493,6 @@ export class CeremonyView extends Component {
   private hide(): void {
     if (!this.overlay) return;
     if (this.overlay.active) this.onDismiss?.();
-    Tween.stopAllByTarget(this.raysNode);
-    Tween.stopAllByTarget(this.raysNode2);
     tween(this.dim).to(0.3, { opacity: 0 }).start();
 
     if (this.panelLightOp) {
@@ -909,10 +714,6 @@ export class CeremonyView extends Component {
   abort(): void {
     if (this.dim) Tween.stopAllByTarget(this.dim);
     if (this.overlay) Tween.stopAllByTarget(this.overlay);
-    if (this.raysNode) Tween.stopAllByTarget(this.raysNode);
-    if (this.raysNode2) Tween.stopAllByTarget(this.raysNode2);
-    if (this.shockNode) Tween.stopAllByTarget(this.shockNode);
-    if (this.shockRingNode) Tween.stopAllByTarget(this.shockRingNode);
 
     for (const s of this.sparkles) {
       Tween.stopAllByTarget(s.node);

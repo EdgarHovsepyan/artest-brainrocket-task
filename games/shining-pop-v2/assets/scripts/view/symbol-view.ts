@@ -490,11 +490,7 @@ export class SymbolView extends Component {
         n.setPosition(x, y, 0);
         const g = n.addComponent(Graphics);
         g.fillColor = new Color(255, 224, 255, 200);
-        g.moveTo(0, 6);
-        g.lineTo(5, 0);
-        g.lineTo(0, -6);
-        g.lineTo(-5, 0);
-        g.close();
+        g.circle(0, 0, 5.5);
         g.fill();
         n.addComponent(UIOpacity).opacity = 0;
         this.node.addChild(n);
@@ -551,17 +547,7 @@ export class SymbolView extends Component {
           g.fill();
         } else {
           g.fillColor = candy[i % candy.length];
-          const R = 9,
-            r = 3.7;
-          for (let k = 0; k < 10; k++) {
-            const rad = k % 2 === 0 ? R : r;
-            const a = Math.PI / 2 + (k * Math.PI) / 5;
-            const x = Math.cos(a) * rad,
-              y = Math.sin(a) * rad;
-            if (k === 0) g.moveTo(x, y);
-            else g.lineTo(x, y);
-          }
-          g.close();
+          g.circle(0, 0, 8);
           g.fill();
         }
         n.addComponent(UIOpacity).opacity = 0;

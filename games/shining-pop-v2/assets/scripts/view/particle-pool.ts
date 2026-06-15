@@ -59,7 +59,7 @@ export class ParticlePool extends Component {
 
     const g = n.addComponent(Graphics);
     g.fillColor = new Color(255, 255, 255, 255);
-    this.drawDiamond(g);
+    this.drawDot(g);
 
     const op = n.addComponent(UIOpacity);
     op.opacity = 255;
@@ -70,12 +70,8 @@ export class ParticlePool extends Component {
     return slot;
   }
 
-  private drawDiamond(g: Graphics): void {
-    g.moveTo(0, UNIT);
-    g.lineTo(UNIT, 0);
-    g.lineTo(0, -UNIT);
-    g.lineTo(-UNIT, 0);
-    g.close();
+  private drawDot(g: Graphics): void {
+    g.circle(0, 0, UNIT);
     g.fill();
   }
 
@@ -112,7 +108,7 @@ export class ParticlePool extends Component {
       const g = slot.graphics;
       g.clear();
       g.fillColor = color;
-      this.drawDiamond(g);
+      this.drawDot(g);
     }
 
     slot.node.setPosition(x, y, 0);
