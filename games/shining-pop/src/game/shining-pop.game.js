@@ -926,6 +926,9 @@
     antialias: !_gpuWeak, backgroundColor: 0x1a0a2e,
     resolution: _pickRes(_initSz.w, _initSz.h), autoDensity: true,
   });
+  // Cap to 60fps: the additive-VFX frame is fillrate-bound, so on 120/144Hz panels
+  // an uncapped ticker doubles GPU load for no visible gain (and causes uneven pacing).
+  app.ticker.maxFPS = 60;
   document.body.appendChild(app.canvas);
   // ── ACCESSIBILITY ATTRIBUTES on the canvas ──────────────────────
   // WCAG 4.1.2 (Name, Role, Value) — declare the canvas as an
@@ -10706,7 +10709,7 @@
     const _fsInt = (v) => (Number.isFinite(+v) ? Math.trunc(+v) : 0);
     const _sN = _fsInt(_bonusState.spinNum);
     const _tS = _fsInt(_bonusState.totalSpins);
-    const _sM = _fsInt(_bonusState.spinMult);
+    const _sM = (Number.isFinite(+_bonusState.spinMult) ? +(+_bonusState.spinMult).toFixed(2) : 0);
     // 2-color HUD text — PINK shades distinguish modes, all on smoke-white
     // base. Behavioural differences (wild reel / sticky / multiplier) carry
     // the rest of the mode identity.
@@ -10860,7 +10863,7 @@
       // the text atlas every frame (8-12ms hit on mobile). Tint is
       // GPU-side, instant, and behaves identically for whole-glyph color.
       bonusMultBig.visible = true;
-      bonusMultBig.text = '×' + (Number.isFinite(+_bonusState.spinMult) ? Math.trunc(+_bonusState.spinMult) : 0);
+      bonusMultBig.text = '×' + (Number.isFinite(+_bonusState.spinMult) ? +(+_bonusState.spinMult).toFixed(2) : 0);
       bonusMultBig.position.set(cx, cy);
       bonusMultBig.scale.set(scale);
       bonusMultBig.alpha = eAlpha;
