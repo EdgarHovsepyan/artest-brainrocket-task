@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node ../../scripts/assemble-demo.mjs",
+  "outputDirectory": "public",
+  "trailingSlash": true,
+  "framework": null,
+  "rewrites": [{ "source": "/spine/:path*", "destination": "/shining-pop/spine/:path*" }]
+}

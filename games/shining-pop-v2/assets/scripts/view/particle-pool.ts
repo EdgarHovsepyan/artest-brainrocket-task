@@ -1,11 +1,3 @@
-// MVC — VIEW. Object pool of pre-allocated shard Nodes (Graphics + UIOpacity) so
-// burst() / sparkCascade() / coinGeyser() borrow & return instead of new/destroy
-// on every shard. Sized by VIEW_CONFIG.particles.{prealloc, poolCap}. When the
-// pool is full, get() returns null and the caller silently drops the spawn —
-// the pool never grows past poolCap (predictable upper bound, GC-quiet hot path).
-//
-// Task 5.4 / CC-2 in ULTRACODE-BLUEPRINT.md.
-
 import {
   _decorator,
   Color,
@@ -22,26 +14,22 @@ import { VIEW_CONFIG } from './view-config';
 
 const { ccclass } = _decorator;
 
-/** Unit-diamond half-extent in design px. Node scale multiplies this. */
 const UNIT = 8;
-/** Glow-sprite extent — wider than the diamond so the halo can feather out. */
+
 const GLOW = UNIT * 6;
 
 export interface PoolShard {
   node: Node;
   graphics: Graphics;
   opacity: UIOpacity;
-  /** Set once the shard is upgraded to the additive glow sprite. */
+
   sprite?: Sprite;
-  /** Stable slot index for O(1) return-to-pool. */
+
   idx: number;
 }
 
 @ccclass('ParticlePool')
 export class ParticlePool extends Component {
-  // CGI upgrade — SlotView injects the additive glow material + white frame
-  // once the effect kit loads; every shard then renders as a soft light point
-  // instead of a filled diamond. Statics so no plumbing through ParticleLayer.
   static glowMat: Material | null = null;
   static glowFrame: SpriteFrame | null = null;
 
@@ -91,11 +79,6 @@ export class ParticlePool extends Component {
     g.fill();
   }
 
-  /**
-   * Borrow a shard configured at (x,y) with `color` tint and `scale` multiplier.
-   * Returns null if liveCount >= poolCap — caller must handle (silently drop the spawn).
-   * Cheap re-tint: clear + fillColor + redraw the 4-vertex diamond + fill.
-   */
   get(x: number, y: number, color: Color, scale = 1): PoolShard | null {
     this.ensureBuilt();
     const { poolCap } = VIEW_CONFIG.particles;
@@ -107,14 +90,12 @@ export class ParticlePool extends Component {
       slot = this.slots[idx]!;
     } else if (this.slots.length < poolCap) {
       slot = this.allocate();
-      // allocate() pushed onto freeIdx — pop it back off since we're using it.
+
       this.freeIdx.pop();
     } else {
       return null;
     }
 
-    // Upgrade to the glow sprite the first time the material is available;
-    // the diamond stays as the no-material fallback.
     if (!slot.sprite && ParticlePool.glowMat && ParticlePool.glowFrame) {
       slot.graphics.clear();
       const sp = slot.node.addComponent(Sprite);
@@ -144,10 +125,6 @@ export class ParticlePool extends Component {
     return slot;
   }
 
-  /**
-   * Return a shard to the pool. Safe to call on already-returned or destroyed slots
-   * (idempotent guards). Resets transform/opacity so the next get() lands clean.
-   */
   put(slot: PoolShard | null): void {
     if (!slot || !slot.node || !slot.node.isValid) return;
     if (!slot.node.active) return;
@@ -161,12 +138,10 @@ export class ParticlePool extends Component {
     if (this.liveCount < 0) this.liveCount = 0;
   }
 
-  /** Live (borrowed, not-yet-returned) shard count — for guard tests + telemetry. */
   get live(): number {
     return this.liveCount;
   }
 
-  /** Total slots currently allocated (<= poolCap). */
   get capacity(): number {
     return this.slots.length;
   }

@@ -1,10 +1,4 @@
-/**
- * Crown Wild rig preview/validator — loads crownwild.json + crownwild.atlas +
- * crown.png/crown_fx.png through the REAL @esotericsoftware/spine-pixi-v8 runtime
- * and plays idle / land / win / bigwin. This is the master-prompt's required
- * "validate the skeleton loads via real runtime before claiming done" step, plus
- * the state-buttons preview. Activated via ?spine=crown (DEV-gated in main.ts).
- */
+
 import { Application, Assets, Container } from 'pixi.js';
 import { Spine } from '@esotericsoftware/spine-pixi-v8';
 
@@ -14,7 +8,7 @@ import { Spine } from '@esotericsoftware/spine-pixi-v8';
   const canvas = app.canvas as HTMLCanvasElement;
   Object.assign(canvas.style, { position: 'fixed', inset: '0', zIndex: '99990' } as Partial<CSSStyleDeclaration>);
   document.body.appendChild(canvas);
-  // hide the game's HTML boot loader (EXTRA STUDIO splash) so it doesn't cover the preview
+  
   for (const el of Array.from(document.querySelectorAll('body > *'))) {
     if (el !== canvas && !(el as HTMLElement).dataset?.cw) (el as HTMLElement).style.display = 'none';
   }
@@ -36,8 +30,8 @@ import { Spine } from '@esotericsoftware/spine-pixi-v8';
     await Assets.load(['cwAtlas', 'cwSkel']);
 
     const spine = new Spine({ skeleton: 'cwSkel', atlas: 'cwAtlas' });
-    spine.state.data.defaultMix = 0.18;          // smooth crossfades (master-prompt §3)
-    spine.state.setAnimation(0, 'idle', true);   // resting state on track 0
+    spine.state.data.defaultMix = 0.18;          
+    spine.state.setAnimation(0, 'idle', true);   
 
     const holder = new Container();
     holder.addChild(spine);
@@ -50,13 +44,13 @@ import { Spine } from '@esotericsoftware/spine-pixi-v8';
     layout();
     window.addEventListener('resize', layout);
 
-    // one-shots on track 1, auto-return to idle (track 0 shows through)
+    
     const play = (name: string) => {
       spine.state.setAnimation(1, name, false);
       spine.state.addEmptyAnimation(1, 0.18, 0);
     };
 
-    // DOM state buttons (master-prompt preview §6)
+    
     const bar = document.createElement('div');
     Object.assign(bar.style, {
       position: 'fixed', left: '50%', bottom: '18px', transform: 'translateX(-50%)', zIndex: '100000',
@@ -74,7 +68,7 @@ import { Spine } from '@esotericsoftware/spine-pixi-v8';
     }
     document.body.appendChild(bar);
 
-    // auto-sequence so a screenshot/visitor sees it alive: land → win → bigwin → loop
+    
     let i = 0; const seq = ['land', 'win', 'bigwin'];
     setInterval(() => { play(seq[i % seq.length]); i++; }, 2200);
     setTimeout(() => play('bigwin'), 700);

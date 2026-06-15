@@ -18,3 +18,19 @@ packages/*/dist/
 # misc
 *.log
 .DS_Store
+
+# Secrets — never commit API keys / env files (ElevenLabs etc.)
+.env
+.env.*
+*.key
+*.secret
+.secrets/
+**/secrets/
+
+# Generated demo bundle (assemble-demo.mjs) — Vercel builds it on deploy
+/public/
+
+.vercel
+
+# Playwright capture output (verify-the-built-thing screenshots) — never committed
+/tmp/

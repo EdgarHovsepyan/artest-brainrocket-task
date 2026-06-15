@@ -1,7 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node scripts/assemble-demo.mjs || node ../../scripts/assemble-demo.mjs",
+  "outputDirectory": "public",
+  "trailingSlash": true,
   "framework": null,
-  "installCommand": "HUSKY=0 pnpm install --no-frozen-lockfile",
-  "buildCommand": "HUSKY=0 pnpm --filter @artest/shining-pop build",
-  "outputDirectory": "games/shining-pop/dist"
+  "rewrites": [{ "source": "/spine/:path*", "destination": "/shining-pop/spine/:path*" }]
 }

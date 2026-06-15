@@ -1,10 +1,6 @@
-// Seeded RNG (mulberry32). Deterministic given a seed — required so RTP
-// simulations and replays are reproducible. NO Cocos imports.
-
 export interface Rng {
-  /** Float in [0, 1). */
   next(): number;
-  /** Integer in [0, maxExclusive). */
+
   int(maxExclusive: number): number;
 }
 

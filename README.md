@@ -9,8 +9,10 @@
 [![PixiJS](https://img.shields.io/badge/PixiJS-v8-e91e63?logo=javascript&logoColor=white)](games/shining-pop)
 [![Cocos Creator](https://img.shields.io/badge/Cocos%20Creator-3.8.8-55c2e1?logo=cocos&logoColor=white)](games/shining-pop-v2)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](#engineering-standards)
-[![Tests](https://img.shields.io/badge/tests-73%2F73%20passing-2ea043)](#quality-gates)
+[![Tests](https://img.shields.io/badge/tests-91%2F91%20passing-2ea043)](#quality-gates)
 [![RTP](https://img.shields.io/badge/RTP-~97%25%20sim--anchored-f5a623)](#developer-quick-start)
+[![CI](https://img.shields.io/badge/CI-green-2ea043?logo=githubactions&logoColor=white)](#quality-gates)
+[![Live](https://img.shields.io/badge/play-live%20demo-ff2d78?logo=vercel&logoColor=white)](https://artest-brainrocket-task.vercel.app/)
 
 _Two production slot games on one deterministic, sim-anchored math core —
 designed, built and verified end-to-end by a single developer._
@@ -25,6 +27,40 @@ designed, built and verified end-to-end by a single developer._
 | ------------------------------------------ | ------------------- | ------------------------------------ | ------- | ------------------------------ |
 | **[shining-pop](games/shining-pop)**       | PixiJS v8           | Vite · GSAP · Spine · Web Audio      | ~97 %   | flagship — submission-ready    |
 | **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC · 9 CCEffect shaders | ~97.5 % | parity port + shader VFX suite |
+
+> Two games, one candy slot. **No other variations** — the PixiJS flagship and the Cocos parity port share a single deterministic math core.
+
+## ✨ The craft
+
+This is built to an **awards-tier** bar, not a template floor:
+
+- 🍬 **Material, not decoration** — peppermint candy-material win line (GLSL specular gloss), symbol-shaped additive halos clipped to the candy alpha, a 3D card-turn pop on winning symbols lifted above the reel mask. No stroked boxes, no diagonal CSS sheens.
+- 🎯 **Readable by design** — win-focus dim, left→right reveal cadence, tap-the-reels to flash every payline, panels that hand the screen cleanly to the player on mobile.
+- 📱 **Mobile-first responsiveness** — transparent floating bars, glyphs oversampled to stay crisp at any scale, safe-area decks, capped device-pixel-ratio for crisp-yet-60fps.
+- 🔒 **Provably correct** — one sim-anchored math core, 91 passing unit tests, an RTP economy guard in CI, server-authoritative crediting.
+
+## ▶ Live demo
+
+**▶ Live now — play in the browser, no install:**
+
+|                                    | Play                                                           |
+| ---------------------------------- | -------------------------------------------------------------- |
+| **Landing** (both games)           | **https://artest-brainrocket-task.vercel.app/**                |
+| **shining-pop** · PixiJS v8        | **https://artest-brainrocket-task.vercel.app/shining-pop/**    |
+| **shining-pop-v2** · Cocos Creator | **https://artest-brainrocket-task.vercel.app/shining-pop-v2/** |
+
+> Deployed on Vercel from one static bundle behind a landing page. The repo is
+> deploy-ready (`vercel.json` + `scripts/assemble-demo.mjs`) — to redeploy:
+>
+> ```bash
+> npx vercel --prod          # or: import the GitHub repo at vercel.com/new
+> ```
+>
+> Vercel runs `assemble-demo.mjs`, which copies the two committed builds into
+> `/public` at clean paths (`/shining-pop/`, `/shining-pop-v2/`) behind the
+> landing page. Each game keeps its own directory root (`trailingSlash: true`) so
+> its assets resolve — both verified booting live. Works the same on Netlify /
+> GitHub Pages (point the host at the `public/` the script produces).
 
 ## Instant run — no toolchain needed
 
@@ -43,27 +79,21 @@ No install step, no dependencies — open either URL and play.
 
 <div align="center">
 
-<img width="860" alt="Cocos Creator — base game" src="docs/media/cocos-desktop.png" />
+**Two games, one shared math core** — a Cocos Creator 3.8.8 build and a PixiJS v8 build of the same candy slot. (No other variations.)
 
-_Cocos Creator 3.8.8 — candy reskin, authored icon set, full-bleed reels_
+<img width="430" alt="Cocos Creator — base game" src="docs/media/cocos-desktop.png" />
 
-<img width="860" alt="Cocos Creator — win presentation" src="docs/media/cocos-win.png" />
-
-_Win presentation: gold payline core + flowing plasma beam · per-symbol shader fire · jelly squash-and-stretch · win-focus dim_
-
-<img width="860" alt="Cocos Creator — EPIC WIN ceremony" src="docs/media/cocos-ceremony.png" />
-
-_Tiered ceremony: outlined headline, rolling count-up, rotating god-rays, warm gold light_
+_Cocos Creator 3.8.8 — candy reskin, authored icon set, continuous reels in a glass-portal window, peppermint candy-material win line, symbol-shaped halo, win-focus dim_
 
 <table>
   <tr>
     <td align="center" valign="top">
-      <img width="230" alt="Cocos mobile portrait" src="docs/media/cocos-mobile.png" /><br/>
-      <em>Portrait: safe-area deck, docked BUY BONUS,<br/>44 px targets</em>
+      <img width="160" alt="Cocos mobile portrait" src="docs/media/cocos-mobile.png" /><br/>
+      <em>Cocos portrait: transparent deck, docked<br/>BUY BONUS, panels hide the bar, 44 px targets</em>
     </td>
     <td align="center" valign="top">
-      <img width="540" alt="PixiJS intro" src="docs/media/pixi-desktop.png" /><br/>
-      <img width="540" alt="PixiJS board" src="docs/media/pixi-board.png" /><br/>
+      <img width="270" alt="PixiJS intro" src="docs/media/pixi-desktop.png" /><br/>
+      <img width="270" alt="PixiJS board" src="docs/media/pixi-board.png" /><br/>
       <em>PixiJS v8 flagship — branded intro gate &amp; full control surface</em>
     </td>
   </tr>
@@ -125,8 +155,9 @@ sequenceDiagram
   plasma. Every shader honors a master switch, reduced-motion, and a vector
   fallback.
 - **Modern win language** — winners jelly-wobble while non-winners dim back;
-  a crisp 3 px gold payline core rides a soft plasma bloom; tiered ceremonies
-  escalate continuously with the win multiple up to an EPIC max-win detonation.
+  a crisp 3 px gold payline core rides a soft plasma bloom; a tier-scaled Spine
+  win-callout (winged-heart banner + cotton-candy cloud) crowns the big wins,
+  with a procedural light-rig fallback if the skeleton is unavailable.
 - **Full control surface** — authored icon set across both bars, swipeable bet
   carousel, ×2 gamble, quick-bet stack, turbo, autoplay with stop conditions,
   4-state buttons with hover/press glow, animated panel transitions, and a
@@ -148,11 +179,29 @@ pnpm --filter @artest/shining-pop dev          # PixiJS dev server :5173
 pnpm --filter @artest/shining-pop-v2 sim       # Cocos RTP sim (2M spins)
 ```
 
-Cocos rebuilds headlessly — no editor session needed:
+### Building both games for production
+
+Each game builds to a static bundle that the demo (and any host) serves as-is.
+
+**shining-pop — PixiJS v8 (Vite):** bundles + inlines into a single reviewable `dist/`.
+
+```bash
+pnpm --filter @artest/shining-pop build      # → games/shining-pop/dist/
+#  or, from the game folder:  cd games/shining-pop && pnpm build
+```
+
+**shining-pop-v2 — Cocos Creator 3.8.8:** headless CLI build, no editor session needed.
 
 ```bash
 CocosCreator --project games/shining-pop-v2 --build "platform=web-mobile;debug=false"
+#  Windows path example:
+#  "C:/ProgramData/cocos/editors/Creator/3.8.8/CocosCreator.exe" \
+#    --project games/shining-pop-v2 --build "platform=web-mobile;debug=false"
+#  → games/shining-pop-v2/build/web-mobile/
 ```
+
+Then `node scripts/assemble-demo.mjs` stitches both builds into `public/` for the
+[live demo](#-live-demo), or `node scripts/preview.mjs` serves them locally.
 
 ## Quality gates
 

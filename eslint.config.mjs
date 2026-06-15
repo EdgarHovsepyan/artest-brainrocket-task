@@ -8,6 +8,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/build/**',
+      '**/public/**', // assemble-demo output (gitignored; minified bundles)
       '**/library/**',
       '**/temp/**',
       '**/.cache/**',

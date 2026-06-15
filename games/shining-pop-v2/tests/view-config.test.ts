@@ -72,6 +72,61 @@ test('win-focus + win-line beams stay within valid ranges', () => {
   );
 });
 
+test('halo tint is a valid, correctly-oriented warm→cool ramp', () => {
+  const h = VIEW_CONFIG.win.haloTint;
+  assert.match(h.hot, /^#[0-9a-fA-F]{6}$/, 'hot tint must be a hex colour');
+  assert.match(h.cold, /^#[0-9a-fA-F]{6}$/, 'cold tint must be a hex colour');
+  // the heat ramp must be oriented hot > cold so the lerp span is positive;
+  // an inverted ramp would tint premium symbols cool and cheap ones warm.
+  assert.ok(h.hotHeat > h.coldHeat, 'haloTint.hotHeat must exceed coldHeat');
+});
+
+test('wild happy-face config is sane (on-character offset, positive scale + fade)', () => {
+  const h = VIEW_CONFIG.win.wildHappyFace;
+  assert.equal(typeof h.enabled, 'boolean');
+  // the face sits up toward the gingerbread head, within the symbol bounds.
+  assert.ok(
+    h.offsetYFrac >= 0 && h.offsetYFrac <= 0.5,
+    'offsetYFrac must keep the face on the head',
+  );
+  assert.ok(h.scale > 0, 'scale must be positive');
+  assert.ok(h.fadeMs > 0, 'fade must be a positive duration');
+});
+
+test('win anticipation dip is a brief, real squash (never inverted or sluggish)', () => {
+  const a = VIEW_CONFIG.win.winAnticipation;
+  // a dip must shrink the symbol (0 < dip < 1) so the pop reads as an impact;
+  // dip >= 1 would be a no-op or a pre-pop grow, which defeats anticipation.
+  assert.ok(a.dip > 0 && a.dip < 1, 'anticipation dip must be a squash in (0,1)');
+  // the wind-up has to be snappy — a long dip stalls the win read.
+  assert.ok(a.ms > 0 && a.ms <= 160, 'anticipation must be a brisk (0,160] ms wind-up');
+  assert.equal(typeof a.enabled, 'boolean');
+});
+
+test('per-symbol reel-landing config is sane across speed modes', () => {
+  const L = VIEW_CONFIG.land;
+  for (const key of ['off', 'turbo', 'max'] as const) {
+    // a landing dip + squash must be a small positive fraction (a subtle settle,
+    // not a second full bounce) and the per-row duration/stagger must be positive.
+    assert.ok(L.landDip[key] > 0 && L.landDip[key] < 0.2, `${key} landDip out of (0,0.2)`);
+    assert.ok(L.landSq[key] > 0 && L.landSq[key] < 0.2, `${key} landSq out of (0,0.2)`);
+    assert.ok(L.symDurMs[key] > 0, `${key} symDurMs must be positive`);
+    assert.ok(L.symStagMs[key] >= 0, `${key} symStagMs must be >= 0`);
+  }
+  // faster modes settle quicker: max is snappier than off (less sluggish landing).
+  assert.ok(L.symDurMs.max <= L.symDurMs.off, 'max-speed landing must not be slower than off');
+});
+
+test('anticipation thresholds + aura are well-formed', () => {
+  const a = VIEW_CONFIG.anticipation;
+  assert.ok(Number.isInteger(a.minEarlyWilds) && a.minEarlyWilds > 0);
+  assert.ok(Number.isInteger(a.minEarlyScatters) && a.minEarlyScatters > 0);
+  assert.ok(a.extraSeconds > 0, 'anticipation must add real hang time');
+  assert.equal(typeof a.showAura, 'boolean');
+  assert.match(a.auraColor, /^#[0-9a-fA-F]{6}$/, 'aura colour must be hex');
+  assert.ok(a.boltCount >= 0 && a.reStrikeMs > 0);
+});
+
 test('resolveBigWinTier maps win multiples to the right tier band', () => {
   assert.equal(resolveBigWinTier(0), null, 'no ceremony for a 0x win');
   assert.equal(resolveBigWinTier(9), null, 'below the BIG floor → no named tier');
