@@ -261,7 +261,14 @@ export class CeremonyView extends Component {
     SUPER: -44,
     EPIC: -50,
   };
+  /** The borrowed cupid-wf Spine is off-theme on a candy game (it cycled cupid/heart
+   *  win banners that read as "other win themes" — owner). Disabled: big wins now use
+   *  the on-theme PROCEDURAL ceremony (god-rays + candy sparkle burst + kinetic
+   *  count-up + tier header), which settles cleanly on its final state. Flip back to
+   *  true only with a candy-themed skeleton. */
+  private static readonly USE_SPINE_BANNER = false;
   private loadWinCallout(ov: Node): void {
+    if (!CeremonyView.USE_SPINE_BANNER) return; // procedural candy ceremony only
     resources.load('spine/cupid-wf/cupid-wf', sp.SkeletonData, (err, data) => {
       if (err || !data || !ov.isValid) {
         console.warn('[spine] win-callout load failed; procedural fallback', err);
