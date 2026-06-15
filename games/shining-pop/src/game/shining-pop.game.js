@@ -10169,7 +10169,7 @@
       try { setGradeMode('base'); } catch(e){} // VFX-02 — return to base mood
     }
 
-    // credit + bookkeeping — SERVER-AUTHORITATIVE (CLAUDE.md hard rule: the credited
+    // credit + bookkeeping — SERVER-AUTHORITATIVE (hard rule: the credited
     // total is ALWAYS the server payoutMultiplier, never the frontend's per-event
     // re-sum, which can drift by banker's-rounding / the max-win cap on live RGS).
     // In demo serverTotalX6 == the old baseWinX6+fsWinX6 (== fsWinX6 for a buy, whose

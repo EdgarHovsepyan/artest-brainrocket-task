@@ -8,3 +8,6 @@
 **/*.zst
 pnpm-lock.yaml
 games/shining-pop
+# Cocos-editor-generated project settings — reformatting them just churns + the
+# editor rewrites them on every build (recurring CI format failures otherwise).
+games/shining-pop-v2/settings

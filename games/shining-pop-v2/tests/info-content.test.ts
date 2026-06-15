@@ -1,6 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PAYTABLE, SYMBOLS, WILD_STRIKE } from '../assets/scripts/logic/game-config';
+import { PAYTABLE, SCATTER, SYMBOLS, WILD_STRIKE } from '../assets/scripts/logic/game-config';
 import {
   CONTROLS_LINES,
   maxWinMultiple,
@@ -10,9 +10,13 @@ import {
   SYMBOL_DISPLAY,
 } from '../assets/scripts/logic/info-content';
 
-test('paytable rows mirror the spec PAYTABLE exactly — all 10 symbols, all pays', () => {
+test('paytable rows mirror the spec PAYTABLE for every LINE symbol (scatter excluded)', () => {
   const rows = paytableRows();
-  assert.equal(rows.length, 10);
+  // The SCATTER (id 8) never pays on a line (the engine ignores it for line wins),
+  // so it is excluded from the line-pay table and documented separately. 10 PAYTABLE
+  // symbols minus the scatter = 9 line-pay rows.
+  assert.equal(rows.length, 9);
+  assert.ok(!rows.some((r) => r.id === SCATTER));
   for (const row of rows) {
     assert.equal(row.pay3, PAYTABLE[row.id][3]);
     assert.equal(row.pay4, PAYTABLE[row.id][4]);
