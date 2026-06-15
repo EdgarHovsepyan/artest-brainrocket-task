@@ -34,6 +34,9 @@ export class SymbolView extends Component {
   private halo: Node | null = null;
   private haloOp: UIOpacity | null = null;
   private haloSp: Sprite | null = null;
+
+  private happyFace: Node | null = null;
+  private happyFaceOp: UIOpacity | null = null;
   private size = 90;
 
   private homeParent: Node | null = null;
@@ -195,6 +198,86 @@ export class SymbolView extends Component {
     this.haloOp = op;
   }
 
+  // Cute happy face for the WILD gingerbread character on a win: sparkly eyes,
+  // a big open grin, rosy cheeks. Drawn once procedurally over the head; shown
+  // on win, hidden on clear. Built lazily so non-WILD symbols pay nothing.
+  private ensureHappyFace(): void {
+    if (this.happyFace || !this.art) return;
+    const cfg = VIEW_CONFIG.win.wildHappyFace;
+    const n = new Node('happyFace');
+    n.layer = this.node.layer;
+    n.addComponent(UITransform).setContentSize(this.size, this.size);
+    this.art.addChild(n);
+    n.setPosition(0, this.size * cfg.offsetYFrac, 0);
+    n.setScale(cfg.scale, cfg.scale, 1);
+
+    const g = n.addComponent(Graphics);
+    const eyeY = 5;
+    const eyeX = 11;
+    // Rosy cheeks (soft pink, behind the features).
+    g.fillColor = new Color(255, 130, 170, 120);
+    g.circle(-eyeX - 6, -3, 5.5);
+    g.circle(eyeX + 6, -3, 5.5);
+    g.fill();
+    // Eyes — big dark rounds with a bright sparkle (cute, alive).
+    g.fillColor = new Color(40, 22, 14, 255);
+    g.circle(-eyeX, eyeY, 4.2);
+    g.circle(eyeX, eyeY, 4.2);
+    g.fill();
+    g.fillColor = new Color(255, 255, 255, 255);
+    g.circle(-eyeX + 1.5, eyeY + 1.5, 1.5);
+    g.circle(eyeX + 1.5, eyeY + 1.5, 1.5);
+    g.fill();
+    // Big open grin — a filled parabola mouth with a little tongue.
+    g.fillColor = new Color(70, 30, 18, 255);
+    const w = 15;
+    const depth = 13;
+    g.moveTo(-w, -3);
+    for (let i = 1; i <= 14; i++) {
+      const x = -w + (2 * w * i) / 14;
+      const y = -3 - depth * (1 - (x / w) * (x / w));
+      g.lineTo(x, y);
+    }
+    g.lineTo(w, -3);
+    g.close();
+    g.fill();
+    g.fillColor = new Color(255, 120, 150, 255);
+    g.circle(0, -3 - depth * 0.62, 3.4);
+    g.fill();
+
+    const op = n.addComponent(UIOpacity);
+    op.opacity = 0;
+    n.active = false;
+    this.happyFace = n;
+    this.happyFaceOp = op;
+  }
+
+  private showHappyFace(delay: number): void {
+    if (!VIEW_CONFIG.win.wildHappyFace.enabled) return;
+    if (this._currentId !== SYMBOLS.WILD) return;
+    this.ensureHappyFace();
+    if (!this.happyFace || !this.happyFaceOp) return;
+    const ms = VIEW_CONFIG.win.wildHappyFace.fadeMs / 1000;
+    Tween.stopAllByTarget(this.happyFaceOp);
+    Tween.stopAllByTarget(this.happyFace);
+    this.happyFace.active = true;
+    this.happyFaceOp.opacity = 0;
+    this.happyFace.setScale(0.6, 0.6, 1);
+    tween(this.happyFaceOp).delay(delay).to(ms, { opacity: 255 }).start();
+    tween(this.happyFace)
+      .delay(delay)
+      .to(ms, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .start();
+  }
+
+  private hideHappyFace(): void {
+    if (!this.happyFace || !this.happyFaceOp) return;
+    Tween.stopAllByTarget(this.happyFaceOp);
+    Tween.stopAllByTarget(this.happyFace);
+    this.happyFaceOp.opacity = 0;
+    this.happyFace.active = false;
+  }
+
   private liftForWin(overlay: Node, worldCenter: Vec3): void {
     if (this.homeParent) return;
     this.homeParent = this.node.parent;
@@ -322,6 +405,9 @@ export class SymbolView extends Component {
 
       this.playStarPop(popStart, heat);
     }
+
+    // The WILD character beams a happy grin as it pops.
+    this.showHappyFace(popStart);
   }
 
   private playWinShader(delay: number, mat: Material): void {
@@ -615,6 +701,7 @@ export class SymbolView extends Component {
     }
     this.node.setScale(1, 1, 1);
     this.node.eulerAngles = new Vec3(0, 0, 0);
+    this.hideHappyFace();
     this.setDimmed(false);
     if (this.glow) {
       Tween.stopAllByTarget(this.glow);

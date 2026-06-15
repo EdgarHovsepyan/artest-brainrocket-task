@@ -81,6 +81,18 @@ test('halo tint is a valid, correctly-oriented warm→cool ramp', () => {
   assert.ok(h.hotHeat > h.coldHeat, 'haloTint.hotHeat must exceed coldHeat');
 });
 
+test('wild happy-face config is sane (on-character offset, positive scale + fade)', () => {
+  const h = VIEW_CONFIG.win.wildHappyFace;
+  assert.equal(typeof h.enabled, 'boolean');
+  // the face sits up toward the gingerbread head, within the symbol bounds.
+  assert.ok(
+    h.offsetYFrac >= 0 && h.offsetYFrac <= 0.5,
+    'offsetYFrac must keep the face on the head',
+  );
+  assert.ok(h.scale > 0, 'scale must be positive');
+  assert.ok(h.fadeMs > 0, 'fade must be a positive duration');
+});
+
 test('win anticipation dip is a brief, real squash (never inverted or sluggish)', () => {
   const a = VIEW_CONFIG.win.winAnticipation;
   // a dip must shrink the symbol (0 < dip < 1) so the pop reads as an impact;
