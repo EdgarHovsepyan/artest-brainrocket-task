@@ -300,6 +300,7 @@ export class CeremonyView extends Component {
             .by(6, { angle: -(10 + 8 * tx) })
             .repeatForever()
             .start();
+          this.breatheRays();
         }
 
         this.shake(Math.min(tier.shakeAmp * 1.8, tier.shakeAmp + 14 * tx));
@@ -402,6 +403,7 @@ export class CeremonyView extends Component {
     this.raysNode2.angle = 0;
     tween(this.raysNode).by(6, { angle: 18 }).repeatForever().start();
     tween(this.raysNode2).by(6, { angle: -13 }).repeatForever().start();
+    this.breatheRays();
     this.fireShock(280);
     this.fireSparkleBurst();
     this.fireDetonationFlash(0.6);
@@ -429,6 +431,22 @@ export class CeremonyView extends Component {
       g.lineTo(-330 * s, -10 * s);
       g.close();
       g.fill();
+    }
+  }
+
+  // Organic breathing so the ray fans feel like living light shafts, not rigid
+  // cardboard cutouts spinning on a pivot (master brief #4) — a slow sine swell
+  // layered on top of the rotation.
+  private breatheRays(): void {
+    for (const n of [this.raysNode, this.raysNode2]) {
+      if (!n) continue;
+      n.setScale(1, 1, 1);
+      tween(n)
+        .to(1.7, { scale: new Vec3(1.07, 1.07, 1) }, { easing: 'sineInOut' })
+        .to(1.7, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+        .union()
+        .repeatForever()
+        .start();
     }
   }
 
@@ -820,18 +838,21 @@ export class CeremonyView extends Component {
   private drawNumberGlow(): void {
     const g = this.numberGlow;
     g.clear();
-    const layers = 9;
+    // Emissive radial glow instead of a hard orange rhombus barrier (master brief
+    // #3): soft concentric ellipses with a quadratic alpha falloff, warm candy
+    // gradient (gold core → pink halo). Reads as light behind the number — it
+    // lifts the text without a flat geometric panel suffocating the artwork.
+    const layers = 16;
     for (let i = layers; i >= 1; i--) {
-      const f = i / layers;
-      const halfW = 64 + 250 * f;
-      const halfH = 24 + 64 * f;
-      const a = Math.round(8 + 26 * (1 - f));
-      g.fillColor = new Color(255, 198, 96, a);
-      g.moveTo(0, -halfH);
-      g.lineTo(halfW, 0);
-      g.lineTo(0, halfH);
-      g.lineTo(-halfW, 0);
-      g.close();
+      const f = i / layers; // 1 outer → ~0 inner
+      const warm = 1 - f; // 0 outer → 1 inner
+      const rx = 70 + 260 * f;
+      const ry = 30 + 78 * f;
+      const a = Math.round(3 + 30 * warm * warm);
+      const gch = Math.round(150 + 90 * warm); // pink outer → gold inner
+      const bch = Math.round(175 - 30 * warm);
+      g.fillColor = new Color(255, gch, bch, a);
+      g.ellipse(0, 0, rx, ry);
       g.fill();
     }
   }
