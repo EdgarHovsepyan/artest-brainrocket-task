@@ -59,6 +59,8 @@ export class SymbolView extends Component {
 
   static fxBurstMat: Material | null = null;
   static fxWhiteFrame: SpriteFrame | null = null;
+  static wildWinFrame: SpriteFrame | null = null;
+  private wildFaceSwapped = false;
 
   static fxHaloMat: Material | null = null;
   private burstUpgraded = false;
@@ -132,6 +134,7 @@ export class SymbolView extends Component {
 
   setSymbol(id: number): void {
     this._currentId = id;
+    this.wildFaceSwapped = false;
     const frame = this.frames[id] ?? null;
     if (this.sprite) this.sprite.spriteFrame = frame;
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
@@ -410,8 +413,30 @@ export class SymbolView extends Component {
       this.playStarPop(popStart, heat);
     }
 
-    // The WILD character beams a happy grin as it pops.
-    this.showHappyFace(popStart);
+    // The WILD gingerbread bursts into a laugh as it pops: swap idle->win face.
+    this.swapWildWinFace(popStart);
+  }
+
+  // Swap the WILD idle art for the laughing-win art at the bottom of the win
+  // pop's anticipation squash, so the laughing face springs out on the pop
+  // (squash-as-a-bridge masks the instant frame swap). Falls back to the
+  // procedural happy face if the win texture isn't loaded.
+  private swapWildWinFace(delay: number): void {
+    if (this._currentId !== SYMBOLS.WILD || !this.sprite) return;
+    const winF = SymbolView.wildWinFrame;
+    if (!winF) {
+      this.showHappyFace(delay);
+      return;
+    }
+    this.wildFaceSwapped = true;
+    this.scheduleOnce(
+      () => {
+        if (this.wildFaceSwapped && this._currentId === SYMBOLS.WILD && this.sprite) {
+          this.sprite.spriteFrame = winF;
+        }
+      },
+      Math.max(0, delay),
+    );
   }
 
   private playWinShader(delay: number, mat: Material): void {
@@ -717,6 +742,12 @@ export class SymbolView extends Component {
     }
     this.node.setScale(1, 1, 1);
     this.node.eulerAngles = new Vec3(0, 0, 0);
+    if (this.wildFaceSwapped) {
+      this.wildFaceSwapped = false;
+      if (this.sprite && this._currentId === SYMBOLS.WILD) {
+        this.sprite.spriteFrame = this.frames[SYMBOLS.WILD] ?? null;
+      }
+    }
     this.hideHappyFace();
     this.setDimmed(false);
     if (this.glow) {
