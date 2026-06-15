@@ -66,27 +66,21 @@ No install step, no dependencies — open either URL and play.
 
 <div align="center">
 
-<img width="860" alt="Cocos Creator — base game" src="docs/media/cocos-desktop.png" />
+**Two games, one shared math core** — a Cocos Creator 3.8.8 build and a PixiJS v8 build of the same candy slot. (No other variations.)
 
-_Cocos Creator 3.8.8 — candy reskin, authored icon set, full-bleed reels_
+<img width="430" alt="Cocos Creator — base game" src="docs/media/cocos-desktop.png" />
 
-<img width="860" alt="Cocos Creator — win presentation" src="docs/media/cocos-win.png" />
-
-_Win presentation: gold payline core + flowing plasma beam · per-symbol shader fire · jelly squash-and-stretch · win-focus dim_
-
-<img width="860" alt="Cocos Creator — Spine win-callout ceremony" src="docs/media/cocos-ceremony.png" />
-
-_Spine 4.2 win-callout: winged golden-heart banner, cotton-candy cloud, floating petals, kinetic gold count-up — tier-scaled, with a procedural fallback_
+_Cocos Creator 3.8.8 — candy reskin, authored icon set, continuous reels in a glass-portal window, peppermint candy-material win line, symbol-shaped halo, win-focus dim_
 
 <table>
   <tr>
     <td align="center" valign="top">
-      <img width="230" alt="Cocos mobile portrait" src="docs/media/cocos-mobile.png" /><br/>
-      <em>Portrait: safe-area deck, docked BUY BONUS,<br/>44 px targets</em>
+      <img width="160" alt="Cocos mobile portrait" src="docs/media/cocos-mobile.png" /><br/>
+      <em>Cocos portrait: transparent deck, docked<br/>BUY BONUS, panels hide the bar, 44 px targets</em>
     </td>
     <td align="center" valign="top">
-      <img width="540" alt="PixiJS intro" src="docs/media/pixi-desktop.png" /><br/>
-      <img width="540" alt="PixiJS board" src="docs/media/pixi-board.png" /><br/>
+      <img width="270" alt="PixiJS intro" src="docs/media/pixi-desktop.png" /><br/>
+      <img width="270" alt="PixiJS board" src="docs/media/pixi-board.png" /><br/>
       <em>PixiJS v8 flagship — branded intro gate &amp; full control surface</em>
     </td>
   </tr>

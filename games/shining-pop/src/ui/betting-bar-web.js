@@ -73,7 +73,10 @@ function cbase(r, fill, sw) {
 }
 function T(t, sz, col, w, ax, mid, ls) {
   const o = new PIXI.Text({ text: t, style: { fontFamily: FONT, fontSize: Math.round(sz * FS), fontWeight: String(w || 700), fill: col, letterSpacing: ls || 0 } });
-  o.resolution = Math.max(2, DPR); o.anchor.set(ax || 0, mid ? 0.5 : 0); return o;
+  // The whole bar is scaled up by the responsive fit, so a 2× glyph texture gets
+  // stretched → blur. Rasterise at 3× (capped at the device DPR floor of 3) for
+  // crisp numbers at any bar scale.
+  o.resolution = Math.max(3, DPR); o.anchor.set(ax || 0, mid ? 0.5 : 0); return o;
 }
 function hit(c, h, fn) {
   c.eventMode = 'static'; c.cursor = 'pointer'; c.hitArea = h; let d = false;
@@ -165,26 +168,45 @@ export class BettingBarWeb extends PIXI.Container {
     const sel = new PIXI.Container(); sel.position.set(SX, 148); this.addChild(sel);
     sel.addChild(panel(SW, 76, 38, G.panel, 2, false));
     const cMask = new PIXI.Graphics().roundRect(12, 8, SW - 24, 60, 30).fill(0xffffff); sel.addChild(cMask);
-    sel.addChild(new PIXI.Graphics()
-      .roundRect(PCX - 62, 8, 124, 60, 30).fill(fg(G.active, 'v'))
-      .roundRect(PCX - 62, 8, 124, 60, 30).stroke({ width: 2, color: COL.pillStroke }));
     const track = new PIXI.Container(); track.mask = cMask; sel.addChild(track);
+    // The active-bet pill rides UNDER the cells as a track child so it stays locked to
+    // the active cell at ANY scroll position. A fixed centre pill forced the active
+    // cell to the centre, which left a big empty band on the side where the ladder
+    // ran out (index 0 = min bet) — the reported "empty carousel" gap.
+    const pill = new PIXI.Graphics()
+      .roundRect(-62, 8, 124, 60, 30).fill(fg(G.active, 'v'))
+      .roundRect(-62, 8, 124, 60, 30).stroke({ width: 2, color: COL.pillStroke });
+    track.addChild(pill);
     sel.eventMode = 'static'; sel.cursor = 'grab'; sel.hitArea = new PIXI.Rectangle(0, 0, SW, 76);
-    const car = { track, CELLW, PCX, levels: [], cells: [], active: 0, drag: false, lastX: 0, vx: 0, moved: 0, emitted: -1, fmt: (v) => String(v) };
+    const car = { track, pill, CELLW, PCX, levels: [], cells: [], active: 0, drag: false, lastX: 0, vx: 0, moved: 0, emitted: -1, fmt: (v) => String(v) };
     this._car = car;
-    const trackXFor = (i) => PCX - (i * CELLW + CELLW / 2);
+    // Clamp the scroll so the cells ALWAYS fill the window — never reveal empty space
+    // past the first/last cell. (When fewer cells than the window, centre them.)
+    const contentW = () => car.levels.length * CELLW;
+    const clampTrack = (x) => {
+      const cw = contentW();
+      if (cw <= SW - 24) return (SW - cw) / 2; // narrow ladder → centred
+      return Math.max(SW - 12 - cw, Math.min(12, x)); // last cell flush-right … first flush-left
+    };
+    const trackXFor = (i) => clampTrack(PCX - (i * CELLW + CELLW / 2));
+    const pillXFor = (i) => i * CELLW + CELLW / 2; // local centre of cell i (track child)
     const nearest = () => Math.max(0, Math.min(car.levels.length - 1, Math.round((PCX - track.x - CELLW / 2) / CELLW)));
     const restyle = () => car.cells.forEach((c, i) => { const cen = i === car.active; c.style.fill = cen ? COL.dark : COL.value; c.scale.set(cen ? 1 : 0.78); c.alpha = cen ? 1 : 0.6; });
     car._restyle = restyle;
     car._snapTo = (i, animate) => {
       car.active = Math.max(0, Math.min(car.levels.length - 1, i)); car.emitted = car.active;
-      const tx = trackXFor(car.active);
-      if (animate && window.gsap) window.gsap.to(track, { x: tx, duration: 0.3, ease: 'power2.out', onComplete: restyle });
-      else { track.x = tx; restyle(); }
+      const tx = trackXFor(car.active), px = pillXFor(car.active);
+      if (animate && window.gsap) {
+        window.gsap.to(track, { x: tx, duration: 0.3, ease: 'power2.out', onComplete: restyle });
+        window.gsap.to(pill, { x: px, duration: 0.3, ease: 'power2.out' });
+      } else { track.x = tx; pill.x = px; restyle(); }
     };
     const snap = () => {
-      const i = nearest(); car.active = i; const tx = trackXFor(i);
-      if (window.gsap) window.gsap.to(track, { x: tx, duration: 0.36, ease: 'back.out(1.3)', onComplete: restyle }); else track.x = tx;
+      const i = nearest(); car.active = i; const tx = trackXFor(i), px = pillXFor(i);
+      if (window.gsap) {
+        window.gsap.to(track, { x: tx, duration: 0.36, ease: 'back.out(1.3)', onComplete: restyle });
+        window.gsap.to(pill, { x: px, duration: 0.36, ease: 'back.out(1.3)' });
+      } else { track.x = tx; pill.x = px; }
       restyle();
       if (i !== car.emitted) { car.emitted = i; this._emit('bet:set', i); }
     };
@@ -248,7 +270,9 @@ export class BettingBarWeb extends PIXI.Container {
   }
 
   fitBottom(W, H, maxScale) {
-    let s = W / this.DESIGN_W;
+    // Inset from the screen edges (≈3.5% each side) so the bar has clean left/right
+    // gaps and reads as a compact floating bar, not a full-width slab (owner).
+    let s = (W * 0.93) / this.DESIGN_W;
     if (maxScale) s = Math.min(s, maxScale);
     this.scale.set(s);
     this.position.set((W - this.DESIGN_W * s) / 2, H - this.DESIGN_H * s);
@@ -272,6 +296,7 @@ export class BettingBarWeb extends PIXI.Container {
     if (!same) {
       car.levels = values.slice();
       car.track.removeChildren(); car.cells = [];
+      car.track.addChild(car.pill); // re-attach the active pill BEHIND the new cells
       values.forEach((v, i) => { const t = T(car.fmt(v), 27, COL.value, 700, 0.5, true); t.position.set(i * car.CELLW + car.CELLW / 2, 38); car.track.addChild(t); car.cells.push(t); });
       car._snapTo(activeIdx || 0, false);
     } else if (!car.drag && (activeIdx || 0) !== car.active) {
