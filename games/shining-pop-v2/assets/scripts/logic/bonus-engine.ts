@@ -12,6 +12,10 @@ export interface FreeSpinStep {
   payout: number;
 
   sticky: Array<[number, number]>;
+
+  // Reels fully locked this step (whole-reel wilds, or every row sticky). These
+  // HOLD instead of re-spinning — a locked reel that keeps spinning reads as a bug.
+  lockedReels: number[];
 }
 
 export interface BonusResult {
@@ -66,7 +70,7 @@ export function runScatterFreeSpins(rng: Rng, spins: number): BonusResult {
     const grid = spinGrid(rng);
     const result = evaluateSpin(grid);
     totalPayout += result.totalPayout;
-    steps.push({ grid, payout: result.totalPayout, sticky: [] });
+    steps.push({ grid, payout: result.totalPayout, sticky: [], lockedReels: [] });
   }
   return { mode: 'wilds', steps, totalPayout };
 }
@@ -80,6 +84,21 @@ export function runFreeSpins(rng: Rng, mode: BonusMode, spins: number): BonusRes
     applyMechanic(grid, mode, rng, sticky);
     const result = evaluateSpin(grid);
     totalPayout += result.totalPayout;
+    const lockedReels: number[] = [];
+    for (let reel = 0; reel < GRID.reels; reel++) {
+      if (sticky.has('reel:' + reel)) {
+        lockedReels.push(reel);
+        continue;
+      }
+      let allRows = true;
+      for (let row = 0; row < GRID.rows; row++) {
+        if (!sticky.has(reel + ',' + row)) {
+          allRows = false;
+          break;
+        }
+      }
+      if (allRows) lockedReels.push(reel);
+    }
     steps.push({
       grid,
       payout: result.totalPayout,
@@ -87,6 +106,7 @@ export function runFreeSpins(rng: Rng, mode: BonusMode, spins: number): BonusRes
       sticky: Array.from(sticky)
         .filter((k) => k.indexOf('reel:') !== 0)
         .map((k) => k.split(',').map(Number) as [number, number]),
+      lockedReels,
     });
   }
   return { mode, steps, totalPayout };

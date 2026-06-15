@@ -3101,7 +3101,7 @@ export class SlotView extends Component {
     this.reels.forEach((r) => r.quickStop());
   }
 
-  async playSpin(grid: number[][], speedMul = 1): Promise<void> {
+  async playSpin(grid: number[][], speedMul = 1, heldReels: readonly number[] = []): Promise<void> {
     const { minSpinMs, reelStopStaggerMs } = VIEW_CONFIG.spin;
     const { minEarlyWilds, minEarlyScatters, extraSeconds } = VIEW_CONFIG.anticipation;
 
@@ -3135,6 +3135,11 @@ export class SlotView extends Component {
     this.playReelPortalEntry();
     await Promise.all(
       this.reels.map((reel, i) => {
+        // Locked reel in the bonus: hold its symbols, never re-spin them.
+        if (heldReels.indexOf(i) >= 0) {
+          reel.show(grid[i]);
+          return Promise.resolve();
+        }
         let cumGapMs = 0;
         for (let k = 1; k <= i; k++) {
           const dUnits = (cadence[k] ?? k) - (cadence[k - 1] ?? k - 1);

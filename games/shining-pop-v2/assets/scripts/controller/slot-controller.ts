@@ -566,10 +566,14 @@ export class SlotController extends Component {
     const deadPauseMs = VIEW_CONFIG.bonus.deadPauseMs[tk];
     const winPauseMs = VIEW_CONFIG.bonus.winPauseMs[tk];
     const { bigStepMultiple } = VIEW_CONFIG.bonus;
+    let prevLocked: number[] = [];
     for (let i = 0; i < outcome.bonus.steps.length; i++) {
       const step = outcome.bonus.steps[i];
       this.view.clearWins();
-      await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul);
+      // Hold the reels that were already locked last step (a reel spins IN once,
+      // then stays put) — locked wild reels no longer pointlessly re-spin.
+      await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul, prevLocked);
+      prevLocked = step.lockedReels;
 
       this.view.pulseSticky(step.sticky, mode);
       if (step.sticky.length > 0) this.view.audio.stickyLock();
