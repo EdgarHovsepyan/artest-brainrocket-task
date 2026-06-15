@@ -20,7 +20,7 @@ import {
   Vec3,
   view,
 } from 'cc';
-import { BONUS_MODES, BonusMode, GRID, PAYLINES, SYMBOLS } from '../logic/game-config';
+import { BONUS_MODES, BonusMode, GRID, PAYLINES, SCATTER, SYMBOLS } from '../logic/game-config';
 import { formatMoney } from '../logic/money';
 import {
   CONTROLS_LINES,
@@ -194,6 +194,9 @@ export class SlotView extends Component {
   private soundBtn: DeckButton | null = null;
   private buyMenu: Node | null = null;
   private buyModal: BuyBonusModal | null = null;
+  // Explicit open-state: the modal's close() only flips node.active after a fade,
+  // so anyOverlayOpen() can't read node.active synchronously. This tracks intent.
+  private buyMenuOpen = false;
   private buyFab: Node | null = null;
   private buyBetStepCb: ((dir: number) => void) | null = null;
   private autoplayPanel: Node | null = null;
@@ -2045,13 +2048,16 @@ export class SlotView extends Component {
       host.setSiblingIndex(root.children.length - 1);
       this.buyModal = host.addComponent(BuyBonusModal);
       this.buyModal.on('buy', (mode) => {
+        this.buyMenuOpen = false;
         this.buyModal?.close();
         this.buyCb?.(mode as string);
       });
       this.buyModal.on('bet:inc', () => this.buyBetStepCb?.(1));
       this.buyModal.on('bet:dec', () => this.buyBetStepCb?.(-1));
       this.buyModal.on('ui:click', () => this.audio.click());
-
+      // Scrim tap / cancel / close-X all emit 'cancel' and self-close the modal;
+      // route through closeBuyMenu so the buy FAB + betting bar are restored.
+      this.buyModal.on('cancel', () => this.closeBuyMenu());
       this.buyModal.on('buy:blocked', () => this.audio.click());
     }
     const tiers: BuyTier[] = options.map((o, i) => {
@@ -2094,16 +2100,22 @@ export class SlotView extends Component {
   }
 
   closeBuyMenu(): void {
+    this.buyMenuOpen = false;
     this.buyModal?.close();
     this.setBuyFabVisible(true);
+    // Re-sync the overlay gate so the betting bar comes back (the bug: the modal
+    // self-closing on cancel never told the controller the overlay was gone).
+    this.scheduleOverlaySync();
   }
 
   openBuyMenu(): void {
     this.closeOverlays();
+    this.buyMenuOpen = true;
     this.fitBuyModal();
     this.buyModal?.open();
     this.audio.buyOpen();
     this.setBuyFabVisible(false);
+    this.scheduleOverlaySync();
   }
 
   private fitBuyModal(): void {
@@ -2593,7 +2605,7 @@ export class SlotView extends Component {
       on(this.quickBetPanel)
     )
       return true;
-    if (this.buyModal && this.buyModal.isValid && this.buyModal.node.active) return true;
+    if (this.buyMenuOpen) return true;
     if (this.node.parent?.getChildByName('rcModal')) return true;
     return false;
   }
@@ -2986,11 +2998,22 @@ export class SlotView extends Component {
 
   async playSpin(grid: number[][], speedMul = 1): Promise<void> {
     const { minSpinMs, reelStopStaggerMs } = VIEW_CONFIG.spin;
-    const { minEarlyWilds, extraSeconds } = VIEW_CONFIG.anticipation;
+    const { minEarlyWilds, minEarlyScatters, extraSeconds } = VIEW_CONFIG.anticipation;
 
+    // Tension on the last reels when the early reels (0-2) already tease a feature:
+    // enough wilds for a WILD STRIKE, or enough scatters for the free-spins trigger
+    // (scatters pay from anywhere, so a 3rd is live). Koster — vary anticipation by
+    // trigger type; the bonus tease is the highest-tension moment in the game.
     let earlyWilds = 0;
-    for (let r = 0; r < 3; r++) for (const id of grid[r]) if (id === SYMBOLS.WILD) earlyWilds++;
-    const antic = earlyWilds >= minEarlyWilds && !this.reducedFx;
+    let earlyScatters = 0;
+    for (let r = 0; r < 3; r++) {
+      for (const id of grid[r]) {
+        if (id === SYMBOLS.WILD) earlyWilds++;
+        else if (id === SCATTER) earlyScatters++;
+      }
+    }
+    const antic =
+      (earlyWilds >= minEarlyWilds || earlyScatters >= minEarlyScatters) && !this.reducedFx;
     const turbo = speedMul <= VIEW_CONFIG.turbo.turbo;
 
     const cadence = this.reducedFx ? [0, 1, 2, 3, 4] : VIEW_CONFIG.spin.stopCadence;

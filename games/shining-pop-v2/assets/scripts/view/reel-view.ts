@@ -158,7 +158,28 @@ export class ReelView extends Component {
         this.lastStripY = 0;
         strip.setScale(1, 1, 1);
 
-        if (!this.reducedMotion) this.cells.forEach((c) => c.setIdle(true));
+        if (!this.reducedMotion) {
+          // Merge a staggered per-symbol landing into the reel stop: each row
+          // dips + squashes + springs as it settles, cascading top→bottom. Params
+          // come from VIEW_CONFIG.land keyed by the active speed (off/turbo/max).
+          const L = VIEW_CONFIG.land;
+          const T = VIEW_CONFIG.turbo;
+          const key: 'off' | 'turbo' | 'max' =
+            speedMul <= T.max + 1e-3 ? 'max' : speedMul <= T.turbo + 1e-3 ? 'turbo' : 'off';
+          const cell = VIEW_CONFIG.layout.cell;
+          const dip = L.landDip[key];
+          const sq = L.landSq[key];
+          const dur = L.symDurMs[key];
+          const stag = L.symStagMs[key] / 1000;
+          this.cells.forEach((c, row) => {
+            if (stag > 0 && row > 0) {
+              this.scheduleOnce(() => c.playLand(cell, dip, sq, dur), row * stag);
+            } else {
+              c.playLand(cell, dip, sq, dur);
+            }
+          });
+          this.cells.forEach((c) => c.setIdle(true));
+        }
         resolve();
       };
       strip.setPosition(0, this.startY, 0);

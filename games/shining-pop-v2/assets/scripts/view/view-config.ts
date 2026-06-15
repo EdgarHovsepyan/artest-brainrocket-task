@@ -321,7 +321,9 @@ export const VIEW_CONFIG = {
 
     extraSeconds: 0.6,
 
-    showAura: false,
+    // The aura is a complete pulsing glow + lightning column (anticipation-layer)
+    // with a reduced-motion path; ON so a feature tease reads as held breath.
+    showAura: true,
     boltCount: 4,
     reStrikeMs: 110,
     auraColor: '#ff2f93',
