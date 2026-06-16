@@ -440,9 +440,11 @@ export const VIEW_CONFIG = {
      *  lightning diamonds (the "WILD #3" geometry the user rejected). The
      *  anticipation now reads from the DECEL TIMING alone (the late reels drag
      *  longer = tension) + a subtle warm reel pulse. No drawn aura geometry. */
-    showAura: false,
-    boltCount: 4,
-    reStrikeMs: 110,
+    // Re-enabled per request: the electric magenta anticipation aura on the late
+    // dragging reels is back ON and boosted (more bolts) — the build-up tension cue.
+    showAura: true,
+    boltCount: 6,
+    reStrikeMs: 90,
     auraColor: '#ff2f93',
   },
 

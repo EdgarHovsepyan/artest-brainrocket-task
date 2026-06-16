@@ -196,6 +196,19 @@ export class AudioManager {
     this.musicGain = g;
   }
 
+  /** Sidechain-duck the music bed under a win sting, then ease it back, so the
+   *  most important AV moment reads punchier without touching a single sample.
+   *  Pure WebAudio gain ramp; no-op if music isn't playing / muted. */
+  duckMusic(depth = 0.4, releaseS = 0.6): void {
+    const g = this.musicGain;
+    if (!g || !this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const d = Math.max(0, Math.min(1, depth));
+    g.gain.cancelScheduledValues(t);
+    g.gain.setTargetAtTime(d, t, 0.03); // fast dip under the transient
+    g.gain.setTargetAtTime(1, t + 0.14, Math.max(0.1, releaseS) / 3); // ease back up
+  }
+
   // ---- reel cycle ----------------------------------------------------------
   spinStart(): void {
     if (this.playSample('spin_start', 'sfx', 0.8)) return;
@@ -286,6 +299,7 @@ export class AudioManager {
   // ---- wins / features -----------------------------------------------------
   /** Tiered win sting: 1 small · 2 nice · 3 big · 4 mega · 5 epic. */
   win(tier: number): void {
+    this.duckMusic(0.5 - Math.min(4, Math.max(0, tier - 1)) * 0.04, 0.6); // bigger win ducks deeper
     const ids: ClipId[] = ['win_small', 'win_nice', 'win_big', 'win_mega', 'win_epic'];
     const id = ids[Math.min(ids.length - 1, Math.max(0, tier - 1))];
     if (this.playSample(id, 'win', 0.95)) return;
@@ -304,6 +318,7 @@ export class AudioManager {
    *  low boom distinct from the melodic win sting. Fired on the detonation frame
    *  (ceremony only shows for 8x+ wins, so this is never an LDW case). */
   impact(): void {
+    this.duckMusic(0.3, 0.75); // deep duck under the detonation braam
     if (this.playSample('impact_braam', 'win', 0.9)) return;
     this.voice(72, 0.6, 'sawtooth', 0.34);
     this.voice(110, 0.5, 'triangle', 0.22);
@@ -333,6 +348,7 @@ export class AudioManager {
    *  the multiplier. The 'mult_reveal' clip was loaded but never played. */
   multReveal(n: number): void {
     const m = Number.isFinite(n) ? n : 1;
+    this.duckMusic(0.45, 0.5); // duck under the WILD STRIKE reveal
     if (this.playSample('mult_reveal', 'win', Math.min(1, 0.7 + m * 0.03))) return;
     const base = 330 + Math.min(8, m) * 26;
     this.voice(base, 0.12, 'triangle', 0.16);
