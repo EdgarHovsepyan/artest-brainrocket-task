@@ -173,7 +173,6 @@ export class SlotView extends Component {
 
   private preloadedSpines: Record<string, sp.SkeletonData> = {};
 
-  private cineBloomOp: UIOpacity | null = null;
   private cineWipe: Node | null = null;
   private cineWipeOp: UIOpacity | null = null;
   private cineWipeBand: Node | null = null;
@@ -313,6 +312,7 @@ export class SlotView extends Component {
       'unlock-burst',
       'soft-burst',
       'particle-glow',
+      'screen-post',
     ].forEach((key) => {
       this.effectMaterials[key] = null;
       jobs.push(
@@ -1871,32 +1871,65 @@ export class SlotView extends Component {
     this.windowFeatherBottom = make(-1, 'windowFeatherBottom');
   }
 
+  private cineBloomMat: Material | null = null;
+  private cineBloomDrv = { k: 0 };
   private buildCinematicBloom(): void {
     const W = 2600;
     const H = 2200;
     const bloom = this.mkNode('cineBloom', W, H, this.node);
-    const bg = bloom.addComponent(Graphics);
-    bg.fillColor = new Color(255, 195, 135, 255);
-    bg.rect(-W / 2, -H / 2, W, H);
-    bg.fill();
-    this.cineBloomOp = bloom.addComponent(UIOpacity);
-    this.cineBloomOp.opacity = 0;
-    bloom.active = false;
+    const sp = bloom.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = Sprite.Type.SIMPLE;
+    sp.spriteFrame = this.getWhiteFrame();
+    const eff = this.getEffectMaterial('screen-post')?.effectAsset;
+    if (eff) {
+      const m = new Material();
+      m.initialize({ effectAsset: eff, defines: { USE_TEXTURE: true } });
+      m.setProperty('u_intensity', 0);
+      sp.customMaterial = m;
+      this.cineBloomMat = m;
+    }
+    bloom.active = !this.reducedFx;
     this.cineBloomNode = bloom;
   }
 
   cinematicBloom(intensity = 1): void {
-    if (!this.cineBloomOp || this.reducedFx) return;
-    const peak = Math.round(20 + 32 * Math.min(1, Math.max(0, intensity)));
-    Tween.stopAllByTarget(this.cineBloomOp);
-    if (this.cineBloomNode) this.cineBloomNode.active = true;
-    this.cineBloomOp.opacity = 0;
-    tween(this.cineBloomOp)
-      .to(0.08, { opacity: peak }, { easing: 'quadOut' })
-      .to(0.5, { opacity: 0 }, { easing: 'quadIn' })
-      .call(() => {
-        if (this.cineBloomNode) this.cineBloomNode.active = false;
-      })
+    if (this.reducedFx || !this.cineBloomMat) return;
+    const mat = this.cineBloomMat;
+    const peak = Math.min(0.78, Math.max(0, intensity));
+    const drv = this.cineBloomDrv;
+    Tween.stopAllByTarget(drv);
+    drv.k = 0;
+    tween(drv)
+      .to(
+        0.12,
+        { k: 1 },
+        {
+          easing: 'quadOut',
+          onUpdate: () => {
+            try {
+              mat.setProperty('u_intensity', peak * drv.k);
+              mat.setProperty('u_time', drv.k * 1.2);
+            } catch {
+              /* material may lack props */
+            }
+          },
+        },
+      )
+      .to(
+        0.62,
+        { k: 0 },
+        {
+          easing: 'quadIn',
+          onUpdate: () => {
+            try {
+              mat.setProperty('u_intensity', peak * drv.k);
+            } catch {
+              /* no-op */
+            }
+          },
+        },
+      )
       .start();
   }
 
@@ -3452,6 +3485,7 @@ export class SlotView extends Component {
         );
     });
     this.audio.win(Math.min(5, Math.max(2, count - 1)));
+    this.cinematicBloom(Math.min(1, 0.5 + count * 0.1));
 
     if (this.scatterCallout?.isValid) this.scatterCallout.destroy();
     const root = this.mkNode('scatterCallout', this.gw, 200, this.node);
@@ -3752,6 +3786,7 @@ export class SlotView extends Component {
     scatterCount?: number,
   ): void {
     this.ceremony.showFeatureUnlocked(name, mode, scatterCount);
+    this.scheduleOnce(() => this.cinematicBloom(0.9), 0.42);
   }
 
   burstParticles(result: SpinResult, multiple: number): void {

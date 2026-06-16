@@ -1,0 +1,81 @@
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: one
+          blendDstAlpha: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_tint:      { value: [1.0, 0.74, 0.42, 1.0], editor: { type: color } }
+        u_intensity: { value: 0.0 }
+        u_time:      { value: 0.0 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+  out vec4 color;
+  out vec2 uv0;
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+  in vec4 color;
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+  uniform Constants { vec4 u_tint; float u_intensity; float u_time; };
+
+  vec4 frag () {
+    float a = 1.0;
+    #if USE_TEXTURE
+      a = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
+    #endif
+    float inten = clamp(u_intensity, 0.0, 1.0);
+    vec2 p = uv0 - 0.5;
+    float d = length(p) * 2.0;
+    // a warm cinematic bloom-wash that breathes (mostly even so it reads across
+    // the whole frame, brighter toward the centre of the action), plus a
+    // chromatic-aberration colour-split fringe that widens at the screen edges.
+    float pulse = 0.88 + 0.12 * sin(u_time * 7.0);
+    float wash = (0.82 + 0.18 * exp(-d * d * 0.5)) * pulse;
+    float ring = smoothstep(0.5, 1.15, d);
+    vec3 chroma = vec3(ring * 0.75, ring * 0.2, ring * 0.82);
+    vec3 rgb = u_tint.rgb * (wash * 1.15) + chroma;
+    float outA = clamp(wash + ring * 0.55, 0.0, 1.0) * inten * a * color.a;
+    vec4 o = vec4(rgb, outA);
+    ALPHA_TEST(o);
+    return o;
+  }
+}%
