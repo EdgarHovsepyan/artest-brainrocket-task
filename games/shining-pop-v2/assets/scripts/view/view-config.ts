@@ -2,11 +2,45 @@
 // ZERO HARDCODING: every size, timing and gain lives here and is read by the
 // view components. Designers tune this file, never the component code.
 
+// Wave 1 — one-time device-capability probe so heavy VFX (particle volume, fill)
+// scale down on weak hardware instead of every device paying the max cost.
+// Pure heuristic from navigator/window hints, read defensively via globalThis so
+// it stays type-safe and, in a non-browser context (unit tests/SSR), defaults to
+// the HIGH tier (full quality). Consumers read VIEW_CONFIG.tier.particleScale.
+function detectDeviceTier(): { low: boolean; particleScale: number; dpr: number } {
+  const g: any = typeof globalThis !== 'undefined' ? globalThis : {};
+  let low = false;
+  let dpr = 1;
+  try {
+    const nav = g.navigator;
+    if (nav) {
+      const cores = typeof nav.hardwareConcurrency === 'number' ? nav.hardwareConcurrency : 8;
+      const mem = typeof nav.deviceMemory === 'number' ? nav.deviceMemory : 8;
+      if (cores <= 4 || mem <= 4) low = true;
+    }
+    const win = g.window;
+    if (win && Number.isFinite(win.devicePixelRatio)) {
+      dpr = Math.min(3, Math.max(1, win.devicePixelRatio));
+      const scr = g.screen;
+      // a high-DPR phone-class screen pushes a lot of fill → treat as low tier
+      if (dpr >= 2.5 && scr && Math.min(scr.width, scr.height) <= 480) low = true;
+    }
+  } catch {
+    /* non-browser / locked-down env — stay on the high tier */
+  }
+  return { low, particleScale: low ? 0.55 : 1, dpr };
+}
+
 export const VIEW_CONFIG = {
   /** Master shader kill-switch — when false, every consumer skips customMaterial
    *  and uses its Graphics fallback (low-end devices, shader-regression debugging).
    *  Each FX *also* honors `reducedFx`. Set false to prove the game still reads. */
   vfx: { materialsEnabled: true },
+
+  /** Wave 1 — device-capability tier. `particleScale` multiplies particle-volume
+   *  budgets (1.0 high / 0.55 low) so weak hardware doesn't pay the max particle
+   *  + fill cost. Probed once at module load; high-tier default off-browser. */
+  tier: detectDeviceTier(),
 
   /** Board layout (px). The view builds the whole scene from these numbers. */
   layout: {
@@ -245,6 +279,22 @@ export const VIEW_CONFIG = {
       scale: 1.06,
     },
 
+    /** PER-SYMBOL WIN IDENTITY (additive over the shared glow/burst/pulse —
+     *  symbol-view reads its own currentId). Higher-tier symbols react hotter and
+     *  bigger so a Wild win FEELS different from a 10's win, instead of one uniform
+     *  pulse. Extends the existing tier-weight idea (idleAmp already differs by
+     *  tier). intensity = glow opacity gain; pulseMul = attack-pop gain; burstMul =
+     *  glow/burst scale gain. Unlisted ids inherit `base`. PRESENTATION ONLY. */
+    symbolProfiles: {
+      base: { intensity: 1.0, pulseMul: 1.0, burstMul: 1.0 },
+      0: { intensity: 1.35, pulseMul: 1.18, burstMul: 1.2 }, // Wild — hottest, biggest
+      1: { intensity: 1.2, pulseMul: 1.1, burstMul: 1.12 }, // H1 crown
+      2: { intensity: 1.16, pulseMul: 1.08, burstMul: 1.1 }, // H2 heart
+      3: { intensity: 1.16, pulseMul: 1.08, burstMul: 1.1 }, // H3 diamond
+      4: { intensity: 1.13, pulseMul: 1.06, burstMul: 1.08 }, // H4 horseshoe
+      // L1..L5 (ids 5..9) inherit `base` — restrained, so the premiums stand out.
+    } as Record<string, { intensity: number; pulseMul: number; burstMul: number }>,
+
     // ── Task 4.1: arcane payline glow (CCEffect bloom) — BOOSTED 2026-06-11
     //    The Graphics stroke alpha was cut so this additive overlay carries
     //    the visual weight of the win line. widthPx and alpha bumped so the
@@ -408,9 +458,21 @@ export const VIEW_CONFIG = {
      *  launched from a single point; spreadDeg = launch cone half-angle. */
     coin: {
       count: 30,
-      launchSpeed: 900,
+      launchSpeed: 900, // legacy ballistic params (kept; hero-coin uses the staging below)
       gravity: 2200,
       spreadDeg: 60,
+      // HERO-COIN staging — each Epic coin pops, arcs up-and-out, decel-spins
+      // (catching the additive light), then falls + shrinks; staggered into a
+      // shower instead of a flat simultaneous spray. The top-tier payoff moment.
+      heroLifeS: 1.15,
+      riseFrac: 0.55, // fraction of life spent rising (decel) vs falling (accel)
+      risePx: 360,
+      fallPx: 540,
+      lateralPx: 240,
+      spinDeg: 540, // finite decelerating spin (never repeatForever → pool-safe)
+      scalePop: 1.5,
+      scaleEnd: 0.4,
+      staggerS: 0.01, // per-coin launch stagger → reads as a shower
     },
   },
 

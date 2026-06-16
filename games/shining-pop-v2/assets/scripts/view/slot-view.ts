@@ -48,8 +48,22 @@ import { AudioManager } from './audio-manager';
 import { applyFont, loadFonts } from './fonts';
 import { PAL } from './palette';
 import { BuyBonusModal, BuyTier } from './buy-bonus-modal';
+import { BeatClock } from './beat-clock';
 
 const { ccclass } = _decorator;
+
+// Wave 1 — the CCEffect materials whose `u_time` the per-frame stepper advances.
+// Hoisted to module scope so `tickUTime` allocates no array each frame (it runs
+// every frame at 60fps; an inline literal here was per-frame GC churn).
+const U_TIME_KEYS = [
+  'payline-glow',
+  'reel-portal',
+  'grid-merge',
+  'crystal-idle',
+  'buy-plasma',
+  'svarka-additive',
+  'win-fire',
+] as const;
 
 // ---- Palette: SHINING-POP crystal-violet — magenta on deep violet (was acid/black) ----
 // Names kept for minimal churn; values repointed to the shining-pop identity (palette.ts).
@@ -131,6 +145,10 @@ export class SlotView extends Component {
    *  consumer must defend with a Graphics fallback (`getEffectMaterial` returns
    *  null when either the material missed or `vfx.materialsEnabled === false`). */
   private effectMaterials: Record<string, Material | null> = {};
+
+  /** Wave 1 — free-running visual metronome (fixed BPM) the later waves quantize
+   *  win/feature reveals to. Created in build(), torn down in onDestroy(). */
+  private beatClock: BeatClock | null = null;
 
   private reels: ReelView[] = [];
   private spinButton: Button | null = null;
@@ -775,6 +793,10 @@ export class SlotView extends Component {
 
     // CC-1 schedule stepper advances u_time on all CCEffect materials + plasma pulse.
     this.schedule(this.tickUTime, 0);
+
+    // Wave 1 — start the visual metronome that later waves quantize reveals to.
+    this.beatClock = new BeatClock();
+    this.beatClock.start();
 
     if (!this.externalControls) {
       this.buildHud();
@@ -1435,6 +1457,28 @@ export class SlotView extends Component {
       .start();
   }
 
+  /** Wave 1 — teardown. SlotView previously had NO onDestroy/onDisable, so its
+   *  persistent schedulers (tickUTime, tickWin, tickSymbolWin, cycleWinLine,
+   *  tickReveal) and the many `repeatForever` tweens across the subtree kept
+   *  ticking after the node was destroyed — the documented 3.8.8 crash where a
+   *  repeatForever tween fires on a freed node. Cancel everything we own. */
+  onDestroy(): void {
+    this.unscheduleAllCallbacks();
+    this.beatClock?.stop();
+    this.beatClock = null;
+    this.stopTweensInSubtree(this.node);
+  }
+
+  /** Recursively `Tween.stopAllByTarget` every node in this view's subtree so no
+   *  child's repeatForever loop survives teardown. Scoped to this.node only — it
+   *  never touches tweens owned by unrelated scene objects. */
+  private stopTweensInSubtree(n: Node | null): void {
+    if (!n || !n.isValid) return;
+    Tween.stopAllByTarget(n);
+    const kids = n.children;
+    for (let i = 0; i < kids.length; i++) this.stopTweensInSubtree(kids[i]);
+  }
+
   /** Schedule stepper: advance the shared u_time uniform on all CCEffect
    *  materials so per-frame shader animation ticks reliably (a plain-object
    *  tween wouldn't tick in the 3.8.8 web runtime). Also pulse-scales the
@@ -1442,16 +1486,7 @@ export class SlotView extends Component {
   private tickUTime = (dt: number): void => {
     this.uTime += dt;
     if (VIEW_CONFIG.vfx.materialsEnabled) {
-      const keys = [
-        'payline-glow',
-        'reel-portal',
-        'grid-merge',
-        'crystal-idle',
-        'buy-plasma',
-        'svarka-additive',
-        'win-fire',
-      ];
-      for (const k of keys) {
+      for (const k of U_TIME_KEYS) {
         const m = (this as any).effectMaterials?.[k];
         if (m && typeof m.setProperty === 'function') {
           try {

@@ -127,3 +127,34 @@ against a build for a punch-list) · `casino-ui-ux-audit` (30-point bar/HUD) ·
 4. `pull --rebase --autostash` → commit (BOM-free file, lowercase subject) →
    push. Update the parity plan row.
 5. Repeat. Keep 44+ tests green and the console silent.
+
+## 9. Live session note — 2026-06-13 (per-symbol WIN identity)
+
+Another session added **per-symbol win identity** to v2's symbol win highlight
+(VISUAL ONLY — math untouched, nothing removed, purely additive):
+
+- `view/view-config.ts` → new `win.symbolProfiles` (per-id
+  `{intensity, pulseMul, burstMul}`; Wild=0 hottest/biggest, H1–H4 graded,
+  L1–L5 inherit `base` = visually unchanged).
+- `view/symbol-view.ts` → `static winProfile(id)`; `playWin()` scales the attack
+  pop + glow opacity/scale by the symbol's profile; `flashWildLand()` is now a
+  multi-stage punch→settle→overshoot with a profile-scaled glow.
+- Reason: every symbol previously got the SAME win reaction — now a Wild win
+  reads hotter/bigger than a low-symbol win. Extends the existing tier-weight
+  idea (`idleAmp` already differs by tier). `dim-the-losers` already existed —
+  left as-is.
+- Verified: `npx tsc --noEmit` clean in both files (engine `.d.ts` noise
+  unchanged); `git status` shows only these 2 files modified. **Uncommitted**
+  (commit-sweep will carry them — verify by content grep). NOT visually verified
+  here (no Playwright in repo): confirm via `?debug=1` → `__v2.spin()` until a
+  win, or a headless build.
+- Don't rebuild this; tune the `symbolProfiles` numbers if a tier feels off.
+
+**2026-06-14 follow-up (HERO coin geyser):** the Epic-ceremony `coinGeyser` (was a
+flat ballistic spray) is now staged hero coins — each pops, arcs up-and-out,
+decel-spins (catching the additive light), then falls + shrinks; per-coin stagger
+reads as a shower. Files: `view/particle-layer.ts` (`coinGeyser` + new `heroCoin`)
+
+- `view/view-config.ts` (`particles.coin` staging params). FINITE spins (pool-safe,
+  no `repeatForever`); opacity outlives motion so `pool.put` fires once. `tsc` clean.
+  **Uncommitted.** Visible only on Epic (100×+) — fire via `?debug=1` → `__v2.ceremony(120, wilds)`. Tune in `particles.coin`.

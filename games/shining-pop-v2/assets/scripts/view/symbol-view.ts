@@ -196,13 +196,28 @@ export class SymbolView extends Component {
     this.burstUpgraded = true;
   }
 
+  /** Per-symbol-id WIN profile (presentation only). Higher-tier symbols react
+   *  hotter/bigger; unlisted ids fall back to `base`. */
+  static winProfile(id: number): { intensity: number; pulseMul: number; burstMul: number } {
+    const p = VIEW_CONFIG.win.symbolProfiles as Record<
+      string,
+      { intensity: number; pulseMul: number; burstMul: number }
+    >;
+    return p[id] ?? p.base;
+  }
+
   playWin(delay = 0, rich = true, winMat: Material | null = null): void {
     this.ensureBurst();
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
+    // PER-SYMBOL WIN IDENTITY — scale the winning symbol's reaction by its tier
+    // profile (Wild hottest/biggest → low symbols restrained) so a Wild win FEELS
+    // different from a 10's win, instead of one uniform pulse. Additive over the
+    // shared glow/burst envelopes; base ids are unchanged. Presentation only.
+    const prof = SymbolView.winProfile(this._currentId);
     const half = symbolPulseMs / 2 / 1000; // ms → s, two halves
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
-    const pop = symbolPulseScale + 0.12; // first beat overshoots → the win has an attack
+    const pop = 1 + (symbolPulseScale + 0.12 - 1) * prof.pulseMul; // attack overshoot, per-symbol
     const bnc = VIEW_CONFIG.win.winBounceLoop;
     // JELLY wobble: wide-and-short ↔ narrow-and-tall (axes in opposition) — the
     // candy "yummy" squash-and-stretch, not a uniform scale pulse.
@@ -233,16 +248,19 @@ export class SymbolView extends Component {
       this.glowOp.opacity = 0;
       // SHINING loop: the warm radial glow breathes behind the symbol FOREVER
       // (was repeat(3)) — pairs with the shader rim/sweep for a sustained shine.
+      const glowHi = Math.min(255, 200 * prof.intensity);
+      const glowLo = Math.min(255, 70 * prof.intensity);
+      const glowScale = 1 + 0.35 * prof.burstMul;
       tween(this.glowOp)
         .delay(delay)
-        .to(half, { opacity: 200 })
-        .to(half, { opacity: 70 })
+        .to(half, { opacity: glowHi })
+        .to(half, { opacity: glowLo })
         .union()
         .repeatForever()
         .start();
       tween(this.glow)
         .delay(delay)
-        .to(half, { scale: new Vec3(1.35, 1.35, 1) }, { easing: 'quadOut' })
+        .to(half, { scale: new Vec3(glowScale, glowScale, 1) }, { easing: 'quadOut' })
         .to(half, { scale: new Vec3(0.95, 0.95, 1) }, { easing: 'quadIn' })
         .union()
         .repeatForever()
@@ -423,22 +441,29 @@ export class SymbolView extends Component {
    *  Distinct from playWin (sustained pulse) — this is the "it just hit" beat. */
   flashWildLand(delay = 0): void {
     this.ensureBurst(); // shader burst, never the banded Graphics circles
+    const prof = SymbolView.winProfile(this._currentId); // wild row → wild profile
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
+    // MULTI-STAGE WILD LAND — punch → settle → a secondary overshoot beat, so the
+    // strike reads as a living "it just hit" reaction, not a single pop.
     tween(this.node)
       .delay(delay)
       .to(0.09, { scale: new Vec3(1.26, 1.26, 1) }, { easing: 'quadOut' })
-      .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .to(0.16, { scale: new Vec3(0.98, 0.98, 1) }, { easing: 'quadIn' })
+      .to(0.14, { scale: new Vec3(1.06, 1.06, 1) }, { easing: 'backOut' })
+      .to(0.12, { scale: new Vec3(1, 1, 1) }, { easing: 'quadIn' })
       .start();
     if (this.glow && this.glowOp) {
       Tween.stopAllByTarget(this.glow);
       Tween.stopAllByTarget(this.glowOp);
       this.glow.setScale(0.7, 0.7, 1);
       this.glowOp.opacity = 0;
-      tween(this.glowOp).delay(delay).to(0.07, { opacity: 235 }).to(0.3, { opacity: 0 }).start();
+      const hi = Math.min(255, 235 * prof.intensity);
+      const gScale = 1 + 0.5 * prof.burstMul;
+      tween(this.glowOp).delay(delay).to(0.07, { opacity: hi }).to(0.3, { opacity: 0 }).start();
       tween(this.glow)
         .delay(delay)
-        .to(0.34, { scale: new Vec3(1.5, 1.5, 1) }, { easing: 'quadOut' })
+        .to(0.34, { scale: new Vec3(gScale, gScale, 1) }, { easing: 'quadOut' })
         .start();
     }
   }
