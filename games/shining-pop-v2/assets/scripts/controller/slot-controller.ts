@@ -130,6 +130,7 @@ export class SlotController extends Component {
     this.view.buildIntro(() => {
       this.introActive = false;
       this.view.wipe('intro', 1, 1.15);
+      this.view.cinematicBloom(0.72);
       if (this.barNode && this.barNode.isValid) this.barNode.active = true;
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');

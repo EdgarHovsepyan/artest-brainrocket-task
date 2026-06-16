@@ -2929,6 +2929,16 @@ export class SlotView extends Component {
       .repeatForever()
       .start();
 
+    const logoGlow = this.mkNode('introLogoGlow', 660, 330, ov);
+    logoGlow.setPosition(0, 76, 0);
+    const lgSp = logoGlow.addComponent(Sprite);
+    lgSp.sizeMode = Sprite.SizeMode.CUSTOM;
+    lgSp.type = Sprite.Type.SIMPLE;
+    lgSp.spriteFrame = this.getRadialFrame();
+    lgSp.color = new Color(255, 150, 212, 255);
+    const lgOp = logoGlow.addComponent(UIOpacity);
+    lgOp.opacity = 0;
+
     const logoNode = this.mkNode('introLogo', 440, 276, ov);
     logoNode.setPosition(0, 70, 0);
     const logoOp = logoNode.addComponent(UIOpacity);
@@ -2948,6 +2958,18 @@ export class SlotView extends Component {
     tween(logoNode)
       .to(0.55, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .call(() => {
+        tween(lgOp)
+          .to(0.12, { opacity: 215 }, { easing: 'quadOut' })
+          .to(0.6, { opacity: 110 }, { easing: 'sineInOut' })
+          .call(() => {
+            tween(lgOp)
+              .to(1.6, { opacity: 150 }, { easing: 'sineInOut' })
+              .to(1.6, { opacity: 110 }, { easing: 'sineInOut' })
+              .union()
+              .repeatForever()
+              .start();
+          })
+          .start();
         tween(logoNode)
           .to(1.8, { scale: new Vec3(1.035, 1.035, 1) }, { easing: 'sineInOut' })
           .to(1.8, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
