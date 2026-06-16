@@ -3005,13 +3005,43 @@ export class SlotView extends Component {
   }
 
   setBalance(cents: number): void {
-    if (this.balanceLabel) this.balanceLabel.string = fmt(cents);
+    if (!this.balanceLabel) return;
+    const prev = this.lastBalanceCents;
+    this.lastBalanceCents = cents;
+    this.balanceLabel.string = fmt(cents);
+    // Wave 2 — punch on a real change only; never on the first set (boot) so the
+    // HUD doesn't pop on load. (prev is NaN until the first value lands.)
+    if (!Number.isNaN(prev) && cents !== prev) this.pulseLabel(this.balanceLabel);
   }
   setBet(cents: number): void {
-    if (this.betLabel) this.betLabel.string = fmt(cents);
+    if (!this.betLabel) return;
+    const prev = this.lastBetCents;
+    this.lastBetCents = cents;
+    this.betLabel.string = fmt(cents);
+    if (!Number.isNaN(prev) && cents !== prev) this.pulseLabel(this.betLabel);
   }
   setWin(cents: number): void {
+    // NOTE: called every frame by the count-up — must stay a bare write. The
+    // land punch fires once from tickWin's completion branch, not here.
     if (this.winLabel) this.winLabel.string = fmt(cents);
+  }
+
+  /** Wave 2 — a brief "punch" on a HUD readout when its value changes, so the
+   *  balance / bet / win feel alive instead of snapping. Tween.stopAllByTarget
+   *  lets rapid successive changes re-trigger cleanly. Honors reducedFx (instant,
+   *  no scale animation). */
+  private pulseLabel(label: Label | null, up = 1.16): void {
+    if (!label) return;
+    const n = label.node;
+    Tween.stopAllByTarget(n);
+    if (this.reducedFx) {
+      n.setScale(1, 1, 1);
+      return;
+    }
+    n.setScale(up, up, 1);
+    tween(n)
+      .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .start();
   }
 
   /** Transient banner (e.g. "WILD ×3", bonus name). Empty string clears. */
@@ -3352,6 +3382,9 @@ export class SlotView extends Component {
   private winCountDur = 1;
   private winCountElapsed = 0;
   private winCountLastTick = 0;
+  // Wave 2 — last rendered HUD values, so balance/bet only punch on real change.
+  private lastBalanceCents = NaN;
+  private lastBetCents = NaN;
 
   /** Kinetic count-up of the win amount, with audio ticks. */
   countUp(toCents: number): void {
@@ -3372,7 +3405,9 @@ export class SlotView extends Component {
   private tickWin = (dt: number): void => {
     this.winCountElapsed += dt;
     const p = Math.min(1, this.winCountElapsed / this.winCountDur);
-    const v = Math.round(this.winCountTo * p);
+    // Wave 2 — quartOut so the number rushes then settles (was a flat linear roll).
+    const e = 1 - Math.pow(1 - p, 4);
+    const v = Math.round(this.winCountTo * e);
     this.setWin(v);
     if (p - this.winCountLastTick > 0.12) {
       this.winCountLastTick = p;
@@ -3381,6 +3416,8 @@ export class SlotView extends Component {
     if (p >= 1) {
       this.unschedule(this.tickWin);
       this.setWin(this.winCountTo);
+      // Wave 2 — land the final number with a single punch (not per frame).
+      this.pulseLabel(this.winLabel, 1.22);
     }
   };
 
