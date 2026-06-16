@@ -277,6 +277,14 @@ export class SlotView extends Component {
         }),
       ),
     );
+    jobs.push(
+      new Promise<void>((res) =>
+        resources.load(`sym/sym_l4_j_win/spriteFrame`, SpriteFrame, (err, sf) => {
+          if (!err && sf) SymbolView.scatterWinFrame = sf;
+          res();
+        }),
+      ),
+    );
     ['spin_idle', 'spin_active'].forEach((name) => {
       jobs.push(
         new Promise<void>((res) =>

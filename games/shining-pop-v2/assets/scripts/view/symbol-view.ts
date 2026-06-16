@@ -61,6 +61,7 @@ export class SymbolView extends Component {
   static fxWhiteFrame: SpriteFrame | null = null;
   static fxRadialFrame: SpriteFrame | null = null;
   static wildWinFrame: SpriteFrame | null = null;
+  static scatterWinFrame: SpriteFrame | null = null;
   private wildFaceSwapped = false;
 
   static fxHaloMat: Material | null = null;
@@ -411,16 +412,20 @@ export class SymbolView extends Component {
   }
 
   private swapWildWinFace(delay: number): void {
-    if (this._currentId !== SYMBOLS.WILD || !this.sprite) return;
-    const winF = SymbolView.wildWinFrame;
+    if (!this.sprite) return;
+    const isWild = this._currentId === SYMBOLS.WILD;
+    const isScat = this._currentId === 8;
+    if (!isWild && !isScat) return;
+    const winF = isWild ? SymbolView.wildWinFrame : SymbolView.scatterWinFrame;
     if (!winF) {
-      this.showHappyFace(delay);
+      if (isWild) this.showHappyFace(delay);
       return;
     }
     this.wildFaceSwapped = true;
     this.scheduleOnce(
       () => {
-        if (this.wildFaceSwapped && this._currentId === SYMBOLS.WILD && this.sprite) {
+        const id = this._currentId;
+        if (this.wildFaceSwapped && (id === SYMBOLS.WILD || id === 8) && this.sprite) {
           this.sprite.spriteFrame = winF;
         }
       },
@@ -714,8 +719,8 @@ export class SymbolView extends Component {
     this.node.eulerAngles = new Vec3(0, 0, 0);
     if (this.wildFaceSwapped) {
       this.wildFaceSwapped = false;
-      if (this.sprite && this._currentId === SYMBOLS.WILD) {
-        this.sprite.spriteFrame = this.frames[SYMBOLS.WILD] ?? null;
+      if (this.sprite && (this._currentId === SYMBOLS.WILD || this._currentId === 8)) {
+        this.sprite.spriteFrame = this.frames[this._currentId] ?? null;
       }
     }
     this.hideHappyFace();
