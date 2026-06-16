@@ -2371,7 +2371,19 @@ export class SlotView extends Component {
       });
       let y = top - 28;
       for (const row of paytableRows()) {
-        this.mkLabel(row.name, -w / 2 + info.leftMargin, y, 12, MUTED, panel).horizontalAlign =
+        // Symbol-art THUMBNAIL per row (reuses the loaded frames, same pattern as
+        // the intro peek). The rows used to be name-text only, which read as
+        // crushed/templated; the art makes each pay row instantly legible.
+        const thumb = this.mkNode('ptThumb', 26, 26, panel);
+        thumb.setPosition(-w / 2 + info.leftMargin + 13, y - 5, 0);
+        const sf = this.frames[row.id];
+        if (sf) {
+          const sp = thumb.addComponent(Sprite);
+          sp.sizeMode = Sprite.SizeMode.CUSTOM;
+          sp.type = Sprite.Type.SIMPLE;
+          sp.spriteFrame = sf;
+        }
+        this.mkLabel(row.name, -w / 2 + info.leftMargin + 34, y, 12, MUTED, panel).horizontalAlign =
           Label.HorizontalAlign.LEFT;
         [row.pay3, row.pay4, row.pay5].forEach((pay, i) => {
           const v = this.mkLabel(String(pay), w / 2 - 170 + i * 62, y, 12, MUTED, panel);
