@@ -6,8 +6,9 @@
    already loads (public/assets/audio/<id>.mp3) — so the upgrade is picked up
    with ZERO game-code changes (the Sound manager loads by filename/manifest).
 
-   Style: dark elegant crystal/gem casino, magenta "villain" mood, premium,
-   clean dry mix (SFX carry no music bed). Durations match manifest.json.
+   Style: bright HAPPY candy-pop arcade casino, juicy and satisfying, feel-good
+   and celebratory, premium clean dry mix (SFX carry no music bed). Durations
+   match manifest.json.
 
    The API key is read from a file OUTSIDE the repo (never committed):
      C:\\Users\\edgar\\AppData\\Local\\Temp\\el.key
@@ -23,36 +24,36 @@ const AUDIO_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 
 const ENDPOINT = 'https://api.elevenlabs.io/v1/sound-generation';
 
 // Shared style anchor so the whole bank is cohesive.
-const STYLE = 'dark elegant crystal-gem casino slot, magenta villain mood, premium, clean dry mix, no music bed';
+const STYLE = 'bright happy candy-pop arcade casino slot, juicy and satisfying, feel-good celebratory, premium, clean dry mix, no music bed';
 
 // id → { dur (s), prompt, influence }. dur matches manifest; clamped to >=0.5.
 const BANK = {
-  spin_start:      { dur: 0.6, prompt: `magical reel launch whoosh, crystalline shimmer rising, short snappy, ${STYLE}` },
-  reel_stop:       { dur: 0.5, prompt: `crisp gem reel-stop click with a soft glassy thud, tight, ${STYLE}` },
-  win_small:       { dur: 0.8, prompt: `gentle pleasant small-win sparkle chime, light, ${STYLE}` },
-  win_nice:        { dur: 1.2, prompt: `bright crystalline nice-win flourish, uplifting bell cascade, ${STYLE}` },
-  win_big:         { dur: 1.7, prompt: `triumphant big-win fanfare, gem shimmer + warm brass swell, magenta energy, cinematic` },
-  win_mega:        { dur: 2.1, prompt: `huge epic mega-win orchestral stinger, choir hit + crystal cascade + deep bass, cinematic, magenta villain grandeur` },
-  win_epic:        { dur: 2.6, prompt: `massive cinematic EPIC win explosion, full choir + brass braam + sub bass + shattering crystal cascade, awe, magenta villain` },
-  scatter_tick:    { dur: 0.6, prompt: `rising crystalline scatter anticipation tick, pitched-up sparkle, tension, ${STYLE}` },
-  scatter_trigger: { dur: 2.0, prompt: `magical scatter trigger, portal opening burst with shimmering crystal swell, ${STYLE}` },
-  wild_land:       { dur: 0.9, prompt: `heavy magical wild crystal slam landing, weighty impact + shimmer tail, ${STYLE}` },
-  wild_expand:     { dur: 1.2, prompt: `wild expanding shimmer sweep, energy stretching across, ${STYLE}` },
-  buy_open:        { dur: 0.8, prompt: `premium menu open swoosh, glassy crystal whoosh, ${STYLE}` },
-  buy_confirm:     { dur: 1.2, prompt: `confident purchase confirm chime, rewarding gem ka-ching, ${STYLE}` },
-  buy_select:      { dur: 0.5, prompt: `crisp tier select tick, glassy confirm, ${STYLE}` },
-  mult_reveal:     { dur: 0.8, prompt: `multiplier reveal sparkle pop, bright magical accent, ${STYLE}` },
-  retrigger:       { dur: 1.0, prompt: `free-spins retrigger fanfare, exciting crystal bell burst, ${STYLE}` },
-  anticipation:    { dur: 2.6, prompt: `tense rising anticipation drone with shimmering crystal swell, building suspense, ${STYLE}` },
-  near_miss:       { dur: 0.8, prompt: `near-miss tension sting, suspended unresolved shimmer, ${STYLE}` },
-  impact_braam:    { dur: 1.0, prompt: `deep cinematic braam impact hit, dark powerful, magenta villain` },
-  shake_thud:      { dur: 0.5, prompt: `heavy low screen-shake thud impact, punchy, ${STYLE}` },
-  sticky_lock:     { dur: 0.9, prompt: `sticky symbol lock-in, satisfying crystal clunk + magical seal, ${STYLE}` },
-  bonus_intro:     { dur: 1.5, prompt: `dramatic free-spins bonus start braam, dark majestic crystal reveal, magenta villain, cinematic` },
-  bonus_end:       { dur: 2.0, prompt: `free-spins bonus end resolve, triumphant warm wind-down with shimmer, cinematic` },
-  transition_in:   { dur: 1.5, prompt: `whoosh transition into bonus, crystal portal sweep with rising energy, cinematic` },
-  ui_modal_open:   { dur: 0.7, prompt: `soft premium modal open, glassy crystal rise, ${STYLE}` },
-  ui_modal_close:  { dur: 0.55, prompt: `soft premium modal close, glassy crystal descend, ${STYLE}` },
+  spin_start:      { dur: 0.6, prompt: `playful reel launch whoosh, bubbly candy shimmer rising, short snappy and fun, ${STYLE}` },
+  reel_stop:       { dur: 0.5, prompt: `crisp juicy reel-stop pop with a soft bouncy thud, tight and satisfying, ${STYLE}` },
+  win_small:       { dur: 0.8, prompt: `cute pleasant small-win sparkle chime, light and happy, ${STYLE}` },
+  win_nice:        { dur: 1.2, prompt: `bright cheerful nice-win flourish, uplifting candy bell cascade, ${STYLE}` },
+  win_big:         { dur: 1.7, prompt: `triumphant happy big-win fanfare, bright pop chord + sparkling bells + celebratory whoosh, danceable, joyful` },
+  win_mega:        { dur: 2.1, prompt: `huge euphoric mega-win stinger, party horns + sparkling cascade + punchy bass, exciting dance-pop celebration, bright major key` },
+  win_epic:        { dur: 2.6, prompt: `massive EPIC happy-win celebration, full euphoric dance-pop drop with cheering, party brass + glittering arpeggio cascade + big kick, pure joy and hype` },
+  scatter_tick:    { dur: 0.6, prompt: `rising bright scatter anticipation tick, pitched-up bubbly sparkle, fun tension, ${STYLE}` },
+  scatter_trigger: { dur: 2.0, prompt: `joyful scatter trigger, bright portal burst with happy sparkle swell, ${STYLE}` },
+  wild_land:       { dur: 0.9, prompt: `bouncy juicy wild candy slam landing, satisfying squishy impact + sparkle tail, ${STYLE}` },
+  wild_expand:     { dur: 1.2, prompt: `wild expanding bubbly shimmer sweep, fun energy stretching across, ${STYLE}` },
+  buy_open:        { dur: 0.8, prompt: `bright fun menu open swoosh, bubbly candy whoosh, ${STYLE}` },
+  buy_confirm:     { dur: 1.2, prompt: `confident happy purchase confirm chime, rewarding bright ka-ching, ${STYLE}` },
+  buy_select:      { dur: 0.5, prompt: `crisp bubbly tier select tick, juicy confirm, ${STYLE}` },
+  mult_reveal:     { dur: 0.8, prompt: `multiplier reveal sparkle pop, bright happy accent, ${STYLE}` },
+  retrigger:       { dur: 1.0, prompt: `free-spins retrigger fanfare, exciting bright candy bell burst, party energy, ${STYLE}` },
+  anticipation:    { dur: 2.6, prompt: `playful rising anticipation build with bubbly bright swell, fun building excitement, ${STYLE}` },
+  near_miss:       { dur: 0.8, prompt: `near-miss tease sting, suspended bright unresolved sparkle, fun not scary, ${STYLE}` },
+  impact_braam:    { dur: 1.0, prompt: `big punchy celebratory impact hit, bright and powerful party boom, joyful` },
+  shake_thud:      { dur: 0.5, prompt: `punchy low bouncy thud impact, satisfying, ${STYLE}` },
+  sticky_lock:     { dur: 0.9, prompt: `sticky symbol lock-in, satisfying juicy candy clunk + happy seal, ${STYLE}` },
+  bonus_intro:     { dur: 1.5, prompt: `exciting free-spins bonus start fanfare, bright joyful reveal with party energy, celebratory` },
+  bonus_end:       { dur: 2.0, prompt: `free-spins bonus end resolve, happy warm celebratory wind-down with sparkle, joyful` },
+  transition_in:   { dur: 1.5, prompt: `fun whoosh transition into bonus, bright candy portal sweep with rising party energy` },
+  ui_modal_open:   { dur: 0.7, prompt: `soft bright modal open, bubbly candy rise, ${STYLE}` },
+  ui_modal_close:  { dur: 0.55, prompt: `soft bright modal close, bubbly candy descend, ${STYLE}` },
 };
 
 async function gen(id, key) {

@@ -1,14 +1,14 @@
 /* ============================================================================
-   ARTEST | BrainRocket — ElevenLabs ELEGANT music + celebration generator
+   ARTEST | BrainRocket — ElevenLabs HAPPY-DANCE casino music + celebration gen
    ----------------------------------------------------------------------------
-   The bg loop was a "happy lofi" procedural loop; the brief is ELEGANT, clean,
-   premium casino — dark crystal-cathedral mood, classy not cheerful. Generates
-   seamless-ish music loops via the Music API + elegant win/intro stings via the
-   sound-generation API, written into public/assets/audio/.
+   Brief: an ACTIVE, looping, FEEL-GOOD casino vibe — upbeat happy dance/house
+   groove, bouncy candy-pop energy that makes you want to keep spinning (NOT the
+   old dark "elegant villain" mood). Generates seamless music loops via the Music
+   API + celebratory win/intro stings via the sound-generation API, into
+   public/assets/audio/.
 
-   Loops are saved as <id>.mp3 (wired to the Sound loader as mp3 loops in a
-   follow-up — the .wav originals stay until then). Key read from the out-of-repo
-   file (never committed). Run: node scripts/gen-eleven-music.mjs [ids...]
+   Loops are saved as <id>.mp3. Key read from the out-of-repo file (never
+   committed). Run: node scripts/gen-eleven-music.mjs [ids...]
    ============================================================================ */
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -19,19 +19,51 @@ const AUDIO_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 
 const SFX = 'https://api.elevenlabs.io/v1/sound-generation';
 const MUSIC = 'https://api.elevenlabs.io/v1/music';
 
-// loops via Music API (ms); elegant + premium, classy not cheerful.
+// loops via Music API (ms); upbeat, happy, danceable casino — keep-you-playing groove.
 const LOOPS = {
-  main_base_loop: { ms: 26000, prompt: 'Elegant refined casino slot background music, dark crystalline cathedral atmosphere, sophisticated and hypnotic, slow evolving warm pads with subtle shimmering crystal bells and deep cinematic bass, premium and immersive, classy and restrained (NOT cheerful, NOT lofi), magenta-violet villain mood, seamless loop.' },
-  bonus_loop:     { ms: 24000, prompt: 'Elegant intense free-spins casino music, driving crystalline energy, premium cinematic electronic-orchestral, sophisticated pulsing rhythm with shimmering arpeggios and powerful bass, building excitement, classy and high-end, magenta-violet mood, seamless loop.' },
+  main_base_loop: {
+    ms: 26000,
+    prompt:
+      'Upbeat happy casino slot background music, feel-good dance-pop groove, bouncy four-on-the-floor house beat at ~120 BPM, bright cheerful plucky synths and shimmering bells, candy-pop arcade energy, warm sub bass and crisp claps, infectious and danceable, joyful and addictive (makes you want to keep spinning), major key, clean and premium, seamless loop.',
+  },
+  bonus_loop: {
+    ms: 24000,
+    prompt:
+      'High-energy euphoric free-spins casino dance music, driving festival EDM groove at ~128 BPM, pumping four-on-the-floor kick, uplifting supersaw chords and sparkling arpeggios, party hype and celebration, bright happy and exciting, candy-pop colors, punchy and danceable, major key, premium, seamless loop.',
+  },
 };
-// elegant stings via SFX API (s)
+// celebratory stings via SFX API (s) — happy, bright, party energy.
 const STINGS = {
-  main_intro:   { dur: 4.0, prompt: 'Elegant cinematic slot intro sting, crystalline reveal swell rising to a refined chime, premium, classy, magenta-violet crystal mood' },
-  main_tension: { dur: 4.0, prompt: 'Elegant rising tension musical bed, suspenseful crystalline build, cinematic, refined' },
-  main_bigwin:  { dur: 5.0, prompt: 'Elegant triumphant big-win musical swell, cinematic orchestral with crystal shimmer and warm brass, celebratory but classy and premium' },
-  win_big:      { dur: 1.7, prompt: 'Elegant big-win flourish, refined orchestral crystal shimmer + warm swell, premium, classy, magenta mood' },
-  win_mega:     { dur: 2.1, prompt: 'Elegant mega-win orchestral stinger, sophisticated choir + crystal cascade + cinematic bass, grand but refined, premium' },
-  win_epic:     { dur: 2.6, prompt: 'Elegant EPIC win cinematic crescendo, full refined orchestra + choir + shimmering crystal cascade, awe and grandeur, classy premium magenta-villain' },
+  main_intro: {
+    dur: 4.0,
+    prompt:
+      'Upbeat happy casino intro sting, bright cheerful rising chime swell into a joyful pop fanfare, sparkling and inviting, candy-pop dance energy, major key, premium',
+  },
+  main_tension: {
+    dur: 4.0,
+    prompt:
+      'Playful rising excitement musical bed, bright bouncy anticipation build, happy and energetic dance-pop, climbing arpeggio, fun not scary',
+  },
+  main_bigwin: {
+    dur: 5.0,
+    prompt:
+      'Triumphant happy big-win musical swell, euphoric dance-pop celebration with bright brass stabs, sparkling bells and a four-on-the-floor groove, party hype, joyful and uplifting, premium',
+  },
+  win_big: {
+    dur: 1.7,
+    prompt:
+      'Happy big-win flourish, bright cheerful pop chord stab with shimmering bells and a celebratory whoosh, danceable, joyful, premium',
+  },
+  win_mega: {
+    dur: 2.1,
+    prompt:
+      'Euphoric mega-win stinger, uplifting dance-pop hit with party horns, sparkling cascade and punchy bass, exciting and celebratory, bright major key, premium',
+  },
+  win_epic: {
+    dur: 2.6,
+    prompt:
+      'EPIC happy-win celebration crescendo, full euphoric dance-pop drop with cheering energy, party brass, glittering arpeggio cascade and big kick, pure joy and hype, bright major key, premium',
+  },
 };
 
 async function genMusic(id, key) {
