@@ -16,9 +16,9 @@ CCEffect %{
   - passes:
     - vert: sprite-vs:vert
       frag: sprite-fs:frag
-      depthStencilState:
-        depthTest: false
-        depthWrite: false
+      # NOTE: no explicit depthStencilState — let the 2D StencilManager own it so
+      # this overlay is CLIPPED by the per-reel Mask (matches soft-burst.effect).
+      # depthTest:false is the 2D default, so visuals are otherwise unchanged.
       blendState:
         targets:
         - blend: true

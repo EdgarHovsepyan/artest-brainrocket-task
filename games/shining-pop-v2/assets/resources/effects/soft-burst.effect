@@ -11,9 +11,11 @@ CCEffect %{
   - passes:
     - vert: sprite-vs:vert
       frag: sprite-fs:frag
-      depthStencilState:
-        depthTest: false
-        depthWrite: false
+      # NOTE: no explicit depthStencilState — let Cocos' 2D StencilManager own the
+      # depth+stencil state so this additive glow is CLIPPED by the per-reel Mask.
+      # Hard-declaring it (depthTest/Write only) made the oversized win glow escape
+      # the reel window on the top/bottom rows ("symbols jumping out of the reels").
+      # depthTest:false is already the 2D default, so visuals are otherwise unchanged.
       blendState:
         targets:
         - blend: true
