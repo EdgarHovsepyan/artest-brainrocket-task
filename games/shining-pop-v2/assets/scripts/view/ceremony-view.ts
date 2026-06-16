@@ -83,19 +83,9 @@ export class CeremonyView extends Component {
     const dimNode = this.mk('dim', 4000, 4000, this.node);
     const dg = dimNode.addComponent(Graphics);
 
-    dg.fillColor = new Color(6, 3, 13, 142);
+    dg.fillColor = new Color(6, 3, 13, 150);
     dg.rect(-2000, -2000, 4000, 4000);
     dg.fill();
-    const RINGS = 16;
-    for (let i = 0; i < RINGS; i++) {
-      const t = i / (RINGS - 1);
-      const half = 2000 - t * 1640;
-      const a = Math.round((1 - t) * (1 - t) * 46);
-      dg.lineWidth = 150;
-      dg.strokeColor = new Color(5, 2, 11, a);
-      dg.rect(-half, -half, half * 2, half * 2);
-      dg.stroke();
-    }
     this.dim = dimNode.addComponent(UIOpacity);
     this.dim.opacity = 0;
 
@@ -484,25 +474,48 @@ export class CeremonyView extends Component {
     }
     const n = this.lightBurst;
     const op = this.lightBurstOp;
+    const mat = this.burstMat;
     if (!op) return;
     if (this.lightBurstSp) {
       this.lightBurstSp.color = new Color(
-        Math.min(255, col.r + 70),
-        Math.min(255, col.g + 70),
-        Math.min(255, col.b + 70),
+        Math.min(255, col.r + 30),
+        Math.min(255, col.g + 30),
+        Math.min(255, col.b + 30),
         255,
       );
     }
     Tween.stopAllByTarget(n);
     Tween.stopAllByTarget(op);
     n.active = true;
-    n.setScale(0.4, 0.4, 1);
-    op.opacity = 235;
+    n.setScale(0.7, 0.7, 1);
+    op.opacity = 255;
+    try {
+      mat.setProperty('u_progress', 0);
+      mat.setProperty('u_time', 0);
+    } catch {
+      /* fallback material may lack these props */
+    }
     tween(n)
-      .to(0.55, { scale: new Vec3(2.9, 2.9, 1) }, { easing: 'quadOut' })
+      .to(0.62, { scale: new Vec3(2.05, 2.05, 1) }, { easing: 'quadOut' })
       .start();
-    tween(op)
-      .to(0.55, { opacity: 0 }, { easing: 'quadIn' })
+    // Drive the shader: bloom the hot core out then dissolve, caustic + sparkles
+    // animating off u_time.
+    const proxy = { t: 0 };
+    tween(proxy)
+      .to(
+        0.62,
+        { t: 1 },
+        {
+          onUpdate: () => {
+            try {
+              mat.setProperty('u_progress', proxy.t);
+              mat.setProperty('u_time', proxy.t * 2.6);
+            } catch {
+              /* no-op */
+            }
+          },
+        },
+      )
       .call(() => {
         if (n.isValid) n.active = false;
       })

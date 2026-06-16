@@ -311,6 +311,7 @@ export class SlotView extends Component {
       'win-fire',
       'symbol-win',
       'win-beam',
+      'unlock-burst',
       'soft-burst',
       'particle-glow',
     ].forEach((key) => {
@@ -904,12 +905,13 @@ export class SlotView extends Component {
 
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);
     this.ceremony.build(this.node);
-    // Hand the ceremony a particle-glow additive material (no rays) for the
-    // shader light-burst on the feature-unlock impact.
-    const pgAsset = this.getEffectMaterial('particle-glow')?.effectAsset;
-    if (pgAsset) {
+    // Hand the ceremony the custom unlock-burst shader (hot core + swirling
+    // candy caustic + sparkle specks) for the feature-unlock impact.
+    const ubAsset = this.getEffectMaterial('unlock-burst')?.effectAsset;
+    if (ubAsset) {
       const bm = new Material();
-      bm.initialize({ effectAsset: pgAsset, defines: { USE_TEXTURE: true } });
+      bm.initialize({ effectAsset: ubAsset, defines: { USE_TEXTURE: true } });
+      bm.setProperty('u_intensity', 1.4);
       this.ceremony.burstMat = bm;
     }
     this.ceremony.burstFrame = this.getWhiteFrame();
