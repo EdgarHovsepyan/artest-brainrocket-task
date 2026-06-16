@@ -414,10 +414,24 @@ export class SlotView extends Component {
     gg.fillColor = new Color(r, g, b, a);
     gg.rect(-1300, -1100, 2600, 2200);
     gg.fill();
-    Tween.stopAllByTarget(this.bonusWashOp!);
-    tween(this.bonusWashOp!)
-      .to(0.45, { opacity: mode === 'idle' ? 0 : 255 }, { easing: 'sineInOut' })
-      .start();
+    const op = this.bonusWashOp!;
+    Tween.stopAllByTarget(op);
+    if (mode === 'idle') {
+      tween(op).to(0.45, { opacity: 0 }, { easing: 'sineInOut' }).start();
+    } else {
+      tween(op)
+        .to(0.45, { opacity: 245 }, { easing: 'sineOut' })
+        .call(() => {
+          tween(op)
+            .to(1.7, { opacity: 205 }, { easing: 'sineInOut' })
+            .to(1.7, { opacity: 245 }, { easing: 'sineInOut' })
+            .union()
+            .repeatForever()
+            .start();
+        })
+        .start();
+      if (!this.reducedFx) this.cinematicBloom(0.6);
+    }
   }
 
   private updateFreeSpinScene(entering: boolean): void {
