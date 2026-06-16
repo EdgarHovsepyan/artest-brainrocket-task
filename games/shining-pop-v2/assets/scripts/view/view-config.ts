@@ -53,12 +53,12 @@ export const VIEW_CONFIG = {
 
       landscapeDockSign: -1,
 
-      portraitScreenX: 0.16,
+      portraitScreenX: 0.2,
       portraitScreenY: 0.2,
 
-      portraitWidthPx: 140,
+      portraitWidthPx: 232,
 
-      portraitBandFrac: 0.6,
+      portraitBandFrac: 0.62,
 
       landscapeScale: 0.78,
     },
@@ -164,10 +164,10 @@ export const VIEW_CONFIG = {
 
     winSustainScale: 1.16,
 
-    // Lift winning symbols out of the reel mask (uncropped, above the frame).
-    // OFF: a tall symbol (the wild) at the bottom row hangs below the frame into
-    // the bar and reads as "moved + empty slot". Pop in place, cropped instead.
-    liftWinSymbols: false,
+    // Lift winning symbols + their FX out of the per-column reel mask so the
+    // win pop/halo/burst are never clipped by the cell bounding box — symbols
+    // render uncropped on the winLift overlay, above the reels, in every state.
+    liftWinSymbols: true,
 
     winTilt: { enabled: true, deg: 13, ms: 540 },
 

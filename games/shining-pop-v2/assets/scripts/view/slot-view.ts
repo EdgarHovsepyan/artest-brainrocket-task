@@ -3461,6 +3461,40 @@ export class SlotView extends Component {
     drawSpan(head + GLINT * 0.3, head + GLINT * 0.7, 3, 210);
   }
 
+  // Light up the N landed scatter symbols (uncropped, lifted) and pop a bold
+  // "N SCATTERS" callout — the player SEES the combo that triggers the bonus.
+  private scatterCallout: Node | null = null;
+  presentScatterTrigger(cells: Array<{ reel: number; row: number }>, count: number): void {
+    if (!cells.length) return;
+    this.clearWins();
+    const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
+    const byReel: number[][] = Array.from({ length: GRID.reels }, () => []);
+    cells.forEach((c) => byReel[c.reel]?.push(c.row));
+    byReel.forEach((rows, reel) => {
+      if (rows.length)
+        this.reels[reel]?.highlight(rows, reel * 0.1, true, winMat, this.winLift, (r) =>
+          this.cellCenter(reel, r),
+        );
+    });
+    this.audio.win(Math.min(5, Math.max(2, count - 1)));
+
+    if (this.scatterCallout?.isValid) this.scatterCallout.destroy();
+    const root = this.mkNode('scatterCallout', this.gw, 200, this.node);
+    root.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    root.setSiblingIndex(this.node.children.length - 1);
+    this.scatterCallout = root;
+    this.mkLabel(`${count} SCATTERS`, 0, 32, 72, new Color(255, 224, 120, 255), root, true);
+    this.mkLabel('FREE SPINS!', 0, -42, 40, new Color(255, 255, 255, 255), root, true);
+    root.setScale(0.5, 0.5, 1);
+    tween(root)
+      .to(0.2, { scale: new Vec3(1.16, 1.16, 1) }, { easing: 'backOut' })
+      .to(0.14, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
+      .start();
+    this.scheduleOnce(() => {
+      if (root.isValid) root.destroy();
+    }, 1.6);
+  }
+
   clearWins(): void {
     this.unschedule(this.cycleWinLine);
     this.unschedule(this.tickReveal);
@@ -3737,8 +3771,12 @@ export class SlotView extends Component {
     return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }
 
-  showFeatureUnlocked(name: string, mode?: 'wilds' | 'crowns' | 'reels'): void {
-    this.ceremony.showFeatureUnlocked(name, mode);
+  showFeatureUnlocked(
+    name: string,
+    mode?: 'wilds' | 'crowns' | 'reels',
+    scatterCount?: number,
+  ): void {
+    this.ceremony.showFeatureUnlocked(name, mode, scatterCount);
   }
 
   burstParticles(result: SpinResult, multiple: number): void {

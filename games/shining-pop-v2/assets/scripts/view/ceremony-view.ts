@@ -43,6 +43,7 @@ export class CeremonyView extends Component {
   private lightBurst: Node | null = null;
   private lightBurstOp: UIOpacity | null = null;
   private lightBurstSp: Sprite | null = null;
+  private unlockBoost = 1;
   private headerLabel!: Label;
   private amountLabel!: Label;
 
@@ -343,14 +344,22 @@ export class CeremonyView extends Component {
     reels: [188, 70, 224],
   };
 
-  showFeatureUnlocked(name: string, mode?: 'wilds' | 'crowns' | 'reels'): void {
+  showFeatureUnlocked(
+    name: string,
+    mode?: 'wilds' | 'crowns' | 'reels',
+    scatterCount?: number,
+  ): void {
     this.abort();
+    // More scatters = a bigger, louder unlock (3 baseline → 5 the biggest).
+    this.unlockBoost = scatterCount
+      ? Math.min(1.32, 1 + (Math.min(5, scatterCount) - 3) * 0.15)
+      : 1;
     const rgb = mode ? CeremonyView.MODE_RGB[mode] : null;
     const modeCol = rgb ? new Color(rgb[0], rgb[1], rgb[2], 255) : TITLE;
     this.headerLabel.string = name;
     this.headerLabel.color = modeCol;
     this.headerLabel.fontSize = 50;
-    this.setAmount('UNLOCKED');
+    this.setAmount(scatterCount ? `${scatterCount} SCATTERS` : 'UNLOCKED');
     this.amountLabel.color = rgb
       ? new Color(
           Math.min(255, rgb[0] + 40),
@@ -499,9 +508,10 @@ export class CeremonyView extends Component {
     } catch {
       /* fallback material may lack these props */
     }
+    const boost = this.unlockBoost;
     tween(n)
-      .to(0.24, { scale: new Vec3(1.32, 1.32, 1) }, { easing: 'backOut' })
-      .to(0.18, { scale: new Vec3(1.2, 1.2, 1) }, { easing: 'sineOut' })
+      .to(0.24, { scale: new Vec3(1.32 * boost, 1.32 * boost, 1) }, { easing: 'backOut' })
+      .to(0.18, { scale: new Vec3(1.2 * boost, 1.2 * boost, 1) }, { easing: 'sineOut' })
       .start();
     // One driver tween over the gummy's whole life: u_time runs continuously for
     // the squishy wobble, u_progress blooms IN, HOLDS so the candy reads, then

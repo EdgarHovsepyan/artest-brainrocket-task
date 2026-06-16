@@ -37,7 +37,14 @@ import {
 } from '../logic/compliance';
 import { formatMoney } from '../logic/money';
 import { installLifecycle, LifecycleHandle } from './lifecycle';
-import { BONUS_MODES, BONUS_MODES_BY_VALUE, BonusMode, SETTINGS } from '../logic/game-config';
+import {
+  BONUS_MODES,
+  BONUS_MODES_BY_VALUE,
+  BonusMode,
+  SCATTER,
+  SCATTER_FS_MODE,
+  SETTINGS,
+} from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
 
@@ -483,11 +490,6 @@ export class SlotController extends Component {
     this.state = 'resolving';
     if (outcome.wildStrike > 1) this.view.setBanner(`WILD ×${outcome.wildStrike}`);
 
-    if (outcome.freeSpins) {
-      this.view.wipe('fs', 1, 1.1);
-      this.view.showFeatureUnlocked('FREE SPINS');
-      this.view.setBanner(`FREE SPINS ×${outcome.result.freeSpins}`);
-    }
     if (outcome.winCents > 0) {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
@@ -501,6 +503,23 @@ export class SlotController extends Component {
         const tier = mult >= 50 ? 5 : mult >= 30 ? 4 : mult >= 10 ? 3 : mult >= 2 ? 2 : 1;
         this.view.audio.win(tier);
       }
+    }
+
+    if (outcome.freeSpins) {
+      // Show the scatter combo that triggered the bonus: light up the landed
+      // scatters + a count callout, hold, then the cinematic unlock transition.
+      const grid = outcome.result.grid;
+      const sc = outcome.result.scatters;
+      const cells: Array<{ reel: number; row: number }> = [];
+      for (let r = 0; r < grid.length; r++)
+        for (let w = 0; w < grid[r]!.length; w++)
+          if (grid[r]![w] === SCATTER) cells.push({ reel: r, row: w });
+      this.view.presentScatterTrigger(cells, sc);
+      await this.wait(1150);
+      this.view.wipe('fs', 1, 1.1);
+      this.view.clearWins();
+      this.view.showFeatureUnlocked('FREE SPINS', SCATTER_FS_MODE, sc);
+      this.view.setBanner(`FREE SPINS ×${outcome.result.freeSpins}`);
     }
 
     this.session = recordSpin(this.session, outcome.betCents, outcome.winCents);
