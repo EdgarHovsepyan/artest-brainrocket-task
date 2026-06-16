@@ -37,7 +37,7 @@ This is built to an **awards-tier** bar, not a template floor:
 - 🍬 **Material, not decoration** — peppermint candy-material win line (GLSL specular gloss), symbol-shaped additive halos clipped to the candy alpha, a 3D card-turn pop on winning symbols lifted above the reel mask. No stroked boxes, no diagonal CSS sheens.
 - 🎯 **Readable by design** — win-focus dim, left→right reveal cadence, tap-the-reels to flash every payline, panels that hand the screen cleanly to the player on mobile.
 - 📱 **Mobile-first responsiveness** — transparent floating bars, glyphs oversampled to stay crisp at any scale, safe-area decks, capped device-pixel-ratio for crisp-yet-60fps.
-- 🔒 **Provably correct** — one sim-anchored math core, 91 passing unit tests, an RTP economy guard in CI, server-authoritative crediting.
+- 🔒 **Provably correct** — one sim-anchored math core, 75 passing unit tests, an RTP economy guard in CI, server-authoritative crediting.
 
 ## ▶ Live demo
 
@@ -148,7 +148,7 @@ sequenceDiagram
 - **Math owned end-to-end** — seeded RNG, reel-strip builder, line evaluator,
   WILD STRIKE, three buy-bonus modes with sim-anchored costs, a 2M-spin
   Monte-Carlo simulator, outcome-book generator, and a cross-engine drift suite.
-- **A real shader VFX suite (Cocos)** — nine custom CCEffect programs (WebGL2 +
+- **A real shader VFX suite (Cocos)** — eleven custom CCEffect programs (WebGL2 +
   ES100 variants): per-symbol fire clipped to each symbol's alpha silhouette,
   rim-light + specular sweep, banding-free soft-burst glow with rotating rays,
   flowing payline plasma with a traveling pulse, reel portal warp, buy-button
