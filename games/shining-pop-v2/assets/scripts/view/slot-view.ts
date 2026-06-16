@@ -3072,6 +3072,7 @@ export class SlotView extends Component {
       return;
     }
     l.string = `WILD ×${Math.round(n)}`;
+    this.audio.multReveal(n); // audio allowed under reducedFx (motion only)
     Tween.stopAllByTarget(l.node);
     if (this.reducedFx) {
       l.node.setScale(1, 1, 1);
@@ -3426,8 +3427,9 @@ export class SlotView extends Component {
   private lastBalanceCents = NaN;
   private lastBetCents = NaN;
 
-  /** Kinetic count-up of the win amount, with audio ticks. */
-  countUp(toCents: number): void {
+  /** Kinetic count-up of the win amount, with audio ticks. Returns the count
+   *  duration (seconds) so the controller can hold the resolve until it lands. */
+  countUp(toCents: number): number {
     const { baseMs, logScaleMs, maxMs } = VIEW_CONFIG.counter;
     this.winCountDur = Math.max(
       0.2,
@@ -3439,6 +3441,7 @@ export class SlotView extends Component {
     this.setWin(0);
     this.unschedule(this.tickWin);
     this.schedule(this.tickWin, 0);
+    return this.winCountDur;
   }
 
   /** Frame-stepped HUD count-up (arrow fn so `this` binds + unschedule matches). */
@@ -3479,6 +3482,7 @@ export class SlotView extends Component {
       const winMult = betCents > 0 ? winCents / betCents : 0;
       const i01 = Math.min(1, winMult / VIEW_CONFIG.particles.coin.intensityRefMultiple);
       this.particles.coinGeyser(0, VIEW_CONFIG.layout.reelCenterY, i01);
+      this.audio.coinCascade(i01); // sparkle bed under the shower (was never played)
     };
     return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }

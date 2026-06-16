@@ -329,6 +329,26 @@ export class AudioManager {
     this.voice(240, 0.14, 'triangle', 0.16);
   }
 
+  /** WILD STRIKE multiplier reveal — a rising triad whose pitch + gain climb with
+   *  the multiplier. The 'mult_reveal' clip was loaded but never played. */
+  multReveal(n: number): void {
+    const m = Number.isFinite(n) ? n : 1;
+    if (this.playSample('mult_reveal', 'win', Math.min(1, 0.7 + m * 0.03))) return;
+    const base = 330 + Math.min(8, m) * 26;
+    this.voice(base, 0.12, 'triangle', 0.16);
+    this.voice(base * 1.25, 0.14, 'sine', 0.12);
+    this.voice(base * 1.5, 0.16, 'sine', 0.1);
+  }
+
+  /** Sparkling coin bed under the geyser, scaled by win intensity [0,1]. The
+   *  'coin_cascade' clip was loaded but never played. One-shot (no loop to leak). */
+  coinCascade(intensity01 = 1): void {
+    const i = Number.isFinite(intensity01) ? Math.max(0, Math.min(1, intensity01)) : 1;
+    if (this.playSample('coin_cascade', 'win', 0.5 + 0.4 * i)) return;
+    this.voice(880, 0.05, 'sine', 0.06 + 0.05 * i);
+    this.voice(1180, 0.06, 'sine', 0.05 + 0.04 * i);
+  }
+
   // ---- UI ------------------------------------------------------------------
   click(): void {
     if (this.playSample('ui_click', 'sfx', 0.7)) return;

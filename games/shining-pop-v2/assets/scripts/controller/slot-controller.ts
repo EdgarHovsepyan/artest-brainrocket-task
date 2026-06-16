@@ -494,10 +494,13 @@ export class SlotController extends Component {
 
     this.state = 'resolving';
     if (outcome.wildStrike > 1) this.view.revealWildMultiplier(outcome.wildStrike);
+    // P0 — hold the resolve (and any auto-spin) until the win count-up has played,
+    // so the crescendo is no longer guillotined by the old hardcoded 0.3s delay.
+    let resolveDelay = 0.3;
     if (outcome.winCents > 0) {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
-      this.view.countUp(outcome.winCents);
+      resolveDelay = Math.max(resolveDelay, this.view.countUp(outcome.winCents));
       this.view.playCeremony(outcome.winCents, outcome.betCents, outcome.wildStrike);
       this.bar.setLastWin(outcome.winCents / 100);
       // UKGC LDW rule: a return <= 1x total bet must NOT play triumphant audio.
@@ -540,7 +543,7 @@ export class SlotController extends Component {
           }, d / 1000);
         }
       }
-    }, 0.3);
+    }, resolveDelay);
   }
 
   /** Buy a feature: play each free spin back, then credit + celebrate. */
