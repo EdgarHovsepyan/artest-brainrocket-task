@@ -493,7 +493,7 @@ export class SlotController extends Component {
     await this.view.playSpin(outcome.result.grid, this.turboScalar());
 
     this.state = 'resolving';
-    if (outcome.wildStrike > 1) this.view.setBanner(`WILD ×${outcome.wildStrike}`);
+    if (outcome.wildStrike > 1) this.view.revealWildMultiplier(outcome.wildStrike);
     if (outcome.winCents > 0) {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);

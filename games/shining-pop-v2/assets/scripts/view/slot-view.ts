@@ -3060,6 +3060,33 @@ export class SlotView extends Component {
     }
   }
 
+  /** Wave 7 — dramatic WILD STRIKE multiplier reveal: the number SLAMS in (big →
+   *  crash → overshoot-settle) instead of the generic banner punch. Pure cc.tween,
+   *  no shader. Non-finite guarded; reducedFx shows it instantly. Reuses the
+   *  bannerLabel (temporally distinct from other banners). */
+  revealWildMultiplier(n: number): void {
+    const l = this.bannerLabel;
+    if (!l) return;
+    if (!Number.isFinite(n) || n <= 1) {
+      l.string = '';
+      return;
+    }
+    l.string = `WILD ×${Math.round(n)}`;
+    Tween.stopAllByTarget(l.node);
+    if (this.reducedFx) {
+      l.node.setScale(1, 1, 1);
+    } else {
+      l.node.setScale(2.2, 2.2, 1);
+      tween(l.node)
+        .to(0.09, { scale: new Vec3(0.86, 0.86, 1) }, { easing: 'quadIn' }) // slam down
+        .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // overshoot settle
+        .start();
+    }
+    this.scheduleOnce(() => {
+      if (this.bannerLabel) this.bannerLabel.string = '';
+    }, 1.6);
+  }
+
   showGrid(grid: number[][]): void {
     this.reels.forEach((reel, i) => reel.show(grid[i]));
   }
