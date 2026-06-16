@@ -904,6 +904,15 @@ export class SlotView extends Component {
 
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);
     this.ceremony.build(this.node);
+    // Hand the ceremony a particle-glow additive material (no rays) for the
+    // shader light-burst on the feature-unlock impact.
+    const pgAsset = this.getEffectMaterial('particle-glow')?.effectAsset;
+    if (pgAsset) {
+      const bm = new Material();
+      bm.initialize({ effectAsset: pgAsset, defines: { USE_TEXTURE: true } });
+      this.ceremony.burstMat = bm;
+    }
+    this.ceremony.burstFrame = this.getWhiteFrame();
 
     this.buildBuyFab();
 
@@ -3383,13 +3392,8 @@ export class SlotView extends Component {
     const g = this.winLineG;
     if (!g) return;
     g.clear();
-    const RED = new Color(255, 58, 74, 242);
-    const SMOKE = new Color(247, 247, 250, 250);
-    const DASH = 12;
     const t = this.reducedFx ? 0 : this.uTime;
-    const phase = (t * 46) % (DASH * 2);
-
-    const pulse = this.reducedFx ? 1 : 1 + 0.16 * Math.sin(t * 3.0);
+    const pulse = this.reducedFx ? 1 : 1 + 0.12 * Math.sin(t * 3.2);
     const stroke = (
       pts: Vec3[],
       cr: number,
@@ -3405,35 +3409,54 @@ export class SlotView extends Component {
       g.stroke();
     };
     for (const pts of this.candyLinePts) {
-      stroke(pts, 255, 56, 92, 16 * pulse, 32 * pulse);
-      stroke(pts, 255, 76, 110, 28 * pulse, 22 * pulse);
-      stroke(pts, 255, 112, 142, 52, 14);
-      stroke(pts, 255, 172, 198, 94, 8);
-
-      let accum = 0;
-      for (let i = 1; i < pts.length; i++) {
-        const ax = pts[i - 1].x,
-          ay = pts[i - 1].y;
-        const dx = pts[i].x - ax,
-          dy = pts[i].y - ay;
-        const len = Math.hypot(dx, dy) || 1;
-        const ux = dx / len,
-          uy = dy / len;
-        let d = 0;
-        while (d < len) {
-          const s1 = Math.min(len, d + DASH);
-          g.lineWidth = 5.5;
-          g.strokeColor = Math.floor((accum + d + phase) / DASH) % 2 === 0 ? RED : SMOKE;
-          g.moveTo(ax + ux * d, ay + uy * d);
-          g.lineTo(ax + ux * s1, ay + uy * s1);
-          g.stroke();
-          d += DASH;
-        }
-        accum += len;
-      }
-
-      stroke(pts, 255, 252, 250, 170 + 50 * (pulse - 1) * 6, 1.9);
+      // A smooth glowing candy ribbon: layered soft halo (wide+faint -> tight+
+      // bright), a glossy body, then a hot centreline — NO candy-cane stripes.
+      stroke(pts, 255, 64, 138, 14 * pulse, 30 * pulse);
+      stroke(pts, 255, 96, 168, 30 * pulse, 19 * pulse);
+      stroke(pts, 255, 138, 196, 70, 11);
+      stroke(pts, 255, 178, 220, 185, 6.5);
+      stroke(pts, 255, 250, 252, 230, 2.8);
+      // A travelling specular glint sliding along the line — the elegant "energy
+      // flow" that replaces the stripes (a liquid highlight, not a dashed cane).
+      if (!this.reducedFx) this.drawFlowGlint(g, pts, t);
     }
+  }
+
+  // A short bright highlight that sweeps along the win-line polyline, giving the
+  // ribbon a glossy liquid sheen travelling through it.
+  private drawFlowGlint(g: Graphics, pts: Vec3[], t: number): void {
+    const segLen: number[] = [];
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const l = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      segLen.push(l);
+      total += l;
+    }
+    if (total <= 0) return;
+    const GLINT = 52;
+    const head = ((t * 230) % (total + GLINT * 2)) - GLINT;
+    const drawSpan = (d0: number, d1: number, w: number, a: number): void => {
+      let acc = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const a0 = acc;
+        const a1 = acc + segLen[i - 1];
+        const s = Math.max(d0, a0);
+        const e = Math.min(d1, a1);
+        if (e > s) {
+          const inv = 1 / (segLen[i - 1] || 1);
+          const ux = (pts[i].x - pts[i - 1].x) * inv;
+          const uy = (pts[i].y - pts[i - 1].y) * inv;
+          g.lineWidth = w;
+          g.strokeColor = new Color(255, 255, 255, a);
+          g.moveTo(pts[i - 1].x + ux * (s - a0), pts[i - 1].y + uy * (s - a0));
+          g.lineTo(pts[i - 1].x + ux * (e - a0), pts[i - 1].y + uy * (e - a0));
+          g.stroke();
+        }
+        acc = a1;
+      }
+    };
+    drawSpan(head, head + GLINT, 8, 55);
+    drawSpan(head + GLINT * 0.3, head + GLINT * 0.7, 3, 210);
   }
 
   clearWins(): void {

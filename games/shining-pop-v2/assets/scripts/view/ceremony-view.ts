@@ -4,9 +4,12 @@ import {
   Component,
   Graphics,
   Label,
+  Material,
   Node,
   resources,
   sp,
+  Sprite,
+  SpriteFrame,
   tween,
   Tween,
   UIOpacity,
@@ -34,6 +37,12 @@ export class CeremonyView extends Component {
   private sparkles: { node: Node; op: UIOpacity; spin: number }[] = [];
   private panelLightOp!: UIOpacity;
   private panelLightG!: Graphics;
+  // Shader light-burst (particle-glow additive) for the feature-unlock impact.
+  burstMat: Material | null = null;
+  burstFrame: SpriteFrame | null = null;
+  private lightBurst: Node | null = null;
+  private lightBurstOp: UIOpacity | null = null;
+  private lightBurstSp: Sprite | null = null;
   private headerLabel!: Label;
   private amountLabel!: Label;
 
@@ -388,6 +397,7 @@ export class CeremonyView extends Component {
     this.scheduleOnce(() => {
       if (!ov.active) return;
       this.fireDetonationFlash(0.85);
+      this.fireLightBurst(modeCol);
       this.fireSparkleBurst();
       this.igniteModeGlow(modeCol);
       this.onDetonate?.(name);
@@ -452,6 +462,50 @@ export class CeremonyView extends Component {
       .to(0.16, { opacity: 230 }, { easing: 'quadOut' })
       .to(0.5, { opacity: 165 }, { easing: 'sineInOut' })
       .to(0.5, { opacity: 205 }, { easing: 'sineInOut' })
+      .start();
+  }
+
+  // A glossy SHADER light-burst (particle-glow additive material) that blooms
+  // out from centre on the unlock impact — the cute candy-light explosion.
+  private fireLightBurst(col: Color): void {
+    if (!this.burstMat || !this.burstFrame) return;
+    if (!this.lightBurst) {
+      const n = this.mk('lightBurst', 560, 560, this.node);
+      n.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+      n.setSiblingIndex(0);
+      const sp = n.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.type = Sprite.Type.SIMPLE;
+      sp.spriteFrame = this.burstFrame;
+      sp.customMaterial = this.burstMat;
+      this.lightBurstSp = sp;
+      this.lightBurstOp = n.addComponent(UIOpacity);
+      this.lightBurst = n;
+    }
+    const n = this.lightBurst;
+    const op = this.lightBurstOp;
+    if (!op) return;
+    if (this.lightBurstSp) {
+      this.lightBurstSp.color = new Color(
+        Math.min(255, col.r + 70),
+        Math.min(255, col.g + 70),
+        Math.min(255, col.b + 70),
+        255,
+      );
+    }
+    Tween.stopAllByTarget(n);
+    Tween.stopAllByTarget(op);
+    n.active = true;
+    n.setScale(0.4, 0.4, 1);
+    op.opacity = 235;
+    tween(n)
+      .to(0.55, { scale: new Vec3(2.9, 2.9, 1) }, { easing: 'quadOut' })
+      .start();
+    tween(op)
+      .to(0.55, { opacity: 0 }, { easing: 'quadIn' })
+      .call(() => {
+        if (n.isValid) n.active = false;
+      })
       .start();
   }
 
@@ -800,6 +854,12 @@ export class CeremonyView extends Component {
       Tween.stopAllByTarget(this.flashOp);
       this.flashOp.opacity = 0;
       if (this.flashNode && this.flashNode.isValid) this.flashNode.active = false;
+    }
+
+    if (this.lightBurst) {
+      if (this.lightBurstOp) Tween.stopAllByTarget(this.lightBurstOp);
+      Tween.stopAllByTarget(this.lightBurst);
+      if (this.lightBurst.isValid) this.lightBurst.active = false;
     }
 
     if (this.winSpineOp) {
