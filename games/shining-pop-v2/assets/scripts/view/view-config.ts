@@ -49,7 +49,7 @@ export const VIEW_CONFIG = {
     /** Symbol art fill fraction of the cell. Bumped 0.92→0.99 (2026-06-12) so
      *  symbols fill nearly the whole cell — kills the big vertical gap the user
      *  saw between rows (symbols read bigger + more compact). */
-    symbolFill: 0.99,
+    symbolFill: 0.84, // smaller/tighter symbols w/ premium padding (was 0.99 — too cramped)
     /** Gap between cells (and between reels). Tightened 8→5 for a more compact
      *  reel (less dead space between symbols vertically + horizontally). */
     gap: 5,
@@ -215,14 +215,14 @@ export const VIEW_CONFIG = {
   /** Winning-line presentation. */
   win: {
     /** Pulse scale applied to winning symbols. */
-    symbolPulseScale: 1.18,
+    symbolPulseScale: 1.1, // tighter win pop (was 1.18)
     symbolPulseMs: 420,
     /** JUICY JELLY — after the initial attack pop, winning symbols settle into a
      *  CONTINUOUS squash-and-stretch wobble (wide-and-short ↔ narrow-and-tall)
      *  until the next spin clears them — the modern candy-slot "yummy" feel, not
      *  a uniform scale pulse. jelly = axis amplitude; ms = one full wobble cycle.
      *  The shader rim/sweep shine loops alongside (SlotView's u_time). */
-    winBounceLoop: { enabled: true, jelly: 0.085, ms: 520 },
+    winBounceLoop: { enabled: true, jelly: 0.05, ms: 520 }, // smaller jelly wobble (was 0.085)
     /** WIN FOCUS — non-winning symbols dim back to this opacity while a win is
      *  presented, so winners read instantly (standard top-provider treatment).
      *  255 disables the dim. */
@@ -258,7 +258,7 @@ export const VIEW_CONFIG = {
      *  behind winners (it BANDED into visible concentric circles — rejected).
      *  Shader = continuous falloff + rotating god-rays + candle flicker. The
      *  Graphics glow remains the fallback when the material is unavailable. */
-    burst: { enabled: true, intensity: 1.15, scale: 1.9 },
+    burst: { enabled: true, intensity: 1.15, scale: 1.35 }, // tighter win glow (was 1.9 — too large; also reduces mask-escape)
 
     // ── CINEMA WAVE: shader winning-symbol highlight (symbol-win.effect) ─────
     /** Award-tier ON-symbol highlight: an additive overlay that reads the

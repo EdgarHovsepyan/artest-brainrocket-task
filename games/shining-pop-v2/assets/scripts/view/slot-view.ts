@@ -802,7 +802,7 @@ export class SlotView extends Component {
       this.buildHud();
       this.buildControlDeck();
     }
-    this.bannerLabel = this.mkLabel('', 0, 250, 36, ACID, this.node, true);
+    this.bannerLabel = this.mkLabel('', 0, 250, 28, ACID, this.node, true); // smaller win-type banner text (was 36)
 
     // ceremony on top of everything; shakes the whole view node
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);
@@ -3077,9 +3077,9 @@ export class SlotView extends Component {
     if (this.reducedFx) {
       l.node.setScale(1, 1, 1);
     } else {
-      l.node.setScale(2.2, 2.2, 1);
+      l.node.setScale(1.5, 1.5, 1); // smaller slam peak (was 2.2 — too large)
       tween(l.node)
-        .to(0.09, { scale: new Vec3(0.86, 0.86, 1) }, { easing: 'quadIn' }) // slam down
+        .to(0.09, { scale: new Vec3(0.92, 0.92, 1) }, { easing: 'quadIn' }) // slam down
         .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // overshoot settle
         .start();
       // Wave 7 — physical jolt scaled by the multiplier, via the ceremony's
