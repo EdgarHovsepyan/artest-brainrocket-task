@@ -458,6 +458,10 @@ export const VIEW_CONFIG = {
      *  launched from a single point; spreadDeg = launch cone half-angle. */
     coin: {
       count: 30,
+      /** Wave 6 — win/total-bet multiple at which the coin shower hits full count;
+       *  smaller epic wins scale down toward ~half (continuous crescendo, not a
+       *  fixed epic burst). */
+      intensityRefMultiple: 150,
       launchSpeed: 900, // legacy ballistic params (kept; hero-coin uses the staging below)
       gravity: 2200,
       spreadDeg: 60,

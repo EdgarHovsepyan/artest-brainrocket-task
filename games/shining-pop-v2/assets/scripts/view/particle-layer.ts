@@ -185,9 +185,16 @@ export class ParticleLayer extends Component {
    *  up-and-out, decel-spins (catching the additive light), then falls + shrinks.
    *  Per-coin stagger makes the top-tier payoff read as a shower, not a flat
    *  simultaneous spray. */
-  coinGeyser(originX = 0, originY = VIEW_CONFIG.layout.reelCenterY): void {
+  coinGeyser(originX = 0, originY = VIEW_CONFIG.layout.reelCenterY, intensity = 1): void {
     const cfg = VIEW_CONFIG.particles.coin;
-    for (let i = 0; i < cfg.count; i++) {
+    // Wave 6 — scale the shower by win intensity (continuous crescendo, not a fixed
+    // epic burst) and by the device tier. intensity in [0,1]; non-finite → full.
+    const i01 = Number.isFinite(intensity) ? Math.max(0, Math.min(1, intensity)) : 1;
+    const count = Math.max(
+      1,
+      Math.round(cfg.count * (0.5 + 0.5 * i01) * VIEW_CONFIG.tier.particleScale),
+    );
+    for (let i = 0; i < count; i++) {
       const slot = this.pool.get(originX, originY, COIN, 0.2);
       if (!slot) return; // pool full — silent drop
       this.heroCoin(slot, originX, originY, i * cfg.staggerS);

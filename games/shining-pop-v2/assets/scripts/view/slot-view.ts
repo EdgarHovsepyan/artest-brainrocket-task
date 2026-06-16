@@ -3442,7 +3442,12 @@ export class SlotView extends Component {
     this.ceremony.onCountPip = () => this.audio.countTick(0.6);
     // Task 5.MATRIX — EPIC-tier coin geyser fires through the CC-2 particle pool.
     this.ceremony.onCoinGeyser = () => {
-      if (!this.reducedFx) this.particles.coinGeyser();
+      if (this.reducedFx) return;
+      // Wave 6 — bigger win => bigger shower. Scale by the win/total-bet multiple
+      // against the configured reference so the crescendo tracks the payout.
+      const winMult = betCents > 0 ? winCents / betCents : 0;
+      const i01 = Math.min(1, winMult / VIEW_CONFIG.particles.coin.intensityRefMultiple);
+      this.particles.coinGeyser(0, VIEW_CONFIG.layout.reelCenterY, i01);
     };
     return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }
