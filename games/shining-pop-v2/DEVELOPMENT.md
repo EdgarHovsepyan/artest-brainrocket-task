@@ -1,8 +1,9 @@
 # Development notes
 
-A 5×3, 10-payline **base-game** video slot — Cocos Creator 3.8.8 + TypeScript,
-MVC, code-driven runtime scene. Visual identity: industrial brutalism (acid
-`#EAFF00` on jet black, hard edges, snap motion).
+A 5×3, 10-payline **candy-themed** video slot — Cocos Creator 3.8.8 + TypeScript,
+MVC, code-driven runtime scene. WILD STRIKE base feature, a scatter that pays
+anywhere and triggers free spins, and three buy-bonus modes. Glossy sweet-shop
+visuals (gummy bears, lollipops, a gingerbread wild) with `.effect` shader VFX.
 
 This file is the contributor's map. Player-facing overview is in [README.md](README.md).
 
@@ -13,10 +14,12 @@ This file is the contributor's map. Player-facing overview is in [README.md](REA
 > _Simple slot, 5 reels × 3 symbols, Cocos Creator 2.x/3.x, TypeScript, Cocos
 > Tween or GreenSock for animation, modular MVC architecture, public assets._
 
-The accompanying spec (`Slot Game.doc.pdf`) is implemented **exactly**: 5×3 grid,
-10 fixed paylines, the given paytable, Wild substitutes all, **base game only**
-(the spec states "Main game only / Separate screen features: no"). No bonus,
-free-spins, or extra screens are added — the deliverable matches the brief.
+The brief's core is implemented exactly — 5×3 grid, 10 fixed paylines, the given
+paytable, Wild substitutes all — then built out into a full candy slot: a
+**WILD STRIKE** base feature, a **scatter** (pays anywhere; 3+ triggers free
+spins), **Sticky-Wilds free spins**, and three **buy-bonus** modes. Math/RTP
+(**≈ 97.8 %**) lives in the engine-agnostic logic layer and is verified by the
+node:test suite + the Monte-Carlo sim.
 
 ## 2. Architecture (MVC)
 

@@ -6,7 +6,7 @@ A focused pass to push both slot engines toward an award-tier "money moment",
 driven by real evidence: both builds were rendered headless (Playwright +
 Chromium) to verify behaviour, not guessed. Math/odds untouched throughout —
 every change is presentation only, and the logic suite stays green (Cocos
-**46/46**, Pixi `vite build` clean).
+**75/75**, Pixi `vite build` clean).
 
 ### Fixed
 

@@ -9,8 +9,8 @@
 [![PixiJS](https://img.shields.io/badge/PixiJS-v8-e91e63?logo=javascript&logoColor=white)](games/shining-pop)
 [![Cocos Creator](https://img.shields.io/badge/Cocos%20Creator-3.8.8-55c2e1?logo=cocos&logoColor=white)](games/shining-pop-v2)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](#engineering-standards)
-[![Tests](https://img.shields.io/badge/tests-91%2F91%20passing-2ea043)](#quality-gates)
-[![RTP](https://img.shields.io/badge/RTP-~97%25%20sim--anchored-f5a623)](#developer-quick-start)
+[![Tests](https://img.shields.io/badge/tests-75%2F75%20passing-2ea043)](#quality-gates)
+[![RTP](https://img.shields.io/badge/RTP-~97.8%25%20sim--anchored-f5a623)](#developer-quick-start)
 [![CI](https://img.shields.io/badge/CI-green-2ea043?logo=githubactions&logoColor=white)](#quality-gates)
 [![Live](https://img.shields.io/badge/play-live%20demo-ff2d78?logo=vercel&logoColor=white)](https://artest-brainrocket-task.vercel.app/)
 
@@ -23,10 +23,10 @@ designed, built and verified end-to-end by a single developer._
 
 ## The games
 
-| Game                                       | Engine              | Stack                                | RTP     | Status                         |
-| ------------------------------------------ | ------------------- | ------------------------------------ | ------- | ------------------------------ |
-| **[shining-pop](games/shining-pop)**       | PixiJS v8           | Vite · GSAP · Spine · Web Audio      | ~97 %   | flagship — submission-ready    |
-| **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC · 9 CCEffect shaders | ~97.5 % | parity port + shader VFX suite |
+| Game                                       | Engine              | Stack                                 | RTP     | Status                         |
+| ------------------------------------------ | ------------------- | ------------------------------------- | ------- | ------------------------------ |
+| **[shining-pop](games/shining-pop)**       | PixiJS v8           | Vite · GSAP · Spine · Web Audio       | ~97.8 % | flagship — submission-ready    |
+| **[shining-pop-v2](games/shining-pop-v2)** | Cocos Creator 3.8.8 | code-driven MVC · 11 CCEffect shaders | ~97.8 % | parity port + shader VFX suite |
 
 > Two games, one candy slot. **No other variations** — the PixiJS flagship and the Cocos parity port share a single deterministic math core.
 
@@ -171,7 +171,7 @@ sequenceDiagram
 ```bash
 corepack enable                                # one-time: gets the pinned pnpm
 pnpm install
-pnpm test                                      # builds packages + runs all suites (73 green)
+pnpm test                                      # builds packages + runs all suites (75 green)
 pnpm sim                                       # Monte-Carlo RTP of the math core (2M spins)
 pnpm preview                                   # serve both shipped game builds
 
