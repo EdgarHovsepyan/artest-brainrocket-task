@@ -120,6 +120,7 @@ export class BettingBarWeb extends Component {
   private turboGlyphOp!: UIOpacity;
   private turboPip!: Node;
   private track!: Node;
+  private pill!: Node;
   private cells: Label[] = [];
   private levels: number[] = [];
   private activeIdx = 0;
@@ -488,19 +489,26 @@ export class BettingBarWeb extends Component {
     const SW = 800;
     const g = this.gfx('selector');
     this.panel(g, SX, 148, SW, 76, 38);
-    g.fillColor = col(C.activeLo);
-    g.roundRect(SX + SW / 2 - 62, this.Y(216), 124, 60, 30);
-    g.fill();
-    g.fillColor = col(C.active);
-    g.roundRect(SX + SW / 2 - 62, this.Y(190), 124, 32, 26);
-    g.fill();
-    g.fillColor = col(C.activeHi, 0.5);
-    g.roundRect(SX + SW / 2 - 58, this.Y(176), 116, 14, 10);
-    g.fill();
-    g.lineWidth = 2;
-    g.strokeColor = col(C.pillStroke);
-    g.roundRect(SX + SW / 2 - 62, this.Y(216), 124, 60, 30);
-    g.stroke();
+
+    const pillNode = new Node('carPill');
+    pillNode.layer = this.node.layer;
+    this.node.addChild(pillNode);
+    pillNode.addComponent(UITransform);
+    const pg = pillNode.addComponent(Graphics);
+    pg.fillColor = col(C.activeLo);
+    pg.roundRect(SX + SW / 2 - 62, this.Y(216), 124, 60, 30);
+    pg.fill();
+    pg.fillColor = col(C.active);
+    pg.roundRect(SX + SW / 2 - 62, this.Y(190), 124, 32, 26);
+    pg.fill();
+    pg.fillColor = col(C.activeHi, 0.5);
+    pg.roundRect(SX + SW / 2 - 58, this.Y(176), 116, 14, 10);
+    pg.fill();
+    pg.lineWidth = 2;
+    pg.strokeColor = col(C.pillStroke);
+    pg.roundRect(SX + SW / 2 - 62, this.Y(216), 124, 60, 30);
+    pg.stroke();
+    this.pill = pillNode;
 
     const maskNode = new Node('carMask');
     maskNode.layer = this.node.layer;
@@ -523,23 +531,24 @@ export class BettingBarWeb extends Component {
       this.dragging = true;
       this.moved = 0;
       this.dragX = e.getUILocation().x;
-      Tween.stopAllByTarget(this.track);
+      Tween.stopAllByTarget(this.pill);
     });
     sel.on(Node.EventType.TOUCH_MOVE, (e: EventTouch) => {
       if (!this.dragging) return;
+      const n = this.levels.length;
+      if (n === 0) return;
       const x = e.getUILocation().x;
       const dx = (x - this.dragX) / (this.node.scale.x || 1);
       this.dragX = x;
       this.moved += Math.abs(dx);
-      const n = this.levels.length;
-      const nx = this.track.position.x + dx;
-
-      if (n > 0) {
-        const lo = this.trackXFor(n - 1) - this.CELLW;
-        const hi = this.trackXFor(0) + this.CELLW;
-        this.track.setPosition(Math.max(lo, Math.min(hi, nx)), this.track.position.y, 0);
-      } else {
-        this.track.setPosition(nx, this.track.position.y, 0);
+      const lo = this.pillXFor(0);
+      const hi = this.pillXFor(n - 1);
+      const px = Math.max(lo, Math.min(hi, this.pill.position.x + dx));
+      this.pill.setPosition(px, this.pill.position.y, 0);
+      const i = this.idxAtPillX(px);
+      if (i !== this.activeIdx) {
+        this.activeIdx = i;
+        this.restyleCells();
       }
     });
     const end = () => {
@@ -561,10 +570,24 @@ export class BettingBarWeb extends Component {
   private trackXFor(i: number): number {
     return this.PCX - (i * this.CELLW + this.CELLW / 2);
   }
+  private trackHome(): number {
+    const n = this.levels.length;
+    if (n === 0) return 0;
+    const content = n * this.CELLW;
+    return (2 * this.PCX - content) / 2;
+  }
+  private pillXFor(i: number): number {
+    return this.trackHome() - this.trackXFor(i);
+  }
+  private idxAtPillX(px: number): number {
+    if (this.levels.length === 0) return 0;
+    const base = this.trackHome() - this.PCX + this.CELLW / 2;
+    const i = Math.round((px - base) / this.CELLW);
+    return Math.max(0, Math.min(this.levels.length - 1, i));
+  }
   private nearestIdx(): number {
     if (this.levels.length === 0) return 0;
-    const i = Math.round((this.PCX - this.track.position.x - this.CELLW / 2) / this.CELLW);
-    return Math.max(0, Math.min(this.levels.length - 1, i));
+    return this.idxAtPillX(this.pill.position.x);
   }
   private restyleCells(): void {
     const fcfg = VIEW_CONFIG.bar.web.carousel;
@@ -586,10 +609,10 @@ export class BettingBarWeb extends Component {
     const i = this.nearestIdx();
     const changed = i !== this.activeIdx;
     this.activeIdx = i;
-    tween(this.track)
+    tween(this.pill)
       .to(
         0.32,
-        { position: new Vec3(this.trackXFor(i), this.track.position.y, 0) },
+        { position: new Vec3(this.pillXFor(i), this.pill.position.y, 0) },
         { easing: 'backOut' },
       )
       .call(() => this.restyleCells())
@@ -1152,7 +1175,8 @@ export class BettingBarWeb extends Component {
       this.cells = [];
       this.levels = [];
       this.activeIdx = 0;
-      this.track.setPosition(this.trackXFor(0), 0, 0);
+      this.track.setPosition(0, 0, 0);
+      if (this.pill) this.pill.setPosition(0, this.pill.position.y, 0);
       return;
     }
     const same =
@@ -1173,14 +1197,20 @@ export class BettingBarWeb extends Component {
         this.cells.push(t);
       });
       this.activeIdx = Math.max(0, Math.min(vals.length - 1, ai));
-      this.track.setPosition(this.trackXFor(this.activeIdx), 0, 0);
+      this.track.setPosition(this.trackHome(), 0, 0);
+      if (this.pill) this.pill.setPosition(this.pillXFor(this.activeIdx), this.pill.position.y, 0);
       this.restyleCells();
     } else if (!this.dragging) {
       const clamped = Math.max(0, Math.min(vals.length - 1, ai));
       if (clamped !== this.activeIdx) {
         this.activeIdx = clamped;
-        tween(this.track)
-          .to(0.3, { position: new Vec3(this.trackXFor(clamped), 0, 0) }, { easing: 'quadOut' })
+        this.track.setPosition(this.trackHome(), 0, 0);
+        tween(this.pill)
+          .to(
+            0.3,
+            { position: new Vec3(this.pillXFor(clamped), this.pill.position.y, 0) },
+            { easing: 'quadOut' },
+          )
           .call(() => this.restyleCells())
           .start();
         this.restyleCells();

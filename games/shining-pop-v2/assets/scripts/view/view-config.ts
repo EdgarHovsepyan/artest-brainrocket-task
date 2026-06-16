@@ -480,8 +480,8 @@ export const VIEW_CONFIG = {
 
         pillCenterX: 388,
 
-        fadeScale: [1.0, 0.82, 0.74, 0.7] as readonly number[],
-        fadeOpacity: [255, 200, 150, 120] as readonly number[],
+        fadeScale: [1.0, 0.88, 0.82, 0.78] as readonly number[],
+        fadeOpacity: [255, 224, 192, 168] as readonly number[],
       },
       buttonBevel: {
         shadowAlpha: 0.45,
