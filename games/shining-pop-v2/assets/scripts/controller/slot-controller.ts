@@ -128,6 +128,14 @@ export class SlotController extends Component {
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');
     });
+
+    // Tell the boot loader the game is fully built + the intro is on screen, so it
+    // hides on the intro instead of on the empty scene (kills the ~2s black gap).
+    try {
+      (window as unknown as Record<string, boolean>).__shiningPopReady = true;
+    } catch {
+      /* not in a browser context */
+    }
     const unlockOnce = () => {
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');

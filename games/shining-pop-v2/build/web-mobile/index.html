@@ -175,13 +175,18 @@
           if (window.cc) stage = 1;
           if (window.cc && window.cc.game && window.cc.game.inited) stage = 2;
           if (window.cc && window.cc.director && window.cc.director.getScene()) stage = 3;
+          if (window.__shiningPopReady) stage = 4;
         } catch (e) { stage = 0; }
-        var target = [8, 34, 70, 100][stage];
+        // Stage 3 (empty scene up) caps at 92% — the game still has to load its
+        // assets and build the intro. Only the real ready signal (stage 4, set by
+        // the controller right after buildIntro) fills to 100 and lets the loader
+        // hide, so there is NO black gap between the scene mounting and the intro.
+        var target = [8, 34, 70, 92, 100][stage];
         // ease toward the stage target → smooth fill (CSS width-transition adds
         // the final polish); never jumps backward.
         shown += (target - shown) * 0.16;
         setW(shown);
-        if ((stage === 3 && shown > 99.3) || Date.now() - t0 > 30000) {
+        if ((window.__shiningPopReady && shown > 99.3) || Date.now() - t0 > 30000) {
           clearInterval(iv);
           setW(100);
           var el = document.getElementById('brandLoader');
