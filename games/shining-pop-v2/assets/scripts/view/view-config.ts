@@ -477,6 +477,9 @@ export const VIEW_CONFIG = {
       riseFrac: 0.55, // fraction of life spent rising (decel) vs falling (accel)
       risePx: 360,
       fallPx: 540,
+      /** Drop-bug guard: hero coins land no lower than reelCenterY - this, so the
+       *  geyser stays inside the frame instead of raining out the board bottom. */
+      frameFloorPad: 170,
       lateralPx: 240,
       spinDeg: 540, // finite decelerating spin (never repeatForever → pool-safe)
       scalePop: 1.5,

@@ -214,7 +214,16 @@ export class ParticleLayer extends Component {
     const downDur = life - upDur;
     const lateral = cfg.lateralPx * (0.4 + Math.random() * 0.6) * dir;
     const apex = new Vec3(ox + lateral * 0.5, oy + cfg.risePx * (0.7 + Math.random() * 0.5), 0);
-    const land = new Vec3(ox + lateral, oy - cfg.fallPx * (0.7 + Math.random() * 0.5), 0);
+    // DROP-BUG FIX: clamp the landing to the frame floor so coins fall TO the
+    // board, never hundreds of px BELOW it (the layer is unmasked, so on a big
+    // win the geyser coins kept falling out the bottom and read as "symbols
+    // dropping out of the reels"). reelCenterY - frameFloorPad keeps them in-frame.
+    const floorY = VIEW_CONFIG.layout.reelCenterY - cfg.frameFloorPad;
+    const land = new Vec3(
+      ox + lateral,
+      Math.max(floorY, oy - cfg.fallPx * (0.7 + Math.random() * 0.5)),
+      0,
+    );
     const full = cfg.scalePop * (0.85 + Math.random() * 0.3);
 
     slot.node.setPosition(ox, oy, 0);

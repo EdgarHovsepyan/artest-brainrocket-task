@@ -92,6 +92,17 @@ export class SlotController extends Component {
   private async boot(): Promise<void> {
     // externalControls: the shared BettingBar provides the controls + HUD.
     await this.view.init(true);
+    // WCAG 2.3.3 — seed reduced-motion from the OS so a motion-sensitive player
+    // gets the calm experience on first paint, not only after finding the toggle.
+    const mq =
+      typeof window !== 'undefined' && window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null;
+    if (mq) {
+      this.reducedFx = mq.matches;
+      this.view.setReducedFx(this.reducedFx);
+      mq.addEventListener?.('change', (e) => this.applySetting('reducedFx', e.matches));
+    }
     this.view.showGrid(this.model.idleGrid());
     this.view.onBuyClicked((mode) => void this.onBuy(mode as BonusMode));
     this.view.configureBuyMenu(
