@@ -286,7 +286,6 @@ export class SlotView extends Component {
       ['ui2/logo', 'logo'],
       ['bg/bg', 'bg'],
       ['ui2/btn_spin', 'spinArt'],
-      ['ui2/studio', 'studio'],
       ['ui2/buy_bonus', 'buyArt'],
       ['win/tier_standard', 'tier0'],
       ['win/tier_hot', 'tier1'],
