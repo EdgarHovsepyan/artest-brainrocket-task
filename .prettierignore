@@ -7,3 +7,5 @@
 **/*.zst
 pnpm-lock.yaml
 games/shining-pop
+**/build-*
+games/*/extensions

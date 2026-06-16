@@ -8,12 +8,14 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/build/**',
+      '**/build-*/**', // Cocos build-output variants (build-qa, build-shaderfix, build-templates, build-ux2, …)
       '**/library/**',
       '**/temp/**',
       '**/.cache/**',
       '**/*.d.ts',
       'games/*/assets/**', // Cocos editor-managed sources are linted by their own project
       'games/shining-pop/**', // vendored single-file flagship — built & formatted by its own vite toolchain
+      'games/*/extensions/**', // vendored Cocos editor extensions (cocos-mcp-server) — not our source
     ],
   },
   js.configs.recommended,
