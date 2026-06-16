@@ -389,7 +389,11 @@ export class CeremonyView extends Component {
       this.fireDetonationFlash(0.85);
       this.fireLightBurst(modeCol);
       this.fireSparkleBurst();
-      this.igniteModeGlow(modeCol);
+      this.panelLightG?.clear();
+      if (this.panelLightOp) {
+        Tween.stopAllByTarget(this.panelLightOp);
+        this.panelLightOp.opacity = 0;
+      }
       this.onDetonate?.(name);
       tween(ov)
         .to(0.16, { scale: new Vec3(1.22, 1.22, 1) }, { easing: 'quadOut' })
@@ -455,14 +459,14 @@ export class CeremonyView extends Component {
       .start();
   }
 
-  // A glossy SHADER light-burst (particle-glow additive material) that blooms
-  // out from centre on the unlock impact — the cute candy-light explosion.
+  // A juicy gummy-jelly SHADER burst that wobbles in over the dimmed stage then
+  // fissions into droplets on the unlock impact — the cute candy hero reveal.
   private fireLightBurst(col: Color): void {
     if (!this.burstMat || !this.burstFrame) return;
     if (!this.lightBurst) {
       const n = this.mk('lightBurst', 560, 560, this.node);
       n.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
-      n.setSiblingIndex(0);
+      n.setSiblingIndex(this.dim ? this.dim.node.getSiblingIndex() + 1 : 1);
       const sp = n.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.type = Sprite.Type.SIMPLE;
@@ -487,7 +491,7 @@ export class CeremonyView extends Component {
     Tween.stopAllByTarget(n);
     Tween.stopAllByTarget(op);
     n.active = true;
-    n.setScale(0.7, 0.7, 1);
+    n.setScale(0.45, 0.45, 1);
     op.opacity = 255;
     try {
       mat.setProperty('u_progress', 0);
@@ -496,22 +500,28 @@ export class CeremonyView extends Component {
       /* fallback material may lack these props */
     }
     tween(n)
-      .to(0.62, { scale: new Vec3(2.05, 2.05, 1) }, { easing: 'quadOut' })
+      .to(0.24, { scale: new Vec3(1.32, 1.32, 1) }, { easing: 'backOut' })
+      .to(0.18, { scale: new Vec3(1.2, 1.2, 1) }, { easing: 'sineOut' })
       .start();
-    // Drive the shader: bloom the hot core out then dissolve, caustic + sparkles
-    // animating off u_time.
-    const proxy = { t: 0 };
-    tween(proxy)
+    // One driver tween over the gummy's whole life: u_time runs continuously for
+    // the squishy wobble, u_progress blooms IN, HOLDS so the candy reads, then
+    // dissolves + fissions into droplets. ~1.4s on screen, not a flash.
+    const drv = { k: 0 };
+    tween(drv)
       .to(
-        0.62,
-        { t: 1 },
+        1.4,
+        { k: 1 },
         {
           onUpdate: () => {
+            const k = drv.k;
+            let p = 0.46;
+            if (k < 0.23) p = (k / 0.23) * 0.46;
+            else if (k >= 0.62) p = 0.46 + ((k - 0.62) / 0.38) * 0.54;
             try {
-              mat.setProperty('u_progress', proxy.t);
-              mat.setProperty('u_time', proxy.t * 2.6);
+              mat.setProperty('u_progress', p);
+              mat.setProperty('u_time', k * 3.7);
             } catch {
-              /* no-op */
+              /* fallback material may lack these props */
             }
           },
         },

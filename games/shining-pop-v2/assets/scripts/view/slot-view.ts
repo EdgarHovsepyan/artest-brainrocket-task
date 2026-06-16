@@ -905,13 +905,13 @@ export class SlotView extends Component {
 
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);
     this.ceremony.build(this.node);
-    // Hand the ceremony the custom unlock-burst shader (hot core + swirling
-    // candy caustic + sparkle specks) for the feature-unlock impact.
+    // Hand the ceremony the custom unlock-burst shader (a juicy gummy bear that
+    // wobbles in then fissions into droplets) for the feature-unlock impact.
     const ubAsset = this.getEffectMaterial('unlock-burst')?.effectAsset;
     if (ubAsset) {
       const bm = new Material();
       bm.initialize({ effectAsset: ubAsset, defines: { USE_TEXTURE: true } });
-      bm.setProperty('u_intensity', 1.4);
+      bm.setProperty('u_intensity', 1.0);
       this.ceremony.burstMat = bm;
     }
     this.ceremony.burstFrame = this.getWhiteFrame();
