@@ -3081,6 +3081,10 @@ export class SlotView extends Component {
         .to(0.09, { scale: new Vec3(0.86, 0.86, 1) }, { easing: 'quadIn' }) // slam down
         .to(0.22, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // overshoot settle
         .start();
+      // Wave 7 — physical jolt scaled by the multiplier, via the ceremony's
+      // documented-safe shake (position+angle only). A short kick that decays well
+      // before any big-win ceremony detonation fires, so no rest-capture overlap.
+      this.ceremony.kick(Math.min(14, 6 + n * 1.5));
     }
     this.scheduleOnce(() => {
       if (this.bannerLabel) this.bannerLabel.string = '';

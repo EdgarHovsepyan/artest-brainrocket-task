@@ -470,6 +470,13 @@ export class CeremonyView extends Component {
     this.numberSheen = n;
   }
 
+  /** Wave 7 — public, safe screen kick for non-ceremony moments (e.g. WILD
+   *  STRIKE). Reuses the same position+angle-only shake (never scale — fit() owns
+   *  scale), with its live-rest capture, so it can't stamp a stale transform. */
+  kick(amp: number): void {
+    if (Number.isFinite(amp) && amp > 0) this.shake(amp);
+  }
+
   private shake(amp: number): void {
     const n = this.shakeNode;
     if (!n) return;
