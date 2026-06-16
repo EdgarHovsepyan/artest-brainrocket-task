@@ -59,6 +59,7 @@ export class SymbolView extends Component {
 
   static fxBurstMat: Material | null = null;
   static fxWhiteFrame: SpriteFrame | null = null;
+  static fxRadialFrame: SpriteFrame | null = null;
   static wildWinFrame: SpriteFrame | null = null;
   private wildFaceSwapped = false;
 
@@ -184,7 +185,7 @@ export class SymbolView extends Component {
 
   private ensureHalo(): void {
     if (this.halo || !SymbolView.fxHaloMat) return;
-    const s = this.size * 1.2;
+    const s = this.size * 1.75;
     const n = new Node('winHalo');
     n.layer = this.node.layer;
     n.addComponent(UITransform).setContentSize(s, s);
@@ -370,7 +371,9 @@ export class SymbolView extends Component {
       this.glow.setScale(0.8, 0.8, 1);
     }
 
-    const haloFrame = this.sprite?.spriteFrame ?? null;
+    // Soft radial glow (not the symbol's own texture) so the win halo reads as
+    // a clean bloom, not a doubled copy of the candy art.
+    const haloFrame = SymbolView.fxRadialFrame ?? this.sprite?.spriteFrame ?? null;
     if (haloFrame) this.ensureHalo();
     if (haloFrame && this.halo && this.haloOp && this.haloSp) {
       this.haloSp.spriteFrame = haloFrame;

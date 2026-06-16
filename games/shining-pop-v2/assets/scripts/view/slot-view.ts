@@ -158,6 +158,8 @@ export class SlotView extends Component {
   private winBeams: Node[] = [];
   private winCoreG: Graphics | null = null;
   private whiteFrame: SpriteFrame | null = null;
+  private radialFrame: SpriteFrame | null = null;
+  private cineBloomNode: Node | null = null;
 
   private uTime = 0;
 
@@ -861,6 +863,7 @@ export class SlotView extends Component {
     this.buildWinBeams();
     SymbolView.fxBurstMat = this.getEffectMaterial('soft-burst');
     SymbolView.fxWhiteFrame = this.getWhiteFrame();
+    SymbolView.fxRadialFrame = this.getRadialFrame();
 
     const haloBase = this.getEffectMaterial('svarka-additive');
     if (haloBase?.effectAsset) {
@@ -1155,6 +1158,36 @@ export class SlotView extends Component {
     sf.texture = tex;
     sf.packable = false;
     this.whiteFrame = sf;
+    return sf;
+  }
+
+  // Soft radial glow frame (white core -> transparent edge) for the win halo,
+  // so the glow is a clean bloom instead of an additive copy of the symbol art.
+  private getRadialFrame(): SpriteFrame {
+    if (this.radialFrame) return this.radialFrame;
+    const w = 64;
+    const data = new Uint8Array(w * w * 4);
+    const c = (w - 1) / 2;
+    for (let y = 0; y < w; y++) {
+      for (let x = 0; x < w; x++) {
+        const dx = (x - c) / c;
+        const dy = (y - c) / c;
+        const d = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+        const a = Math.round(255 * (1 - d) * (1 - d));
+        const i = (y * w + x) * 4;
+        data[i] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = 255;
+        data[i + 3] = a;
+      }
+    }
+    const tex = new Texture2D();
+    tex.reset({ width: w, height: w, format: Texture2D.PixelFormat.RGBA8888 });
+    tex.uploadData(data);
+    const sf = new SpriteFrame();
+    sf.texture = tex;
+    sf.packable = false;
+    this.radialFrame = sf;
     return sf;
   }
 
@@ -1847,16 +1880,22 @@ export class SlotView extends Component {
     bg.fill();
     this.cineBloomOp = bloom.addComponent(UIOpacity);
     this.cineBloomOp.opacity = 0;
+    bloom.active = false;
+    this.cineBloomNode = bloom;
   }
 
   cinematicBloom(intensity = 1): void {
     if (!this.cineBloomOp || this.reducedFx) return;
     const peak = Math.round(20 + 32 * Math.min(1, Math.max(0, intensity)));
     Tween.stopAllByTarget(this.cineBloomOp);
+    if (this.cineBloomNode) this.cineBloomNode.active = true;
     this.cineBloomOp.opacity = 0;
     tween(this.cineBloomOp)
       .to(0.08, { opacity: peak }, { easing: 'quadOut' })
       .to(0.5, { opacity: 0 }, { easing: 'quadIn' })
+      .call(() => {
+        if (this.cineBloomNode) this.cineBloomNode.active = false;
+      })
       .start();
   }
 
