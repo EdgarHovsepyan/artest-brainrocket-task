@@ -3151,7 +3151,16 @@ export class SlotView extends Component {
     // symbol falls back to the Graphics sheen; otherwise advance the shared
     // material's u_time globally (one stepper, all overlays animate in sync).
     const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
-    this.reels.forEach((reel, i) => reel.highlight(byReel[i] ?? [], i * 0.06, rich, winMat));
+    // Wave 4 — quantize the L->R win wave to the BeatClock (Wave 1 substrate's
+    // first real consumer): start the cascade on the next beat and space reels by
+    // a beat subdivision, so the reveal "lands on the beat" instead of a hardcoded
+    // 60ms step. reducedFx skips the beat-align so the reduced path stays instant.
+    const beatSec = this.beatClock?.beatSeconds ?? 0.48;
+    const reelStaggerSec = beatSec / 8; // ~0.06s at 125BPM — preserves the old feel
+    const waveStartSec = this.reducedFx ? 0 : (this.beatClock?.nextBeatDelay(0.12) ?? 0);
+    this.reels.forEach((reel, i) =>
+      reel.highlight(byReel[i] ?? [], waveStartSec + i * reelStaggerSec, rich, winMat),
+    );
     // One global u_time stepper drives symbol-win + soft-burst + win-beam in sync.
     // The burst shows on EVERY win (it replaced the always-on glow), so schedule
     // whenever any shader-backed win layer can be visible.
