@@ -1,10 +1,15 @@
+// Jurisdiction compliance thresholds — pure TypeScript, NO Cocos. Mirrors the
+// flagship COMPLY table (the rows that affect the Cocos feature set). The active
+// jurisdiction would be chosen by the platform; INT is the open default.
+
 export interface ComplyRules {
+  /** Minutes of session time before a Reality Check is forced. */
   realityCheckMin: number;
-
+  /** Spins since the last check before a Reality Check is forced. */
   realityCheckSpins: number;
-
+  /** Max autoplay count (Infinity = uncapped, 0 = autoplay disabled). */
   autoplayMax: number;
-
+  /** A return <= 1x bet must not play triumphant audio/visual (LDW). */
   allowLdwCelebration: boolean;
 }
 
@@ -38,6 +43,7 @@ export function getComply(code?: string): ComplyRules {
   return JURISDICTIONS[code ?? DEFAULT_JURISDICTION] ?? JURISDICTIONS[DEFAULT_JURISDICTION];
 }
 
+/** Mutable per-session counters the controller feeds; pure helpers below. */
 export interface SessionStats {
   spinsSinceCheck: number;
   startedAtMs: number;
@@ -49,6 +55,7 @@ export function newSession(nowMs: number): SessionStats {
   return { spinsSinceCheck: 0, startedAtMs: nowMs, totalBetCents: 0, totalWonCents: 0 };
 }
 
+/** Record one settled spin into the session. */
 export function recordSpin(s: SessionStats, betCents: number, wonCents: number): SessionStats {
   return {
     ...s,
@@ -58,11 +65,13 @@ export function recordSpin(s: SessionStats, betCents: number, wonCents: number):
   };
 }
 
+/** Has the player crossed a Reality Check threshold (time OR spins)? */
 export function realityCheckDue(s: SessionStats, rules: ComplyRules, nowMs: number): boolean {
   const elapsedMin = (nowMs - s.startedAtMs) / 60000;
   return s.spinsSinceCheck >= rules.realityCheckSpins || elapsedMin >= rules.realityCheckMin;
 }
 
+/** Reset the check counters after the player acknowledges (CONTINUE). */
 export function ackRealityCheck(s: SessionStats, nowMs: number): SessionStats {
   return { ...s, spinsSinceCheck: 0, startedAtMs: nowMs };
 }

@@ -1,3 +1,15 @@
+/* BuyBonusModal — premium Buy-Feature modal, Cocos port of the PixiJS flagship's
+   3-tier buy-bonus card (shining-pop.game.js buyModal). Self-contained: builds
+   its own scrim + card + tier cards + inline bet stepper + BUY/CANCEL + close X,
+   and fit-scales to the viewport (master layoutBuyModal pattern). cc.Graphics has
+   no gradients, so the candy surfaces use the same stop+sheen+rim technique as
+   the betting bar.
+
+   The modal is VISUAL only — it renders the costs the model supplies and emits
+   intent events; the controller owns the spend + free-spin playback.
+
+   Events: buy(mode) · cancel · bet:inc · bet:dec · ui:click
+   API: configure(tiers, betText) · setBet(betText) · open · close · fit · on */
 import {
   _decorator,
   Color,
@@ -42,6 +54,7 @@ const C = {
   buy: '#ff5ab0',
   buyHi: '#ffd9f4',
   cancel: '#241a3a',
+  dark: '#1a0820',
 };
 function col(hex: string, a?: number): Color {
   const c = new Color();
@@ -81,7 +94,9 @@ export class BuyBonusModal extends Component {
     (this.cbs[ev] ?? []).forEach((cb) => {
       try {
         cb(arg);
-      } catch {}
+      } catch {
+        /* host handles */
+      }
     });
   }
 
@@ -91,6 +106,7 @@ export class BuyBonusModal extends Component {
     this.node.active = false;
   }
 
+  // ---- small builders -------------------------------------------------------
   private node2(parent: Node, x: number, y: number, w: number, h: number): Node {
     const n = new Node('n');
     n.layer = this.node.layer;
@@ -127,6 +143,7 @@ export class BuyBonusModal extends Component {
     return l;
   }
 
+  /** Candy panel into a Graphics (origin-centred rect), master sheen technique. */
   private candyPanel(
     g: Graphics,
     w: number,
@@ -156,22 +173,16 @@ export class BuyBonusModal extends Component {
     g.stroke();
   }
 
+  /** Faceted candy gem medallion (no sprite frame supplied). */
   private gem(g: Graphics, cx: number, cy: number, rad: number, accent: string): void {
-    g.fillColor = col('#ff8ad0', 0.9);
+    g.fillColor = col(accent, 0.9);
     g.moveTo(cx, cy + rad);
     g.lineTo(cx + rad * 0.82, cy);
     g.lineTo(cx, cy - rad);
     g.lineTo(cx - rad * 0.82, cy);
     g.close();
     g.fill();
-    g.fillColor = col(accent, 0.78);
-    g.moveTo(cx, cy + rad);
-    g.lineTo(cx + rad * 0.82, cy);
-    g.lineTo(cx, cy - rad);
-    g.lineTo(cx - rad * 0.82, cy);
-    g.close();
-    g.fill();
-    g.fillColor = col('#ffffff', 0.55);
+    g.fillColor = col('#ffffff', 0.4);
     g.moveTo(cx, cy + rad * 0.5);
     g.lineTo(cx + rad * 0.36, cy);
     g.lineTo(cx, cy - rad * 0.5);
@@ -199,12 +210,16 @@ export class BuyBonusModal extends Component {
     });
   }
 
+  // ---- public API -----------------------------------------------------------
+  /** (Re)build the modal from tier data. Idempotent — tears down a prior build. */
   configure(tiers: BuyTier[], betText: string): void {
     this.tiers = tiers;
     this.node.removeAllChildren();
     this.tileNodes = [];
     this.built = true;
 
+    // Scrim — full-bleed hit-blocker behind the card. Sized generous so it
+    // covers any viewport once the modal node sits at the canvas centre.
     const scrim = this.node2(this.node, 0, 0, 6000, 4000);
     const sg = scrim.addComponent(Graphics);
     sg.fillColor = col(C.scrim, 0.82);
@@ -216,6 +231,7 @@ export class BuyBonusModal extends Component {
       this.close();
     });
 
+    // Card — the premium surface everything sits on.
     const card = this.node2(this.node, 0, 0, CARD_W, CARD_H);
     this.card = card;
     const cg = card.addComponent(Graphics);
@@ -224,6 +240,7 @@ export class BuyBonusModal extends Component {
     this.text(card, 'BUY BONUS', 0, CARD_H / 2 - 46, 30, C.title, true);
     this.text(card, 'Choose your bonus — instant free spins.', 0, CARD_H / 2 - 84, 16, C.muted);
 
+    // Tier cards — 3 across.
     const gap = 22;
     const totalW = this.tiers.length * TILE_W + (this.tiers.length - 1) * gap;
     const startX = -totalW / 2 + TILE_W / 2;
@@ -237,6 +254,8 @@ export class BuyBonusModal extends Component {
       this.tileNodes.push(tile);
       this.tileOps.push(tile.getComponent(UIOpacity) ?? tile.addComponent(UIOpacity));
 
+      // Glow ring BEHIND the medallion — layered candy-pink fades + a crisp rim
+      // (the flagship's selected-tier halo). Hidden until this tier is selected.
       const my = TILE_H / 2 - 78;
       const ring = this.node2(tile, 0, my, 116, 116);
       const rg = ring.addComponent(Graphics);
@@ -270,12 +289,12 @@ export class BuyBonusModal extends Component {
       this.text(tile, `${tier.spins} FREE SPINS`, 0, -16, 13, C.label);
       const cost = this.text(tile, tier.costText, 0, -52, 26, C.value, true);
       cost.name = 'cost';
-
-      if (tier.special) this.text(tile, tier.special, 0, -92, 11, C.muted);
+      this.text(tile, tier.special, 0, -92, 11, C.muted);
 
       this.pressFx(tile, [tile], () => this.select(i), false);
     });
 
+    // Inline bet stepper — change bet without closing (master parity: live cost).
     const stepY = -CARD_H / 2 + 118;
     this.text(card, 'YOUR BET', 0, stepY + 30, 13, C.edge);
     const minus = this.node2(card, -120, stepY, 56, 56);
@@ -292,6 +311,7 @@ export class BuyBonusModal extends Component {
     this.text(plus, '+', 0, 2, 30, C.value, true);
     this.pressFx(plus, [plus], () => this.emit('bet:inc'));
 
+    // Action row — CANCEL (secondary) + BUY (hero).
     const btnY = -CARD_H / 2 + 50;
     const cancel = this.node2(card, -150, btnY, 220, 56);
     const ccg = cancel.addComponent(Graphics);
@@ -307,9 +327,10 @@ export class BuyBonusModal extends Component {
     this.buyOp = buy.addComponent(UIOpacity);
     const bg = buy.addComponent(Graphics);
     this.candyPanel(bg, 220, 56, 28, C.buy, C.buyHi, C.buyHi, 2);
-
-    this.buyLabel = this.text(buy, 'BUY', 0, 2, 18, '#f5f5f5', true);
+    this.buyLabel = this.text(buy, 'BUY', 0, 2, 18, C.dark, true);
     this.pressFx(buy, [buy], () => {
+      // Unaffordable tier: refuse with a head-shake + 'buy:blocked' (host shows
+      // the friendly notice) instead of a dead click or a doomed buy intent.
       if (this.affordable[this.selected] === false) {
         this.emit('buy:blocked', this.tiers[this.selected].mode);
         Tween.stopAllByTarget(buy);
@@ -324,6 +345,7 @@ export class BuyBonusModal extends Component {
       this.emit('buy', this.tiers[this.selected].mode);
     });
 
+    // Close X — top-right.
     const close = this.node2(card, CARD_W / 2 - 38, CARD_H / 2 - 38, 52, 52);
     const xg = close.addComponent(Graphics);
     xg.lineWidth = 4;
@@ -341,6 +363,8 @@ export class BuyBonusModal extends Component {
     this.select(0);
   }
 
+  /** Highlight the chosen tier (flagship treatment): glow-ring halo + medallion
+   *  scale-pop + lift + bright accent rim, while the others dim back. */
   private select(i: number): void {
     this.selected = i;
     this.tileNodes.forEach((tile, idx) => {
@@ -361,10 +385,10 @@ export class BuyBonusModal extends Component {
         );
       }
       tile.setPosition(tile.position.x, on ? 32 : 24, 0);
-
+      // Unselected tiers dim back so the chosen one reads as the hero.
       const op = this.tileOps[idx];
       if (op) op.opacity = on ? 255 : 150;
-
+      // Glow ring fades in under the chosen medallion.
       const ring = this.rings[idx];
       if (ring) {
         const rop = ring.getComponent(UIOpacity) ?? ring.addComponent(UIOpacity);
@@ -377,7 +401,7 @@ export class BuyBonusModal extends Component {
           ring.active = false;
         }
       }
-
+      // Medallion pops up on select, settles back otherwise.
       const med = this.medallions[idx];
       if (med) {
         Tween.stopAllByTarget(med);
@@ -389,6 +413,8 @@ export class BuyBonusModal extends Component {
     this.applyBuyState();
   }
 
+  /** BUY reflects the selected tier's affordability: full-strength `BUY <cost>`
+   *  when buyable, dimmed `NEED <cost>` when the balance can't cover it. */
   private applyBuyState(): void {
     if (!this.buyLabel) return;
     const ok = this.affordable[this.selected] !== false;
@@ -396,6 +422,7 @@ export class BuyBonusModal extends Component {
     if (this.buyOp) this.buyOp.opacity = ok ? 255 : 130;
   }
 
+  /** Per-tier affordability flags (host recomputes on balance/bet changes). */
   setAffordable(flags: boolean[]): void {
     this.affordable = flags.slice();
     this.applyBuyState();
@@ -405,6 +432,7 @@ export class BuyBonusModal extends Component {
     if (this.betValue) this.betValue.string = betText;
   }
 
+  /** Update each tier's live cost text (after a bet change). */
   setCosts(costTexts: string[]): void {
     this.tileNodes.forEach((tile, i) => {
       const label = tile.children
@@ -422,9 +450,6 @@ export class BuyBonusModal extends Component {
     if (!this.built) return;
     this.node.active = true;
     const op = this.card.getComponent(UIOpacity) ?? this.card.addComponent(UIOpacity);
-
-    Tween.stopAllByTarget(op);
-    Tween.stopAllByTarget(this.card);
     op.opacity = 0;
     this.card.setScale(0.9 * this.cardScale, 0.9 * this.cardScale, 1);
     tween(op).to(0.2, { opacity: 255 }).start();
@@ -434,40 +459,27 @@ export class BuyBonusModal extends Component {
   }
 
   close(): void {
-    if (!this.node.active) return;
-    const op = this.card.getComponent(UIOpacity) ?? this.card.addComponent(UIOpacity);
-    Tween.stopAllByTarget(op);
-    Tween.stopAllByTarget(this.card);
-    const settled = 0.92 * this.cardScale;
-    tween(this.card)
-      .to(0.12, { scale: new Vec3(settled, settled, 1) }, { easing: 'quadIn' })
-      .start();
-    tween(op)
-      .to(0.12, { opacity: 0 })
-      .call(() => {
-        this.node.active = false;
-        this.card.setScale(this.cardScale, this.cardScale, 1);
-        op.opacity = 255;
-      })
-      .start();
+    this.node.active = false;
   }
 
   isOpen(): boolean {
     return this.node.active;
   }
 
+  /** Fit the card to the SAFE AREA ABOVE THE BETTING BAR. `bottomInset` is the
+   *  screen-px the bar reserves at the bottom; the card shrinks to fit the height
+   *  that remains AND is raised by half the inset so it centres in that band
+   *  instead of the full screen — otherwise its bottom rows (YOUR BET stepper +
+   *  CANCEL/BUY) clip behind the bar. Host is a screen-space overlay, so this
+   *  scale/position is absolute (no board scale applied). */
   fit(viewW: number, viewH: number, bottomInset = 0): void {
     const margin = 36;
     const availH = Math.max(220, viewH - bottomInset - margin);
-
-    const portrait = viewH > viewW;
-    const s = portrait
-      ? Math.min((viewW * 0.97) / CARD_W, availH / CARD_H)
-      : Math.min(1, (viewW - margin) / CARD_W, availH / CARD_H);
+    const s = Math.min(1, (viewW - margin) / CARD_W, availH / CARD_H);
     this.cardScale = s;
     if (this.card) {
       this.card.setScale(s, s, 1);
-      this.card.setPosition(0, bottomInset / 2, 0);
+      this.card.setPosition(0, bottomInset / 2, 0); // centre within the area above the bar
     }
   }
 }

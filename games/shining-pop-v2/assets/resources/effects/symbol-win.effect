@@ -1,24 +1,24 @@
-// CINEMA WAVE — winning-symbol POWER highlight. An additive overlay sprite that
-// samples the symbol's OWN texture and paints, ALL clipped to the symbol's alpha
-// silhouette (never a background box / border quad), a layered hero treatment:
-//   1. IRIDESCENT SHIMMER — a rainbow sheen in tight bright ribbons flowing across
-//      the candy face (the creative signature: candy catching rainbow light);
-//   2. a 4-point STAR GLINT that wanders the surface and twinkles on the beat;
-//   3. a thick PULSING RIM-LIGHT hugging the silhouette (alpha-band, atlas-safe);
-//   4. rising FIRE + a diagonal SPECULAR SWEEP as the warm supporting layers.
-// Everything breathes on one heartbeat `pulse`. Branchless toolkit (no per-fragment
-// branches) adapted from pixi-v8-shader-fx to a Cocos CCEffect (WebGL2 GLSL, dual
-// ES300/ES100 variants; never WebGPU). Honors vfx.materialsEnabled (null -> Graphics
-// sheen fallback) and reducedFx (consumer skips the overlay).
+// CINEMA WAVE — winning-symbol "ON FIRE" highlight. An additive overlay sprite
+// that samples the symbol's OWN texture and paints, ALL clipped to the symbol's
+// alpha silhouette (never a background box / border quad):
+//   1. rising FIRE — scrolling fbm noise through a warm fire ramp, hottest at the
+//      symbol's base, licking up its shape (the symbol itself burns);
+//   2. a silhouette RIM-LIGHT (alpha-band, atlas-pack safe);
+//   3. a diagonal SPECULAR SWEEP across the glossy candy face.
+// Branchless toolkit (step/smoothstep/mix, no per-fragment branches) adapted from
+// pixi-v8-shader-fx to a Cocos CCEffect (WebGL2 GLSL, dual ES300/ES100 variants;
+// never WebGPU). Honors vfx.materialsEnabled (null -> Graphics sheen fallback) and
+// reducedFx (consumer skips the overlay). This REPLACES the old rectangular
+// win-fire background quads — fire is now strictly per-symbol, on the symbol.
 
 CCEffect %{
   techniques:
   - passes:
     - vert: sprite-vs:vert
       frag: sprite-fs:frag
-      depthStencilState:
-        depthTest: false
-        depthWrite: false
+      # NOTE: no explicit depthStencilState — let the 2D StencilManager own it so
+      # this overlay is CLIPPED by the per-reel Mask (matches soft-burst.effect).
+      # depthTest:false is the 2D default, so visuals are otherwise unchanged.
       blendState:
         targets:
         - blend: true
@@ -35,7 +35,6 @@ CCEffect %{
         u_rimWidth:    { value: 0.035 }
         u_sweepSpeed:  { value: 0.55 }
         u_fireAmt:     { value: 1.0 }
-        u_shimmer:     { value: 1.0 }
 }%
 
 CCProgram sprite-vs %{
@@ -84,7 +83,6 @@ CCProgram sprite-fs %{
     float u_rimWidth;
     float u_sweepSpeed;
     float u_fireAmt;
-    float u_shimmer;
   };
 
   // Cheap value-noise (hash + bilerp) → 3-octave fbm → warm fire ramp.
@@ -109,10 +107,6 @@ CCProgram sprite-fs %{
     c = mix(c, vec3(1.0, 1.0, 0.85), smoothstep(0.8, 1.0, t));
     return c;
   }
-  // Cheap rainbow: hue (0..1) → rgb, no branches.
-  vec3 hue (float h) {
-    return clamp(abs(fract(h + vec3(0.0, 0.6667, 0.3333)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
-  }
 
   vec4 frag () {
     // Sample the symbol alpha DIRECTLY (not via a macro) — Cocos's chunk scanner
@@ -122,45 +116,32 @@ CCProgram sprite-fs %{
       a = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
     #endif
 
-    // PER-SYMBOL PHASE — color.rg carries a stable random seed per symbol (the
-    // consumer never tints with color.rgb). phA/phB desync every time-based term
-    // so each candy animates on its OWN clock — the grid reads lively per-symbol,
-    // not one synchronised diagonal sweep across the whole board.
-    float phA = color.r * 6.2831;
-    float phB = color.g;
+    // === FIRE clipped to the symbol silhouette (the symbol burns, no box) ===
+    // Concentrated at the BASE and licking UP, so the candy face stays readable —
+    // the symbol looks lit/edged with flame, not painted solid orange.
+    float t = u_time * 1.6;
+    vec2 np = vec2(uv0.x * 3.0 + sin(uv0.y * 6.0 + t) * 0.16, uv0.y * 3.2 - t * 1.25);
+    float n = fbm(np);
+    float vfall = pow(smoothstep(0.72, 0.0, uv0.y), 1.5); // hot only low → rises, fades up
+    float flame = pow(n * vfall, 1.5) * (0.55 + 0.4 * u_intensity);
+    flame *= a;                                           // CLIP to the symbol shape
+    vec3 fireCol = fireRamp(clamp(flame, 0.0, 1.0));
+    float fireA = clamp(flame, 0.0, 1.0) * 0.68 * u_fireAmt;
 
-    // One heartbeat the highlight pulses on (per-symbol phase).
-    float pulse = 0.55 + 0.45 * sin(u_time * 5.0 + phA);
+    // === silhouette rim-light (alpha band — no neighbour taps, atlas-safe) ===
+    float lo = 0.5 - u_rimWidth * 8.0;
+    float rim = smoothstep(lo, 0.5, a) * (1.0 - smoothstep(0.5, 0.94, a));
+    rim = pow(clamp(rim, 0.0, 1.0), 0.7);
+    float flow = 0.5 + 0.5 * sin(u_time * 3.0 + (uv0.x + uv0.y) * 6.2831);
+    vec3 rimCol = mix(vec3(1.0, 0.45, 0.10), vec3(1.0, 0.93, 0.66), flow);
 
-    // === STAR GLINTS (cute hero): two 4-point sparkles wandering the candy,
-    //     each on its own wander + twinkle so it reads playful, not mechanical ===
-    vec2 g1 = uv0 - vec2(0.5 + 0.26 * sin(u_time * 0.7 + phA), 0.55 + 0.22 * cos(u_time * 0.9 + phA));
-    float c1 = max(exp(-abs(g1.x) * 55.0), exp(-abs(g1.y) * 55.0)) * exp(-dot(g1, g1) * 22.0);
-    vec2 g2 = uv0 - vec2(0.5 + 0.30 * cos(u_time * 0.5 + phA * 1.7), 0.5 + 0.28 * sin(u_time * 0.8 + phA * 1.3));
-    float c2 = max(exp(-abs(g2.x) * 60.0), exp(-abs(g2.y) * 60.0)) * exp(-dot(g2, g2) * 26.0);
-    float tw1 = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(u_time * 9.0 + phA), 3.0);
-    float tw2 = 0.30 + 0.70 * pow(0.5 + 0.5 * sin(u_time * 7.0 + phA + 2.1), 3.0);
-    float glint = (c1 * tw1 + c2 * tw2) * a;
+    // === diagonal specular sweep across the glossy face, masked to the body ===
+    float diag = (uv0.x + (1.0 - uv0.y)) * 0.5;
+    float sweep = (1.0 - smoothstep(0.0, 0.11, abs(diag - fract(u_time * u_sweepSpeed)))) * a;
+    vec3 sweepCol = vec3(1.0, 0.98, 0.92);
 
-    // === SOFT RIM: warm silhouette light hugging the candy shape (pulsing) ===
-    float lo = 0.5 - u_rimWidth * 10.0;
-    float rim = smoothstep(lo, 0.5, a) * (1.0 - smoothstep(0.5, 0.97, a));
-    rim = pow(clamp(rim, 0.0, 1.0), 0.6) * (0.7 + 0.55 * pulse);
-    vec3 rimCol = mix(vec3(1.0, 0.66, 0.34), vec3(1.0, 0.95, 0.82), 0.5 + 0.5 * sin(u_time * 3.0 + phA));
-
-    // === CUTE CANDY WIN (2026-06-15 RADICAL REDESIGN) ===
-    // The candy gently LIGHTS UP and SPARKLES: a soft warm inner glow + the warm
-    // silhouette rim + twinkling star glints. Deliberately DROPPED: the rainbow
-    // iridescent shimmer, the diagonal specular SWEEP, and the fire — those read as
-    // a techy laser / arcade sheen and the owner rejected them (repeatedly). Every
-    // term is alpha-clipped (× a), so the win lives ON the transparent candy, never
-    // on the rectangular cell box. Elegant + cute, not a light show.
-    float body = a * (0.16 + 0.13 * pulse);            // soft "it lit up" inner glow
-    vec3 warm = vec3(1.0, 0.93, 0.76);                 // candy-warm white (no rainbow)
-    vec3 rgb = warm * body
-             + rimCol * rim * 0.95
-             + vec3(1.0, 0.99, 0.95) * glint * 1.8;    // bright white twinkles
-    float outA = clamp(body + rim * 0.85 + glint * 1.5, 0.0, 1.0) * u_intensity * color.a;
+    vec3 rgb = fireCol * fireA + rimCol * rim + sweepCol * sweep * 0.55;
+    float outA = clamp(fireA + rim + sweep * 0.55, 0.0, 1.0) * u_intensity * color.a;
 
     vec4 col = vec4(rgb, outA);
     ALPHA_TEST(col);

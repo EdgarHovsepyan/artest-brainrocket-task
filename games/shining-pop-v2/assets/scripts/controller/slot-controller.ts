@@ -1,3 +1,11 @@
+// MVC — CONTROLLER (+ composition root). The ONE component on the Canvas. Owns the
+// Model, builds the View, and runs the spin lifecycle as an explicit state machine:
+//
+//   idle → spinning → resolving → idle        (re-click while spinning = quick-stop)
+//   idle → bonus (free-spin playback) → idle
+//
+// The Model decides every outcome; the View only renders it.
+
 import {
   _decorator,
   Component,
@@ -37,14 +45,7 @@ import {
 } from '../logic/compliance';
 import { formatMoney } from '../logic/money';
 import { installLifecycle, LifecycleHandle } from './lifecycle';
-import {
-  BONUS_MODES,
-  BONUS_MODES_BY_VALUE,
-  BonusMode,
-  SCATTER,
-  SCATTER_FS_MODE,
-  SETTINGS,
-} from '../logic/game-config';
+import { BONUS_MODES, BonusMode, SETTINGS } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
 import { VIEW_CONFIG } from '../view/view-config';
 
@@ -55,7 +56,7 @@ type FlowState = 'idle' | 'spinning' | 'resolving' | 'bonus';
 @ccclass('SlotController')
 export class SlotController extends Component {
   @property
-  startBalanceCents = 1000_00;
+  startBalanceCents = 100_00;
 
   @property
   betCents = 1_00;
@@ -65,40 +66,47 @@ export class SlotController extends Component {
   private bar!: BettingBarMobile | BettingBarWeb;
   private barNode: Node | null = null;
   private barIsWeb: boolean | null = null;
-
-  private introActive = true;
   private lifecycle: LifecycleHandle | null = null;
   private comply: ComplyRules = getComply();
   private session: SessionStats = newSession(0);
 
   private state: FlowState = 'idle';
   private canStop = false;
-
-  private turboMode: 0 | 1 | 2 = 1;
+  private turboMode: 0 | 1 | 2 = 0;
   private reducedFx = false;
   private autoplay: AutoplayState = idleAutoplay();
   private muted = false;
 
   onLoad(): void {
+    // Uncap the frame rate: Cocos web defaults to 60 — 120 lets the game run at the
+    // display's native refresh (120/144Hz ProMotion) for buttery spins. Visual/perf only.
     game.frameRate = 120;
     this.model = new SlotModel({ balanceCents: this.startBalanceCents, betCents: this.betCents });
     this.session = newSession(this.nowMs());
     const viewNode = new Node('SlotView');
     this.node.addChild(viewNode);
     this.view = viewNode.addComponent(SlotView);
-
-    this.view.onOverlay = (open: boolean): void => {
-      if (this.barNode && this.barNode.isValid) this.barNode.active = !open;
-    };
     void this.boot();
   }
 
   private async boot(): Promise<void> {
+    // externalControls: the shared BettingBar provides the controls + HUD.
     await this.view.init(true);
+    // WCAG 2.3.3 — seed reduced-motion from the OS so a motion-sensitive player
+    // gets the calm experience on first paint, not only after finding the toggle.
+    const mq =
+      typeof window !== 'undefined' && window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null;
+    if (mq) {
+      this.reducedFx = mq.matches;
+      this.view.setReducedFx(this.reducedFx);
+      mq.addEventListener?.('change', (e) => this.applySetting('reducedFx', e.matches));
+    }
     this.view.showGrid(this.model.idleGrid());
     this.view.onBuyClicked((mode) => void this.onBuy(mode as BonusMode));
     this.view.configureBuyMenu(
-      BONUS_MODES_BY_VALUE.map((mode) => ({
+      (Object.keys(BONUS_MODES) as BonusMode[]).map((mode) => ({
         mode,
         name: BONUS_MODES[mode].name,
         costText: this.fmt(this.model.bonusCost(mode)),
@@ -106,7 +114,7 @@ export class SlotController extends Component {
     );
     this.view.setBuyBet(this.fmt(this.model.bet));
     this.refreshBuyAffordability();
-
+    // The modal's inline bet stepper walks the same ladder as the bar.
     this.view.onBuyBetStep((dir) => this.changeBet(dir));
     this.refreshAutoplayPanel();
     this.view.onAutoplayStart((spins) => this.startAuto(spins));
@@ -127,18 +135,12 @@ export class SlotController extends Component {
       this.refreshBuyMenu();
     });
 
+    // INTRO GATE + first-gesture audio bootstrap (master learning: ANY first
+    // gesture must unlock the bank, not only the intro tap).
     this.view.buildIntro(() => {
-      this.introActive = false;
-      this.view.wipe('intro', 1, 1.15);
-      this.view.cinematicBloom(0.72);
-      if (this.barNode && this.barNode.isValid) this.barNode.active = true;
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');
     });
-
-    try {
-      (window as unknown as Record<string, boolean>).__shiningPopReady = true;
-    } catch {}
     const unlockOnce = () => {
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');
@@ -148,19 +150,26 @@ export class SlotController extends Component {
     try {
       window.addEventListener('pointerdown', unlockOnce, { capture: true, once: true });
       window.addEventListener('keydown', unlockOnce, { capture: true, once: true });
-    } catch {}
+    } catch {
+      /* non-browser runtime */
+    }
 
+    // Shared betting bar — WEB strip on landscape, the portrait overlay on
+    // mobile aspect (master parity: two bar layouts, one controller surface).
     this.buildBar();
-
+    // Boot-time relayer for the whole built tree (view + intro + panels).
     this.scheduleOnce(() => this.relayerUI(this.node), 0);
-
+    // ONE resize owner: cc.view holds a SINGLE callback, so the controller fans
+    // out to the view AND the bar (setting it in both places clobbered the view's).
     const handleResize = (): void => {
       this.view.refit();
       this.buildBar();
       this.fitBar();
     };
     view.setResizeCallback(handleResize);
-
+    // Lifecycle hooks: tab visibility + minimize freeze the tick and suspend
+    // audio (browsers throttle hidden tabs anyway; this is explicit + clean);
+    // online/offline shows a network modal; resize is debounced beyond cc.view.
     this.lifecycle = installLifecycle({
       onSuspend: () => this.view.audio.suspend(),
       onResume: () => this.view.audio.resume(),
@@ -171,6 +180,8 @@ export class SlotController extends Component {
     this.view.setInteractable(true);
     input.on(Input.EventType.KEY_DOWN, this.onKey, this);
 
+    // DEV-ONLY remote control (?debug) — master parity with window.__dbg: lets
+    // headless QA force ceremonies/panels without playing for the trigger.
     try {
       if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) {
         (window as unknown as Record<string, unknown>).__v2 = {
@@ -180,12 +191,14 @@ export class SlotController extends Component {
             this.view.playCeremony(this.model.bet * mult, this.model.bet, wild),
           feature: (name = 'STICKY WILDS') => this.view.showFeatureUnlocked(name),
           buy: (mode: BonusMode = 'reels') => void this.onBuy(mode),
-          vfx: () => this.view.vfxHud(),
         };
       }
-    } catch {}
+    } catch {
+      /* non-browser runtime */
+    }
   }
 
+  /** (Re)create the bar variant for the current orientation and wire it. */
   private buildBar(): void {
     const vs = view.getVisibleSize();
     const wantWeb = vs.width > vs.height * 1.05;
@@ -198,7 +211,6 @@ export class SlotController extends Component {
       : barNode.addComponent(BettingBarMobile);
     this.barNode = barNode;
     this.barIsWeb = wantWeb;
-    if (this.introActive) barNode.active = false;
     this.bar.on('spin', () => this.onSpinPressed());
     this.bar.on('bet:inc', () => this.changeBet(1));
     this.bar.on('bet:dec', () => this.changeBet(-1));
@@ -209,25 +221,21 @@ export class SlotController extends Component {
     this.bar.on('autoplay', () => this.toggleAuto());
     this.bar.on('sound', () => this.toggleSound());
     this.bar.on('volume', (v: number) => this.view.setVolume(v));
-
-    this.bar.on('menu', () => {
-      if (this.state === 'idle') this.view.openMenuHub();
-    });
+    this.bar.on('menu', () => this.view.openMenuHub());
     this.bar.on('ui:click', () => this.view.audio.click());
-
+    // Task 7.2 — portrait bar emits 'buy' from its new Buy control next to
+    // the spin ring. Web bar already routes to openBuyMenu via the FAB.
     this.bar.on('buy', () => this.view.openBuyMenu());
-
+    // Defer state writes one frame so the bar's onLoad has built its labels.
     this.scheduleOnce(() => {
+      // Code-created nodes default to the DEFAULT layer, which the 2D UI renderer
+      // skips (-> black screen). Force the built tree onto UI_2D so it draws.
       this.relayerUI(barNode);
       this.fitBar();
-
-      this.bar.setCurrency('USD');
       this.syncHud();
       this.bar.setLastWin(0);
-
-      this.setTurboMode(this.turboMode);
+      this.bar.setTurbo(this.turboMode);
       this.bar.setSoundOn(!this.muted);
-      this.bar.setReducedFx(this.reducedFx);
       this.bar.setAutoplay(this.autoplay.active ? this.autoplay.remaining : null);
       if (this.barIsWeb) {
         (this.bar as BettingBarWeb).setSpinArt(this.view.getBrandFrame('spinArt'));
@@ -236,6 +244,11 @@ export class SlotController extends Component {
     }, 0);
   }
 
+  /** Fit the bar to the viewport. BOTH bars are bottom-docked and return their
+   *  opaque control-band height; the board contain-fits ABOVE that inset (master
+   *  fitBottom contract). Portrait used to centre the bar with a 0 inset, which
+   *  rendered the spin cluster on top of the reels — the mobile bar now docks and
+   *  reserves its band the same way the web bar does. */
   private fitBar(): void {
     const vs = view.getVisibleSize();
     const inset = this.barIsWeb
@@ -244,27 +257,30 @@ export class SlotController extends Component {
     this.view.setBottomInset(inset);
   }
 
+  /** Recursively move a node subtree onto the UI_2D layer so the UI renderer draws it. */
   private relayerUI(n: Node): void {
     n.layer = Layers.Enum.UI_2D;
     const kids = n.children;
     for (let i = 0; i < kids.length; i++) this.relayerUI(kids[i]);
   }
 
+  /** Push model balance + bet into the betting bar (cents → display units). */
   private syncHud(): void {
     this.bar.setBalance(this.model.balance / 100);
     this.bar.setBet(this.model.bet / 100);
-
+    // live bar state: dim the stepper at the ladder ends, dim spin if unaffordable.
     this.bar.setSteppers(this.model.bet > minBet(), this.model.bet < maxBet());
     this.bar.setAffordable(this.model.canSpin());
     if (this.barIsWeb) {
       (this.bar as BettingBarWeb).setBetLevels(
         BET_LEVELS_CENTS.slice(),
         BET_LEVELS_CENTS.indexOf(snapBet(this.model.bet)),
-        (cents) => formatMoney(cents / 100, 'USD'),
+        (cents) => (cents / 100).toFixed(2),
       );
     }
   }
 
+  /** Absolute bet set (carousel / x2 / quick-bet panel) — same guards as stepping. */
   private setBetTo(cents: number): void {
     if (this.state !== 'idle' || this.autoplay.active) return;
     this.model.setBet(snapBet(cents));
@@ -274,23 +290,33 @@ export class SlotController extends Component {
     this.refreshBuyMenu();
   }
 
+  /** Keep the buy modal's tier costs + bet readout in sync after a bet change. */
   private refreshBuyMenu(): void {
-    const costs = BONUS_MODES_BY_VALUE.map((m) => this.fmt(this.model.bonusCost(m)));
+    const costs = (Object.keys(BONUS_MODES) as BonusMode[]).map((m) =>
+      this.fmt(this.model.bonusCost(m)),
+    );
     this.view.refreshBuyCosts(costs);
     this.view.setBuyBet(this.fmt(this.model.bet));
     this.refreshBuyAffordability();
   }
 
+  /** Per-tier affordability for the buy modal — recomputed whenever the balance
+   *  or the bet changes, so BUY dims to NEED before a doomed press can happen. */
   private refreshBuyAffordability(): void {
     this.view.setBuyAffordable(
-      BONUS_MODES_BY_VALUE.map((m) => this.model.balance >= this.model.bonusCost(m)),
+      (Object.keys(BONUS_MODES) as BonusMode[]).map(
+        (m) => this.model.balance >= this.model.bonusCost(m),
+      ),
     );
   }
 
+  /** Wall-clock for the session timer (Date.now is fine at game runtime). */
   private nowMs(): number {
     return typeof Date !== 'undefined' ? Date.now() : 0;
   }
 
+  /** Show the Reality Check; CONTINUE resets the counters + resumes autoplay,
+   *  STOP ends any autoplay and leaves the player on an idle board. */
   private presentRealityCheck(): void {
     const wasAuto = this.autoplay.active;
     if (wasAuto) this.stopAuto();
@@ -315,6 +341,8 @@ export class SlotController extends Component {
     );
   }
 
+  /** Bet stepper from the bar — walks the BET_LEVELS ladder (master parity).
+   *  Locked during autoplay. */
   private changeBet(dir: number): void {
     if (this.state !== 'idle' || this.autoplay.active) return;
     this.model.setBet(stepBet(this.model.bet, dir > 0 ? 1 : -1));
@@ -330,6 +358,9 @@ export class SlotController extends Component {
     this.lifecycle = null;
   }
 
+  /** Network state changed: offline -> blocking modal; online -> dismiss it.
+   *  The modal blocks input to the background (master compliance: clear failure
+   *  state, dismissible "Retry" surface). */
   private onNetworkChange(online: boolean): void {
     if (online) {
       this.view.dismissError();
@@ -345,6 +376,7 @@ export class SlotController extends Component {
     );
   }
 
+  /** Master keyboard map: Space spin · A autoplay · T turbo · M mute · B buy · S settings. */
   private onKey(e: EventKeyboard): void {
     if (e.keyCode === KeyCode.SPACE) this.onSpinPressed();
     else if (e.keyCode === KeyCode.KEY_A) this.toggleAuto();
@@ -359,6 +391,7 @@ export class SlotController extends Component {
     return (cents / 100).toFixed(2);
   }
 
+  /** Bar turbo control cycles OFF -> TURBO -> MEGA -> OFF (master tri-state). */
   private toggleTurbo(): void {
     this.setTurboMode(((this.turboMode + 1) % 3) as 0 | 1 | 2);
   }
@@ -370,13 +403,10 @@ export class SlotController extends Component {
     this.refreshSettingsPanel();
   }
 
+  /** Reel-duration scalar per turbo mode (view-config table). */
   private turboScalar(): number {
     const t = VIEW_CONFIG.turbo;
     return [t.off, t.turbo, t.max][this.turboMode];
-  }
-
-  private turboKey(): 'off' | 'turbo' | 'max' {
-    return (['off', 'turbo', 'max'] as const)[this.turboMode];
   }
 
   private applySetting(key: 'sound' | 'turboMode' | 'reducedFx', value: number | boolean): void {
@@ -390,7 +420,6 @@ export class SlotController extends Component {
     } else {
       this.reducedFx = value as boolean;
       this.view.setReducedFx(this.reducedFx);
-      this.bar.setReducedFx(this.reducedFx);
     }
     this.refreshSettingsPanel();
     this.view.openSettingsPanel();
@@ -411,6 +440,7 @@ export class SlotController extends Component {
     this.bar.setSoundOn(!this.muted);
   }
 
+  /** AUTO control (bar / keyboard A): running -> stop the run; idle -> open the panel. */
   private toggleAuto(): void {
     if (this.autoplay.active) this.stopAuto();
     else this.view.openAutoplayPanel();
@@ -439,32 +469,25 @@ export class SlotController extends Component {
     });
   }
 
+  /** Spin button / Space: start a spin, or quick-stop one already running. */
   private onSpinPressed(): void {
     if (this.state === 'spinning') {
       if (this.canStop) this.view.quickStopReels();
       return;
     }
-    if (this.state !== 'idle' || this.autoplay.active) return;
-    if (!this.model.canSpin()) {
-      this.view.showError(
-        'Insufficient balance',
-        'You don’t have enough balance to spin at this bet.\nLower your bet to keep playing.',
-        'OK',
-        () => this.view.dismissError(),
-      );
-      return;
-    }
+    if (this.state !== 'idle' || !this.model.canSpin()) return;
     void this.runSpin();
   }
 
   private async runSpin(): Promise<void> {
     this.state = 'spinning';
     if (this.autoplay.active) {
+      // Master parity: the spin counter decrements at spin START, not settle.
       this.autoplay = spinStarted(this.autoplay);
       this.bar.setAutoplay(this.autoplay.remaining);
     }
-    this.bar.setSpinning(true);
-    this.view.setInteractable(true);
+    this.bar.setSpinning(true); // swap the spin arrow → stop square
+    this.view.setInteractable(true); // keep enabled so a re-click can quick-stop
     this.view.clearWins();
     this.view.setWin(0);
     this.view.setBanner('');
@@ -472,10 +495,7 @@ export class SlotController extends Component {
     this.view.closeAutoplayPanel();
 
     this.canStop = false;
-    this.scheduleOnce(
-      () => (this.canStop = true),
-      VIEW_CONFIG.spin.quickStopArmMs[this.turboKey()] / 1000,
-    );
+    this.scheduleOnce(() => (this.canStop = true), 0.18);
 
     const outcome = this.model.play();
     this.view.setBalance(outcome.balanceCents);
@@ -484,57 +504,44 @@ export class SlotController extends Component {
     await this.view.playSpin(outcome.result.grid, this.turboScalar());
 
     this.state = 'resolving';
-    if (outcome.wildStrike > 1) this.view.setBanner(`WILD ×${outcome.wildStrike}`);
-
+    if (outcome.wildStrike > 1) this.view.revealWildMultiplier(outcome.wildStrike);
+    // P0 — hold the resolve (and any auto-spin) until the win count-up has played,
+    // so the crescendo is no longer guillotined by the old hardcoded 0.3s delay.
+    let resolveDelay = 0.3;
     if (outcome.winCents > 0) {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
-      this.view.countUp(outcome.winCents);
+      resolveDelay = Math.max(resolveDelay, this.view.countUp(outcome.winCents));
       this.view.playCeremony(outcome.winCents, outcome.betCents, outcome.wildStrike);
       this.bar.setLastWin(outcome.winCents / 100);
-
+      // UKGC LDW rule: a return <= 1x total bet must NOT play triumphant audio.
       if (outcome.winCents > outcome.betCents) {
         const mult = outcome.winCents / outcome.betCents;
-
-        const tier = mult >= 50 ? 5 : mult >= 30 ? 4 : mult >= 10 ? 3 : mult >= 2 ? 2 : 1;
+        const tier = mult >= 50 ? 5 : mult >= 20 ? 4 : mult >= 8 ? 3 : mult >= 2 ? 2 : 1;
         this.view.audio.win(tier);
       }
-    }
-
-    if (outcome.freeSpins) {
-      const grid = outcome.result.grid;
-      const sc = outcome.result.scatters;
-      const cells: Array<{ reel: number; row: number }> = [];
-      for (let r = 0; r < grid.length; r++)
-        for (let w = 0; w < grid[r]!.length; w++)
-          if (grid[r]![w] === SCATTER) cells.push({ reel: r, row: w });
-      this.view.presentScatterTrigger(cells, sc);
-      await this.wait(1150);
-      this.view.wipe('fs', 1, 1.1);
-      this.view.clearWins();
-      this.view.showFeatureUnlocked('FREE SPINS', SCATTER_FS_MODE, sc);
-      this.view.setBanner(`FREE SPINS ×${outcome.result.freeSpins}`);
     }
 
     this.session = recordSpin(this.session, outcome.betCents, outcome.winCents);
 
     this.scheduleOnce(() => {
       this.state = 'idle';
-      this.bar.setSpinning(false);
+      this.bar.setSpinning(false); // stop square → spin arrow
       this.bar.setAffordable(this.model.canSpin());
       this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
       this.view.setInteractable(true);
-
-      if (this.barNode?.isValid) this.barNode.active = !this.view.anyOverlayOpen();
-      this.refreshBuyAffordability();
-
+      this.refreshBuyAffordability(); // balance moved — keep the buy modal honest
+      // Responsible-gaming Reality Check interrupts before the next spin/autoplay.
       if (realityCheckDue(this.session, this.comply, this.nowMs())) {
         this.presentRealityCheck();
         return;
       }
       if (this.autoplay.active) {
+        // Master-parity continuation: feature -> bigWin -> exhausted -> balance.
+        // Base game has no natural free-spin trigger (buy-only), so isFeature
+        // stays false until scatter wiring lands.
         const verdict = evaluateContinuation(this.autoplay, {
-          isFeature: outcome.freeSpins != null,
+          isFeature: false,
           winCents: outcome.winCents,
           betCents: outcome.betCents,
           balanceCents: this.model.balance,
@@ -547,12 +554,15 @@ export class SlotController extends Component {
           }, d / 1000);
         }
       }
-    }, VIEW_CONFIG.spin.settleMs[this.turboKey()] / 1000);
+    }, resolveDelay);
   }
 
+  /** Buy a feature: play each free spin back, then credit + celebrate. */
   private async onBuy(mode: BonusMode): Promise<void> {
     if (this.state !== 'idle' || this.autoplay.active) return;
     if (this.model.balance < this.model.bonusCost(mode)) {
+      // Friendly dismissible notice, never a dead click (the modal's NEED state
+      // blocks this path for taps; this guard covers the B-key shortcut).
       this.view.showError(
         'Insufficient balance',
         'This bonus costs more than your current balance.\nLower your bet or pick a smaller bonus.',
@@ -564,51 +574,44 @@ export class SlotController extends Component {
     this.state = 'bonus';
     this.bar.setSpinning(true);
     this.view.setInteractable(false);
-    this.view.setBuyFabVisible(false);
+    this.view.setBuyFabVisible(false); // no buying mid-feature
     this.view.clearWins();
     this.view.setWin(0);
     this.view.setBanner(BONUS_MODES[mode].name);
-
-    this.view.wipe('bonus', 1, 1.1);
-    this.view.showFeatureUnlocked(BONUS_MODES[mode].name, mode);
-    this.view.setBonusAtmosphere(mode);
+    this.view.showFeatureUnlocked(BONUS_MODES[mode].name);
 
     const outcome = this.model.buyBonus(mode);
     this.view.audio.buyConfirm();
     this.view.audio.bonusIntro();
+    this.view.setBonusAtmosphere(mode);
     this.view.setBalance(outcome.balanceCents);
     this.bar.setBalance(outcome.balanceCents / 100);
 
     const lineBetCents = this.model.bet / SETTINGS.activeLines;
-
+    // Accumulate RAW payout and round ONCE per display (sum-then-round), the same
+    // way the model credits the total -> the HUD running total ends EXACTLY on the
+    // credited win (no round-then-sum drift) and is always clean integer cents.
     let runningPayout = 0;
     const totalSpins = outcome.bonus.steps.length;
     this.view.setBonusHud(0, totalSpins, 0);
-
-    const tk = this.turboKey();
-    const deadPauseMs = VIEW_CONFIG.bonus.deadPauseMs[tk];
-    const winPauseMs = VIEW_CONFIG.bonus.winPauseMs[tk];
-    const { bigStepMultiple } = VIEW_CONFIG.bonus;
-    let prevLocked: number[] = [];
+    const { deadPauseMs, winPauseMs, bigStepMultiple } = VIEW_CONFIG.bonus;
     for (let i = 0; i < outcome.bonus.steps.length; i++) {
       const step = outcome.bonus.steps[i];
       this.view.clearWins();
-
-      await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul, prevLocked);
-      prevLocked = step.lockedReels;
-
-      this.view.pulseSticky(step.sticky, mode);
+      await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul);
+      // Sticky wilds / crowns persist in the grid — bounce them so they read as
+      // locked + alive each spin (not respun). [reel,row][] from the bonus engine.
+      this.view.pulseSticky(step.sticky);
       if (step.sticky.length > 0) this.view.audio.stickyLock();
       runningPayout += step.payout;
-      const runCents = Math.round(runningPayout * lineBetCents);
-      this.view.setBonusHud(i, totalSpins, runCents);
-
-      if (runCents > 0) this.bar.setLastWin(runCents / 100);
-
+      this.view.setBonusHud(i, totalSpins, Math.round(runningPayout * lineBetCents));
+      // Per-spin MONEY MOMENT: a winning free spin gets its win lines, a tiered
+      // sting and a savour dwell so a 40x spin no longer reads like a 0x dead one
+      // (owner: "every free spin ceremony effects all need busting").
       if (step.payout > 0) {
         this.view.showWins(evaluateSpin(step.grid));
         const stepCents = Math.round(step.payout * lineBetCents);
-        const stepMult = this.model.bet > 0 ? stepCents / this.model.bet : 0;
+        const stepMult = this.model.bet > 0 ? stepCents / this.model.bet : 0; // total-bet multiple
         const big = stepMult >= bigStepMultiple;
         this.view.audio.win(big ? 3 : 1);
         if (big) this.view.setBanner(`FREE SPIN ×${Math.round(stepMult)}`);
@@ -620,12 +623,15 @@ export class SlotController extends Component {
 
     this.view.audio.bonusEnd();
     this.view.setBonusHud(null, 0, 0);
-    this.view.wipe('bonus', -1, 1);
     this.view.setBonusAtmosphere('idle');
     this.view.countUp(outcome.winCents);
-
+    // FS finale: floor the ceremony tier so completing a feature with a genuine
+    // win always feels rewarding (flagship parity), and label it as a free-spins
+    // win — LDW-safe wording when the feature returned <= 1x the buy/bet.
     const fsLdw = outcome.winCents <= this.model.bet;
-
+    // BonusOutcome has no betCents — passing it was undefined at runtime and
+    // corrupted the ceremony's win-vs-bet tier scaling. Tier against the live bet,
+    // floored so a real feature win lands at least at the BIG band.
     const fsTierBet = Math.min(this.model.bet, Math.max(1, Math.round(outcome.winCents / 9)));
     this.view.playCeremony(outcome.winCents, fsLdw ? this.model.bet : fsTierBet, 1);
     this.bar.setLastWin(outcome.winCents / 100);
@@ -634,8 +640,7 @@ export class SlotController extends Component {
       this.state = 'idle';
       this.bar.setSpinning(false);
       this.view.setInteractable(true);
-      this.view.setBuyFabVisible(true);
-      if (this.barNode?.isValid) this.barNode.active = !this.view.anyOverlayOpen();
+      this.view.setBuyFabVisible(true); // feature over — buying allowed again
       this.refreshBuyAffordability();
     }, 0.4);
   }

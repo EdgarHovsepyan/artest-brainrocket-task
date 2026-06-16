@@ -1,3 +1,10 @@
+// Sample-first audio engine — strict port of the SHINING POP (Pixi) Sound object.
+// Plays the shared ElevenLabs bank (37 mp3s served from build-templates audio/)
+// through a 4-bus dB mix; every call falls back to the procedural synth voice when
+// a sample is missing or still decoding, so the editor preview stays audible.
+// Plain class (not a Cocos Component); silently no-ops where AudioContext is
+// unavailable. Must be unlocked by a user gesture (unlock()).
+
 type Ctx = AudioContext;
 
 const BANK = [
@@ -43,6 +50,7 @@ const BANK = [
 type ClipId = (typeof BANK)[number];
 type BusId = 'music' | 'gameplay' | 'sfx' | 'win';
 
+/** Fixed design mix in dB (master parity: music clearly present, rush under it). */
 const BUS_DB: Record<BusId, number> = { music: -6, gameplay: -10, sfx: -8, win: -2 };
 const db2lin = (db: number): number => Math.pow(10, db / 20);
 
@@ -62,8 +70,8 @@ export class AudioManager {
   private rushGain: GainNode | null = null;
   private rushPip: number | null = null;
   private lastBetAt = 0;
-  private lastWinAt = 0;
 
+  /** Lazily build the graph on first call (must follow a user gesture on web). */
   private ensure(): boolean {
     if (this.ctx) return true;
     const AC =
@@ -92,19 +100,11 @@ export class AudioManager {
     }
   }
 
+  /** Call from the FIRST user gesture: resumes the context and starts the bank
+   *  download (master parity: the whole game otherwise stays on synth). */
   unlock(): void {
     if (!this.ensure() || !this.ctx) return;
-
-    if (this.ctx.state === 'suspended') {
-      void this.ctx
-        .resume()
-        .then(() => {
-          if (this.musicId && this.buffers[this.musicId] && !this.musicSrc) {
-            this.playMusic(this.musicId);
-          }
-        })
-        .catch(() => undefined);
-    }
+    if (this.ctx.state === 'suspended') void this.ctx.resume();
     if (this.unlocked) return;
     this.unlocked = true;
     this.loadBank();
@@ -113,17 +113,15 @@ export class AudioManager {
   private loadBank(): void {
     if (this.loading || !this.ctx) return;
     this.loading = true;
-
-    const base = typeof document !== 'undefined' ? document.baseURI : '';
     for (const id of BANK) {
-      fetch(base ? new URL(`audio/${id}.mp3`, base).href : `audio/${id}.mp3`)
+      fetch(`audio/${id}.mp3`)
         .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
         .then((ab) => this.ctx!.decodeAudioData(ab))
         .then((buf) => {
           this.buffers[id] = buf;
           if (this.musicId === id && !this.musicSrc) this.playMusic(this.musicId);
         })
-        .catch(() => undefined);
+        .catch(() => undefined); // missing clip -> synth fallback keeps covering it
     }
   }
 
@@ -131,7 +129,8 @@ export class AudioManager {
     this.muted = m;
     this.applyGain();
   }
-
+  /** Tab/visibility lifecycle: suspend the whole audio graph (saves battery on
+   *  mobile, prevents background-tab playback) without losing user volume/mute. */
   suspend(): void {
     this.stopRush();
     if (this.ctx && this.ctx.state === 'running') void this.ctx.suspend().catch(() => undefined);
@@ -139,7 +138,7 @@ export class AudioManager {
   resume(): void {
     if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume().catch(() => undefined);
   }
-
+  /** Master volume 0..1 — driven by the betting-bar volume slider. */
   setVolume(v: number): void {
     this.volume = Math.max(0, Math.min(1, v));
     this.applyGain();
@@ -165,6 +164,9 @@ export class AudioManager {
     return src;
   }
 
+  // ---- music ---------------------------------------------------------------
+  /** Crossfade to a music bed; remembers the request so a still-decoding clip
+   *  starts the moment it lands. */
   playMusic(id: 'main_base_loop' | 'bonus_loop'): void {
     this.musicId = id;
     if (!this.ensure() || !this.ctx) return;
@@ -176,7 +178,9 @@ export class AudioManager {
       this.musicGain.gain.setTargetAtTime(0, t, 0.25);
       try {
         old.stop(t + 0.9);
-      } catch {}
+      } catch {
+        /* already stopped */
+      }
       this.musicSrc = null;
     }
     const src = this.ctx.createBufferSource();
@@ -192,22 +196,28 @@ export class AudioManager {
     this.musicGain = g;
   }
 
-  private duckMusic(duckDb = -6, holdMs = 380): void {
-    const bus = this.buses.music;
-    if (!bus || !this.ctx) return;
-    const rest = db2lin(BUS_DB.music);
-    const ducked = db2lin(BUS_DB.music + duckDb);
+  /** Sidechain-duck the music bed under a win sting, then ease it back, so the
+   *  most important AV moment reads punchier without touching a single sample.
+   *  Pure WebAudio gain ramp; no-op if music isn't playing / muted. */
+  duckMusic(depth = 0.4, releaseS = 0.6): void {
+    const g = this.musicGain;
+    if (!g || !this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
-    bus.gain.cancelScheduledValues(t);
-    bus.gain.setTargetAtTime(ducked, t, 0.03);
-    bus.gain.setTargetAtTime(rest, t + holdMs / 1000, 0.2);
+    const d = Math.max(0, Math.min(1, depth));
+    g.gain.cancelScheduledValues(t);
+    g.gain.setTargetAtTime(d, t, 0.03); // fast dip under the transient
+    g.gain.setTargetAtTime(1, t + 0.14, Math.max(0.1, releaseS) / 3); // ease back up
   }
 
+  // ---- reel cycle ----------------------------------------------------------
   spinStart(): void {
     if (this.playSample('spin_start', 'sfx', 0.8)) return;
     this.voice(220, 0.08, 'triangle', 0.12);
   }
 
+  /** Candy reel loop while reels move (master 2026-06-10 direction: NO noise
+   *  sample — a mellow detuned-triangle whir bed + bouncy major-triad sine
+   *  pips C-E-G-E, cheerful and non-fatiguing, sits under the music). */
   startRush(): void {
     if (this.rushGain || this.muted || !this.ensure() || !this.ctx) return;
     const t = this.ctx.currentTime;
@@ -263,7 +273,9 @@ export class AudioManager {
     this.rushOsc.forEach((o) => {
       try {
         o.stop(t + 0.3);
-      } catch {}
+      } catch {
+        /* already stopped */
+      }
     });
     this.rushOsc = [];
     this.rushGain = null;
@@ -284,12 +296,10 @@ export class AudioManager {
     this.voice(80, 0.4, 'sine', 0.18);
   }
 
+  // ---- wins / features -----------------------------------------------------
+  /** Tiered win sting: 1 small · 2 nice · 3 big · 4 mega · 5 epic. */
   win(tier: number): void {
-    const now = this.ctx ? this.ctx.currentTime : 0;
-    if (this.lastWinAt && now - this.lastWinAt < 0.09) return;
-    this.lastWinAt = now;
-
-    this.duckMusic(tier >= 4 ? -9 : tier >= 2 ? -6 : -4, tier >= 4 ? 520 : 380);
+    this.duckMusic(0.5 - Math.min(4, Math.max(0, tier - 1)) * 0.04, 0.6); // bigger win ducks deeper
     const ids: ClipId[] = ['win_small', 'win_nice', 'win_big', 'win_mega', 'win_epic'];
     const id = ids[Math.min(ids.length - 1, Math.max(0, tier - 1))];
     if (this.playSample(id, 'win', 0.95)) return;
@@ -304,8 +314,11 @@ export class AudioManager {
     this.voice(440 + progress * 660, 0.03, 'sine', 0.05);
   }
 
+  /** Physical detonation "braam" layered under the ceremony's shock/shake — a
+   *  low boom distinct from the melodic win sting. Fired on the detonation frame
+   *  (ceremony only shows for 8x+ wins, so this is never an LDW case). */
   impact(): void {
-    this.duckMusic(-10, 560);
+    this.duckMusic(0.3, 0.75); // deep duck under the detonation braam
     if (this.playSample('impact_braam', 'win', 0.9)) return;
     this.voice(72, 0.6, 'sawtooth', 0.34);
     this.voice(110, 0.5, 'triangle', 0.22);
@@ -331,11 +344,34 @@ export class AudioManager {
     this.voice(240, 0.14, 'triangle', 0.16);
   }
 
+  /** WILD STRIKE multiplier reveal — a rising triad whose pitch + gain climb with
+   *  the multiplier. The 'mult_reveal' clip was loaded but never played. */
+  multReveal(n: number): void {
+    const m = Number.isFinite(n) ? n : 1;
+    this.duckMusic(0.45, 0.5); // duck under the WILD STRIKE reveal
+    if (this.playSample('mult_reveal', 'win', Math.min(1, 0.7 + m * 0.03))) return;
+    const base = 330 + Math.min(8, m) * 26;
+    this.voice(base, 0.12, 'triangle', 0.16);
+    this.voice(base * 1.25, 0.14, 'sine', 0.12);
+    this.voice(base * 1.5, 0.16, 'sine', 0.1);
+  }
+
+  /** Sparkling coin bed under the geyser, scaled by win intensity [0,1]. The
+   *  'coin_cascade' clip was loaded but never played. One-shot (no loop to leak). */
+  coinCascade(intensity01 = 1): void {
+    const i = Number.isFinite(intensity01) ? Math.max(0, Math.min(1, intensity01)) : 1;
+    if (this.playSample('coin_cascade', 'win', 0.5 + 0.4 * i)) return;
+    this.voice(880, 0.05, 'sine', 0.06 + 0.05 * i);
+    this.voice(1180, 0.06, 'sine', 0.05 + 0.04 * i);
+  }
+
+  // ---- UI ------------------------------------------------------------------
   click(): void {
     if (this.playSample('ui_click', 'sfx', 0.7)) return;
     this.voice(660, 0.04, 'sine', 0.08);
   }
 
+  /** Throttled bet-change tick (master parity: crisp on rapid +/- holds). */
   bet(): void {
     const t = this.ctx ? this.ctx.currentTime : 0;
     if (this.lastBetAt && t - this.lastBetAt < 0.03) return;
@@ -369,6 +405,8 @@ export class AudioManager {
     this.win(2);
   }
 
+  // ---- synth fallback voice ---------------------------------------------------
+  /** One decaying oscillator voice. */
   private voice(freq: number, dur: number, type: OscillatorType = 'triangle', gain = 0.3): void {
     if (this.muted || !this.ensure() || !this.ctx) return;
     const t = this.ctx.currentTime;

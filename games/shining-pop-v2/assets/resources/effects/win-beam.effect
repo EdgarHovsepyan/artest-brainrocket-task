@@ -1,9 +1,8 @@
 // CINEMA WAVE — win-line ENERGY BEAM. An additive ribbon sprite stretched
 // between consecutive winning-cell centres: flowing fbm plasma scrolls along the
 // beam, soft ribbon-core falloff (no hard stroke), ends feathered (no caps).
-// Candy-pink additive ramp ("our palette"). This is a SOFT additive bloom ribbon
-// from the noise flow + additive blend — NEVER a drawn/hard magenta line (that
-// stroke geometry was the rejected look; this glow is not that).
+// Warm ember->gold ramp only — NEVER magenta geometry. The svarka/plasma read
+// comes from the noise flow + additive blend, not from a drawn line.
 // Branchless (step/smoothstep/mix). Honors vfx.materialsEnabled (null material →
 // the win presentation simply has no beams; embers + symbol fire still carry it).
 
@@ -113,23 +112,12 @@ CCProgram sprite-fs %{
     float pulse = exp(-pow((pk - 0.5) * 6.0, 2.0));
     body *= 0.85 + 0.9 * pulse;
 
-    // PEPPERMINT CANDY MATERIAL (owner: "yummy material, shader expert level"):
-    // a RED <-> WHITESMOKE candy-cane stripe banded by the flow noise, plus a
-    // sliding SPECULAR gloss streak — the wet wet-highlight that reads as hard
-    // candy, not a soft glow. Still additive, still branchless. (The rejected look
-    // was a flat magenta band; this is a striped jelly material with a live gloss.)
-    vec3 candyRed = vec3(1.0, 0.23, 0.29);
-    vec3 smoke = vec3(0.97, 0.97, 0.98);
-    float stripe = smoothstep(0.45, 0.55, fract(uv0.x * 5.0 - u_time * u_flowSpeed * 0.5 + n * 0.3));
-    vec3 colr = mix(candyRed, smoke, stripe);
-    colr = mix(colr, vec3(1.0, 0.97, 0.99), pulse * 0.5);
-    // sliding wet-gloss highlight, tight to the centreline (the "glossy candy" read)
-    float gloss = exp(-pow((fract(uv0.x * 0.6 - u_time * 0.5) - 0.5) * 9.0, 2.0));
-    float spec = gloss * smoothstep(0.35, 0.0, abs(uv0.y * 2.0 - 1.0));
-    colr += spec * 0.9;
-    float outA = clamp(body * 1.3 + spec * 0.5 * xf * a, 0.0, 1.0) * u_intensity * color.a;
+    // Ember -> gold ramp; the hottest filaments and the pulse go white-gold.
+    vec3 colr = mix(vec3(1.0, 0.42, 0.08), vec3(1.0, 0.94, 0.7), n * yf);
+    colr = mix(colr, vec3(1.0, 0.98, 0.88), pulse * 0.55);
+    float outA = clamp(body * 1.35, 0.0, 1.0) * u_intensity * color.a;
 
-    vec4 o = vec4(colr * (0.55 + 0.85 * body), outA);
+    vec4 o = vec4(colr * (0.6 + 0.8 * body) , outA);
     ALPHA_TEST(o);
     return o;
   }

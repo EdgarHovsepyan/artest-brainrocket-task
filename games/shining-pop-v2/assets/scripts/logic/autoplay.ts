@@ -1,5 +1,11 @@
+// Autoplay state machine — pure TypeScript, NO Cocos. Strict parity port of the
+// shining-pop (PixiJS) autoplay semantics: count selection, stop-on-feature
+// (default ON), stop-on-big-win >= 25x total bet (default OFF), balance guard,
+// decrement at spin start, turbo-scaled inter-spin delay.
+
 export const AUTOPLAY_COUNTS = [10, 25, 50, 100, 250] as const;
 
+/** Big-win threshold as a multiple of total bet (parity: Pixi `betX6*25`). */
 export const BIG_WIN_MULT = 25;
 
 export interface AutoplayOptions {
@@ -9,7 +15,7 @@ export interface AutoplayOptions {
 
 export interface AutoplayState {
   active: boolean;
-
+  /** Spins left. Infinity = unlimited (only when maxSpins allows). */
   remaining: number;
   total: number;
   stopOnFeature: boolean;
@@ -17,6 +23,7 @@ export interface AutoplayState {
 }
 
 export interface SpinSummary {
+  /** A free-spin feature triggered this spin. */
   isFeature: boolean;
   winCents: number;
   betCents: number;
@@ -31,6 +38,7 @@ export function idleAutoplay(): AutoplayState {
   return { active: false, remaining: 0, total: 0, ...DEFAULT_OPTIONS };
 }
 
+/** Jurisdiction cap hook (parity: COMPLY.autoplay_max). Infinity = no cap. */
 export function startAutoplay(
   spins: number,
   opts: AutoplayOptions,
@@ -51,11 +59,16 @@ export function stopAutoplay(state: AutoplayState): AutoplayState {
   return { ...state, active: false, remaining: 0 };
 }
 
+/** Decrement at spin START (parity: Pixi decrements in startSpin). */
 export function spinStarted(state: AutoplayState): AutoplayState {
   if (!state.active || state.remaining === Infinity) return state;
   return { ...state, remaining: state.remaining - 1 };
 }
 
+/**
+ * Post-settle continuation check, evaluated in the same order as the master:
+ * feature -> big win -> exhausted -> balance. Returns the reason when stopping.
+ */
 export function evaluateContinuation(
   state: AutoplayState,
   spin: SpinSummary,
@@ -70,6 +83,7 @@ export function evaluateContinuation(
   return { stop: false };
 }
 
+/** Inter-spin pause (parity: max-turbo 140 / turbo or reduced-motion 280 / off 720). */
 export function interSpinDelayMs(turboMode: 0 | 1 | 2, reducedMotion = false): number {
   if (turboMode === 2) return 140;
   if (turboMode === 1 || reducedMotion) return 280;
