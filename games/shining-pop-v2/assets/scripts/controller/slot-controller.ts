@@ -65,8 +65,7 @@ export class SlotController extends Component {
   private bar!: BettingBarMobile | BettingBarWeb;
   private barNode: Node | null = null;
   private barIsWeb: boolean | null = null;
-  // The intro is a full-screen gate built BEFORE the bar; the bar would otherwise
-  // render on top and poke through the intro on mobile. Keep it hidden until dismiss.
+
   private introActive = true;
   private lifecycle: LifecycleHandle | null = null;
   private comply: ComplyRules = getComply();
@@ -130,19 +129,15 @@ export class SlotController extends Component {
 
     this.view.buildIntro(() => {
       this.introActive = false;
-      this.view.wipe('intro', 1, 1.15); // cinematic candy sweep into the game
-      if (this.barNode && this.barNode.isValid) this.barNode.active = true; // reveal the bar
+      this.view.wipe('intro', 1, 1.15);
+      if (this.barNode && this.barNode.isValid) this.barNode.active = true;
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');
     });
 
-    // Tell the boot loader the game is fully built + the intro is on screen, so it
-    // hides on the intro instead of on the empty scene (kills the ~2s black gap).
     try {
       (window as unknown as Record<string, boolean>).__shiningPopReady = true;
-    } catch {
-      /* not in a browser context */
-    }
+    } catch {}
     const unlockOnce = () => {
       this.view.audio.unlock();
       this.view.audio.playMusic('main_base_loop');
@@ -202,7 +197,7 @@ export class SlotController extends Component {
       : barNode.addComponent(BettingBarMobile);
     this.barNode = barNode;
     this.barIsWeb = wantWeb;
-    if (this.introActive) barNode.active = false; // stay hidden behind the intro gate
+    if (this.introActive) barNode.active = false;
     this.bar.on('spin', () => this.onSpinPressed());
     this.bar.on('bet:inc', () => this.changeBet(1));
     this.bar.on('bet:dec', () => this.changeBet(-1));
@@ -506,8 +501,6 @@ export class SlotController extends Component {
     }
 
     if (outcome.freeSpins) {
-      // Show the scatter combo that triggered the bonus: light up the landed
-      // scatters + a count callout, hold, then the cinematic unlock transition.
       const grid = outcome.result.grid;
       const sc = outcome.result.scatters;
       const cells: Array<{ reel: number; row: number }> = [];
@@ -530,6 +523,8 @@ export class SlotController extends Component {
       this.bar.setAffordable(this.model.canSpin());
       this.bar.setSteppers(this.model.bet > 100, this.model.bet < 1000);
       this.view.setInteractable(true);
+
+      if (this.barNode?.isValid) this.barNode.active = !this.view.anyOverlayOpen();
       this.refreshBuyAffordability();
 
       if (realityCheckDue(this.session, this.comply, this.nowMs())) {
@@ -597,8 +592,7 @@ export class SlotController extends Component {
     for (let i = 0; i < outcome.bonus.steps.length; i++) {
       const step = outcome.bonus.steps[i];
       this.view.clearWins();
-      // Hold the reels that were already locked last step (a reel spins IN once,
-      // then stays put) — locked wild reels no longer pointlessly re-spin.
+
       await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul, prevLocked);
       prevLocked = step.lockedReels;
 
@@ -640,9 +634,7 @@ export class SlotController extends Component {
       this.bar.setSpinning(false);
       this.view.setInteractable(true);
       this.view.setBuyFabVisible(true);
-      // The bar was hidden when the buy menu opened (overlay gate); the bonus
-      // flow never re-syncs it, so reveal it explicitly when we return to idle.
-      if (this.barNode && this.barNode.isValid) this.barNode.active = true;
+      if (this.barNode?.isValid) this.barNode.active = !this.view.anyOverlayOpen();
       this.refreshBuyAffordability();
     }, 0.4);
   }

@@ -40,22 +40,16 @@ export class ParticleLayer extends Component {
   private phys: PhysParticle[] = [];
   private physOn = false;
 
-  // Frame-time governor: sampled every frame (update), read by every spawn path
-  // to scale density to the live frame budget. Rich when smooth, lean when not.
   private readonly gov = new VfxGovernor(VIEW_CONFIG.vfx.quality);
 
   onLoad(): void {
     this.pool = this.node.getComponent(ParticlePool) ?? this.node.addComponent(ParticlePool);
   }
 
-  // Cocos ticks update() every frame regardless of whether physics shards are
-  // live, so it is the honest sampling point for the frame-time EMA.
   update(dt: number): void {
     this.gov.sample(dt);
   }
 
-  // Live VFX telemetry for the ?debug HUD (approval #41). Read-only snapshot —
-  // the governor and pool stay the single owners of these numbers.
   vfxStats(): VfxStats {
     return {
       fps: this.gov.emaFps,
@@ -135,7 +129,7 @@ export class ParticleLayer extends Component {
       new Color(140, 240, 200, 255),
       new Color(255, 250, 250, 255),
     ];
-    // The ignite ring is the signature "pop"; keep a floor of 5 so it always reads.
+
     const ringCount = this.gov.count(8, 5);
     const cellCount = this.gov.count(cfg.perCell, 3);
     for (const c of centers) {

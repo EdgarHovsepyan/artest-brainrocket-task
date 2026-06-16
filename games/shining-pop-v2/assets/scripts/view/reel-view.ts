@@ -159,9 +159,6 @@ export class ReelView extends Component {
         strip.setScale(1, 1, 1);
 
         if (!this.reducedMotion) {
-          // Merge a staggered per-symbol landing into the reel stop: each row
-          // dips + squashes + springs as it settles, cascading top→bottom. Params
-          // come from VIEW_CONFIG.land keyed by the active speed (off/turbo/max).
           const L = VIEW_CONFIG.land;
           const T = VIEW_CONFIG.turbo;
           const key: 'off' | 'turbo' | 'max' =

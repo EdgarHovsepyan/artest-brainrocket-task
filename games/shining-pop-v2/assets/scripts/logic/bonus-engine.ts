@@ -13,8 +13,6 @@ export interface FreeSpinStep {
 
   sticky: Array<[number, number]>;
 
-  // Reels fully locked this step (whole-reel wilds, or every row sticky). These
-  // HOLD instead of re-spinning — a locked reel that keeps spinning reads as a bug.
   lockedReels: number[];
 }
 

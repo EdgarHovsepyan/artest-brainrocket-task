@@ -157,8 +157,7 @@ export class BettingBarWeb extends Component {
     }
 
     this.buildAccount();
-    // Even 30px gaps: LAST WIN 500-800, TOTAL BET 830-1050, carousel from 1080.
-    // (Previously TOTAL BET touched the carousel and sat 20px from LAST WIN.)
+
     this.buildBanner(500, 300, 'LAST WIN', (l) => {
       this.lastWinValue = l;
       this.make3D(l);

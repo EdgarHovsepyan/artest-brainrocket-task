@@ -200,8 +200,7 @@ export class SlotView extends Component {
   private soundBtn: DeckButton | null = null;
   private buyMenu: Node | null = null;
   private buyModal: BuyBonusModal | null = null;
-  // Explicit open-state: the modal's close() only flips node.active after a fade,
-  // so anyOverlayOpen() can't read node.active synchronously. This tracks intent.
+
   private buyMenuOpen = false;
   private buyFab: Node | null = null;
   private buyBetStepCb: ((dir: number) => void) | null = null;
@@ -366,22 +365,18 @@ export class SlotView extends Component {
     this.fit();
   }
 
-  // object-fit: cover for the background photo. The board content is scaled by
-  // `s` to fit the reels; the bg must NOT inherit that — it scales independently
-  // to always FILL the screen (preserve aspect, crop overflow), centred on the
-  // screen, so no dark gaps show on any device aspect.
   private fitBackgroundCover(s: number, vis: { width: number; height: number }): void {
     if (!this.bgArt || s <= 0) return;
     const ut = this.bgArt.getComponent(UITransform);
     if (!ut) return;
     const ratio = 2752 / 1536;
     const overscan = VIEW_CONFIG.layout.bgCoverOverscan;
-    // Screen size expressed in this.node's local units (the node is scaled by s).
+
     const localW = vis.width / s;
     const localH = vis.height / s;
     const w = Math.max(localW, localH * ratio) * overscan;
     ut.setContentSize(w, w / ratio);
-    // Re-centre on the screen (canvas centre 0,0; this.node sits at 0,posY).
+
     this.bgArt.setPosition(0, -this.node.position.y / s, 0);
   }
 
@@ -905,8 +900,7 @@ export class SlotView extends Component {
 
     this.ceremony = this.mkNode('ceremonyLayer', 10, 10, this.node).addComponent(CeremonyView);
     this.ceremony.build(this.node);
-    // Hand the ceremony the custom unlock-burst shader (a juicy gummy bear that
-    // wobbles in then fissions into droplets) for the feature-unlock impact.
+
     const ubAsset = this.getEffectMaterial('unlock-burst')?.effectAsset;
     if (ubAsset) {
       const bm = new Material();
@@ -1171,8 +1165,6 @@ export class SlotView extends Component {
     return sf;
   }
 
-  // Soft radial glow frame (white core -> transparent edge) for the win halo,
-  // so the glow is a clean bloom instead of an additive copy of the symbol art.
   private getRadialFrame(): SpriteFrame {
     if (this.radialFrame) return this.radialFrame;
     const w = 64;
@@ -1469,17 +1461,16 @@ export class SlotView extends Component {
     const dur = cfg.ms / 1000;
     op.opacity = 0;
     n.setPosition(0, ((this.gh + 12) / 2) * cfg.dir, 0);
-    // Start as a tight leading line that snaps open — a sharp sweep reads as
-    // intent, a slow grow reads as a loading bar. expoOut launch + backOut settle.
+
     n.setScale(1, 0.06, 1);
     tween(op)
-      .to(dur * 0.22, { opacity: 255 }, { easing: 'quadOut' }) // bright leading edge punches in
-      .to(dur * 0.62, { opacity: 0 }, { easing: 'sineIn' }) // then blooms away as the board takes over
+      .to(dur * 0.22, { opacity: 255 }, { easing: 'quadOut' })
+      .to(dur * 0.62, { opacity: 0 }, { easing: 'sineIn' })
       .call(() => (n.active = false))
       .start();
     tween(n)
-      .to(dur * 0.55, { scale: new Vec3(1, 1.06, 1) }, { easing: 'expoOut' }) // snap open past full
-      .to(dur * 0.45, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' }) // settle back
+      .to(dur * 0.55, { scale: new Vec3(1, 1.06, 1) }, { easing: 'expoOut' })
+      .to(dur * 0.45, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
       .start();
   }
 
@@ -1922,10 +1913,7 @@ export class SlotView extends Component {
     this.cineWipeG = band.addComponent(Graphics);
   }
 
-  // Candy-wipe + soft-bloom — one reusable cinematic transition fired on
-  // every major state change (intro->game, base<->bonus, free-spins, round end).
   cinematicWipe(core: Color, halo: Color, dir = 1, intensity = 1): void {
-    // No full-screen bloom here — it washed the board out; the translucent band carries the sweep.
     const wipe = this.cineWipe;
     const op = this.cineWipeOp;
     const band = this.cineWipeBand;
@@ -1933,7 +1921,6 @@ export class SlotView extends Component {
     if (!wipe || !op || !band || !g) return;
 
     if (this.reducedFx) {
-      // Accessible fallback: a brief candy luminance pulse, no sweep.
       wipe.active = true;
       wipe.setSiblingIndex(this.node.children.length - 1);
       band.setPosition(0, 0, 0);
@@ -1971,9 +1958,7 @@ export class SlotView extends Component {
     const H = 2800;
     const a = Math.min(1, Math.max(0.4, intensity));
     g.clear();
-    // Feathered candy band: wide soft halo -> brighter core, centred on x=0.
-    // Kept TRANSLUCENT on purpose — the board must read through the sweep so a
-    // transition never washes the reels/symbols out. Max core alpha ~110/255.
+
     const layers: [number, Color, number][] = [
       [560, halo, 16 * a],
       [320, halo, 42 * a],
@@ -1985,7 +1970,7 @@ export class SlotView extends Component {
       g.rect(-w / 2, -H / 2, w, H);
       g.fill();
     }
-    // Two thin peppermint glints riding the core for the candy read.
+
     g.fillColor = new Color(255, 255, 255, Math.round(120 * a));
     g.rect(-128, -H / 2, 8, H);
     g.fill();
@@ -1993,7 +1978,6 @@ export class SlotView extends Component {
     g.fill();
   }
 
-  /** Named candy tones so callers stay declarative. */
   wipeTones = {
     fs: { core: new Color(255, 150, 205, 255), halo: new Color(255, 92, 158, 255) },
     bonus: { core: new Color(255, 120, 235, 255), halo: new Color(196, 70, 230, 255) },
@@ -2217,8 +2201,7 @@ export class SlotView extends Component {
       this.buyModal.on('bet:inc', () => this.buyBetStepCb?.(1));
       this.buyModal.on('bet:dec', () => this.buyBetStepCb?.(-1));
       this.buyModal.on('ui:click', () => this.audio.click());
-      // Scrim tap / cancel / close-X all emit 'cancel' and self-close the modal;
-      // route through closeBuyMenu so the buy FAB + betting bar are restored.
+
       this.buyModal.on('cancel', () => this.closeBuyMenu());
       this.buyModal.on('buy:blocked', () => this.audio.click());
     }
@@ -2753,7 +2736,7 @@ export class SlotView extends Component {
     this.scheduleOverlaySync();
   }
 
-  private anyOverlayOpen(): boolean {
+  anyOverlayOpen(): boolean {
     const on = (n: Node | null): boolean => !!(n && n.isValid && n.active);
     if (
       on(this.autoplayPanel) ||
@@ -3184,7 +3167,6 @@ export class SlotView extends Component {
     this.playReelPortalEntry();
     await Promise.all(
       this.reels.map((reel, i) => {
-        // Locked reel in the bonus: hold its symbols, never re-spin them.
         if (heldReels.indexOf(i) >= 0) {
           reel.show(grid[i]);
           return Promise.resolve();
@@ -3411,21 +3393,16 @@ export class SlotView extends Component {
       g.stroke();
     };
     for (const pts of this.candyLinePts) {
-      // A smooth glowing candy ribbon: layered soft halo (wide+faint -> tight+
-      // bright), a glossy body, then a hot centreline — NO candy-cane stripes.
       stroke(pts, 255, 64, 138, 14 * pulse, 30 * pulse);
       stroke(pts, 255, 96, 168, 30 * pulse, 19 * pulse);
       stroke(pts, 255, 138, 196, 70, 11);
       stroke(pts, 255, 178, 220, 185, 6.5);
       stroke(pts, 255, 250, 252, 230, 2.8);
-      // A travelling specular glint sliding along the line — the elegant "energy
-      // flow" that replaces the stripes (a liquid highlight, not a dashed cane).
+
       if (!this.reducedFx) this.drawFlowGlint(g, pts, t);
     }
   }
 
-  // A short bright highlight that sweeps along the win-line polyline, giving the
-  // ribbon a glossy liquid sheen travelling through it.
   private drawFlowGlint(g: Graphics, pts: Vec3[], t: number): void {
     const segLen: number[] = [];
     let total = 0;
@@ -3461,8 +3438,6 @@ export class SlotView extends Component {
     drawSpan(head + GLINT * 0.3, head + GLINT * 0.7, 3, 210);
   }
 
-  // Light up the N landed scatter symbols (uncropped, lifted) and pop a bold
-  // "N SCATTERS" callout — the player SEES the combo that triggers the bonus.
   private scatterCallout: Node | null = null;
   presentScatterTrigger(cells: Array<{ reel: number; row: number }>, count: number): void {
     if (!cells.length) return;
@@ -3766,7 +3741,7 @@ export class SlotView extends Component {
     this.ceremony.onCoinGeyser = () => {
       if (!this.reducedFx) this.particles.coinGeyser();
     };
-    // Candy wipe as the big-win ceremony settles back to the base game.
+
     this.ceremony.onDismiss = () => this.wipe('win', -1, 0.8);
     return this.ceremony.show(winCents, betCents, multiplier, this.reducedFx);
   }
@@ -3804,7 +3779,6 @@ export class SlotView extends Component {
     this.audio.setVolume(v);
   }
 
-  // ?debug HUD line for the adaptive VFX governor (approval #41): "58fps vfx 92% 37/96".
   vfxHud(): string {
     return formatVfxHud(this.particles.vfxStats());
   }

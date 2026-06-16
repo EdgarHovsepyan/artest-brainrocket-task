@@ -192,8 +192,6 @@ export class AudioManager {
     this.musicGain = g;
   }
 
-  // Duck the music bus so a win sting / braam cuts through, then ramp it back
-  // (skill ROADMAP #9). Smooth setTargetAtTime only — a raw gain step clicks.
   private duckMusic(duckDb = -6, holdMs = 380): void {
     const bus = this.buses.music;
     if (!bus || !this.ctx) return;
@@ -201,8 +199,8 @@ export class AudioManager {
     const ducked = db2lin(BUS_DB.music + duckDb);
     const t = this.ctx.currentTime;
     bus.gain.cancelScheduledValues(t);
-    bus.gain.setTargetAtTime(ducked, t, 0.03); // quick dip on the hit
-    bus.gain.setTargetAtTime(rest, t + holdMs / 1000, 0.2); // smooth recover
+    bus.gain.setTargetAtTime(ducked, t, 0.03);
+    bus.gain.setTargetAtTime(rest, t + holdMs / 1000, 0.2);
   }
 
   spinStart(): void {
@@ -287,11 +285,10 @@ export class AudioManager {
   }
 
   win(tier: number): void {
-    // Throttle: a rapid win flurry must not stack stings into a wash (#37).
     const now = this.ctx ? this.ctx.currentTime : 0;
     if (this.lastWinAt && now - this.lastWinAt < 0.09) return;
     this.lastWinAt = now;
-    // Bigger wins duck the music harder + longer so the sting owns the moment.
+
     this.duckMusic(tier >= 4 ? -9 : tier >= 2 ? -6 : -4, tier >= 4 ? 520 : 380);
     const ids: ClipId[] = ['win_small', 'win_nice', 'win_big', 'win_mega', 'win_epic'];
     const id = ids[Math.min(ids.length - 1, Math.max(0, tier - 1))];
@@ -308,7 +305,7 @@ export class AudioManager {
   }
 
   impact(): void {
-    this.duckMusic(-10, 560); // the braam owns the detonation frame
+    this.duckMusic(-10, 560);
     if (this.playSample('impact_braam', 'win', 0.9)) return;
     this.voice(72, 0.6, 'sawtooth', 0.34);
     this.voice(110, 0.5, 'triangle', 0.22);

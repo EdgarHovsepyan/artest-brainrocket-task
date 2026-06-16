@@ -37,7 +37,7 @@ export class CeremonyView extends Component {
   private sparkles: { node: Node; op: UIOpacity; spin: number }[] = [];
   private panelLightOp!: UIOpacity;
   private panelLightG!: Graphics;
-  // Shader light-burst (particle-glow additive) for the feature-unlock impact.
+
   burstMat: Material | null = null;
   burstFrame: SpriteFrame | null = null;
   private lightBurst: Node | null = null;
@@ -132,7 +132,7 @@ export class CeremonyView extends Component {
 
     const flashNode = this.mk('detoFlash', 4000, 4000, this.node);
     const fg = flashNode.addComponent(Graphics);
-    // Warm CANDY bloom — never white. A gentle gold pop, not a screen-washing flash.
+
     const BLOOM = 18;
     for (let i = BLOOM; i > 0; i--) {
       const t = i / BLOOM;
@@ -170,13 +170,6 @@ export class CeremonyView extends Component {
     EPIC: -50,
   };
 
-  // WIN CEREMONY = the authored Spine win-callout (Cupids-Crush 4.2), NOT the
-  // procedural rhombus/sunburst/sparkle graphics. DECISION (keep it): the flat
-  // geometric romb + hard vector rays read as dated/cheap and are intentionally
-  // OFF in-game. They remain in code ONLY as a safety fallback if the Spine asset
-  // fails to load at runtime (so the ceremony is never empty). To verify Spine is
-  // live: rebuild web-mobile, win 10x+, you should see the cupid-wf banner — if
-  // you instead see rays/shock, the Spine asset failed to load (debug the load).
   private static readonly USE_SPINE_BANNER = true;
   private loadWinCallout(ov: Node): void {
     if (!CeremonyView.USE_SPINE_BANNER) return;
@@ -185,8 +178,7 @@ export class CeremonyView extends Component {
         console.warn('[spine] win-callout load failed; procedural fallback', err);
         return;
       }
-      // Any failure here (bad skeleton, missing texture) must NOT crash the
-      // ceremony — leave winSpine null so show() uses the procedural fallback.
+
       try {
         const n = new Node('winCallout');
         n.layer = ov.layer;
@@ -236,8 +228,6 @@ export class CeremonyView extends Component {
 
       let useSpine = !!this.winSpine && this.winSpine.isValid && !reduced;
       if (useSpine) {
-        // A Spine playback failure must degrade to the procedural ceremony, not
-        // crash the win — flip useSpine so the !useSpine block below still fires.
         try {
           const anim = CeremonyView.TIER_ANIM[tier.name] ?? 'normal-win';
           const sk = this.winSpine!;
@@ -350,7 +340,7 @@ export class CeremonyView extends Component {
     scatterCount?: number,
   ): void {
     this.abort();
-    // More scatters = a bigger, louder unlock (3 baseline → 5 the biggest).
+
     this.unlockBoost = scatterCount
       ? Math.min(1.32, 1 + (Math.min(5, scatterCount) - 3) * 0.15)
       : 1;
@@ -390,9 +380,6 @@ export class CeremonyView extends Component {
     this.convergeCandy();
     this.onCountPip?.();
 
-    // ── ACT 2 · IMPACT (≈0.42s) ───────────────────────────────────────────
-    // A candy flash detonates, the lights burst back OUT, the banner SLAMS in
-    // with an overshoot, the mode glow ignites behind it and the screen kicks.
     this.scheduleOnce(() => {
       if (!ov.active) return;
       this.fireDetonationFlash(0.85);
@@ -420,12 +407,9 @@ export class CeremonyView extends Component {
       }
     }, 0.42);
 
-    // ── ACT 3 · HOLD + DISMISS.
     this.scheduleOnce(() => this.hide(), 2.1);
   }
 
-  // Candy lights stream inward from the rim to centre — the anticipation breath
-  // before the feature banner detonates.
   private convergeCandy(): void {
     const n = this.sparkles.length;
     for (let i = 0; i < n; i++) {
@@ -453,8 +437,6 @@ export class CeremonyView extends Component {
     }
   }
 
-  // The mode-tinted stage glow behind the banner: a bright ignite on impact,
-  // then a gentle breathing hold.
   private igniteModeGlow(col: Color): void {
     if (!this.panelLightG || !this.panelLightOp) return;
     this.panelLightG.clear();
@@ -468,8 +450,6 @@ export class CeremonyView extends Component {
       .start();
   }
 
-  // A juicy gummy-jelly SHADER burst that wobbles in over the dimmed stage then
-  // fissions into droplets on the unlock impact — the cute candy hero reveal.
   private fireLightBurst(col: Color): void {
     if (!this.burstMat || !this.burstFrame) return;
     if (!this.lightBurst) {
@@ -505,17 +485,13 @@ export class CeremonyView extends Component {
     try {
       mat.setProperty('u_progress', 0);
       mat.setProperty('u_time', 0);
-    } catch {
-      /* fallback material may lack these props */
-    }
+    } catch {}
     const boost = this.unlockBoost;
     tween(n)
       .to(0.24, { scale: new Vec3(1.32 * boost, 1.32 * boost, 1) }, { easing: 'backOut' })
       .to(0.18, { scale: new Vec3(1.2 * boost, 1.2 * boost, 1) }, { easing: 'sineOut' })
       .start();
-    // One driver tween over the gummy's whole life: u_time runs continuously for
-    // the squishy wobble, u_progress blooms IN, HOLDS so the candy reads, then
-    // dissolves + fissions into droplets. ~1.4s on screen, not a flash.
+
     const drv = { k: 0 };
     tween(drv)
       .to(
@@ -530,9 +506,7 @@ export class CeremonyView extends Component {
             try {
               mat.setProperty('u_progress', p);
               mat.setProperty('u_time', k * 3.7);
-            } catch {
-              /* fallback material may lack these props */
-            }
+            } catch {}
           },
         },
       )
@@ -542,8 +516,6 @@ export class CeremonyView extends Component {
       .start();
   }
 
-  // Soft radial light: concentric circles, faint+wide (outer) to bright+tight
-  // (inner), for an ambient stage glow with no hard-edged geometry.
   private drawSoftGlow(
     g: Graphics,
     r: number,
@@ -554,7 +526,7 @@ export class CeremonyView extends Component {
   ): void {
     const LAYERS = 9;
     for (let i = 0; i < LAYERS; i++) {
-      const t = i / (LAYERS - 1); // 0 outer → 1 inner
+      const t = i / (LAYERS - 1);
       const rad = radius * (1 - t * 0.84);
       const a = Math.round(peak * (0.1 + 0.9 * t) * (0.45 + 0.55 * t));
       g.fillColor = new Color(r, gg, b, a);
@@ -586,7 +558,7 @@ export class CeremonyView extends Component {
       [255, 206, 71],
       [150, 215, 255],
     ];
-    // Soft round sparkle dots — no hard-edged silhouettes.
+
     const dot = (g: Graphics, r: number): void => {
       g.circle(0, 0, r);
       g.fill();
@@ -599,11 +571,11 @@ export class CeremonyView extends Component {
       const g = n.addComponent(Graphics);
       const [cr, cg, cb] = palette[i % palette.length];
       const shape = shapes[i % shapes.length];
-      // Size variety so the burst has near/far depth, not one flat scale.
+
       const r = 8 + (i % 4) * 2.4;
-      g.fillColor = new Color(cr, cg, cb, 64); // soft outer glow
+      g.fillColor = new Color(cr, cg, cb, 64);
       shape(g, r);
-      g.fillColor = new Color(cr, cg, cb, 255); // bright core
+      g.fillColor = new Color(cr, cg, cb, 255);
       shape(g, r * 0.5);
       const op = n.addComponent(UIOpacity);
       op.opacity = 0;
@@ -627,20 +599,20 @@ export class CeremonyView extends Component {
       op.opacity = 255;
       const tx = Math.cos(a) * dist;
       const ty = Math.sin(a) * dist;
-      // Per-shard stagger so the burst blooms outward in a wave, not one block.
+
       const lead = (i % 6) * 0.018;
       tween(node)
         .delay(lead)
         .to(0.12, { scale: new Vec3(1.18, 1.18, 1) }, { easing: 'backOut' })
         .to(0.52, { scale: new Vec3(0.62, 0.62, 1) }, { easing: 'sineOut' })
         .start();
-      // expoOut launch, then a gentle gravity drift down on settle (secondary motion).
+
       tween(node)
         .delay(lead)
         .to(0.6, { position: new Vec3(tx, ty, 0) }, { easing: 'expoOut' })
         .to(0.5, { position: new Vec3(tx * 1.04, ty - 26, 0) }, { easing: 'sineIn' })
         .start();
-      // Tumble: boxes/stars spin hard, rombs drift — gives the confetti life.
+
       tween(node).delay(lead).by(0.85, { angle: spin }, { easing: 'quadOut' }).start();
       tween(op)
         .delay(0.24 + lead)
@@ -785,9 +757,6 @@ export class CeremonyView extends Component {
   };
 
   private landingPop(): void {
-    // Tier-scaled settle overshoot (Swink — sub-frame settle; Sylvester — bigger
-    // wins savour harder): the final lock punches by landingPopScale, amplified
-    // by the active tier's textPop, then springs back via backOut.
     const { landingPopScale, landingPopMs } = VIEW_CONFIG.counter;
     const over = 1 + landingPopScale * Math.max(1, this.currentTextPop);
     const up = (landingPopMs / 1000) * 0.37;
@@ -829,18 +798,15 @@ export class CeremonyView extends Component {
   private drawNumberGlow(): void {
     const g = this.numberGlow;
     g.clear();
-    // Emissive radial glow instead of a hard orange rhombus barrier (master brief
-    // #3): soft concentric ellipses with a quadratic alpha falloff, warm candy
-    // gradient (gold core → pink halo). Reads as light behind the number — it
-    // lifts the text without a flat geometric panel suffocating the artwork.
+
     const layers = 16;
     for (let i = layers; i >= 1; i--) {
-      const f = i / layers; // 1 outer → ~0 inner
-      const warm = 1 - f; // 0 outer → 1 inner
+      const f = i / layers;
+      const warm = 1 - f;
       const rx = 70 + 260 * f;
       const ry = 30 + 78 * f;
       const a = Math.round(3 + 30 * warm * warm);
-      const gch = Math.round(150 + 90 * warm); // pink outer → gold inner
+      const gch = Math.round(150 + 90 * warm);
       const bch = Math.round(175 - 30 * warm);
       g.fillColor = new Color(255, gch, bch, a);
       g.ellipse(0, 0, rx, ry);

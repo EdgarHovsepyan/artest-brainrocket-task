@@ -203,9 +203,6 @@ export class SymbolView extends Component {
     this.haloOp = op;
   }
 
-  // Cute happy face for the WILD gingerbread character on a win: sparkly eyes,
-  // a big open grin, rosy cheeks. Drawn once procedurally over the head; shown
-  // on win, hidden on clear. Built lazily so non-WILD symbols pay nothing.
   private ensureHappyFace(): void {
     if (this.happyFace || !this.art) return;
     const cfg = VIEW_CONFIG.win.wildHappyFace;
@@ -219,12 +216,12 @@ export class SymbolView extends Component {
     const g = n.addComponent(Graphics);
     const eyeY = 5;
     const eyeX = 11;
-    // Rosy cheeks (soft pink, behind the features).
+
     g.fillColor = new Color(255, 130, 170, 120);
     g.circle(-eyeX - 6, -3, 5.5);
     g.circle(eyeX + 6, -3, 5.5);
     g.fill();
-    // Eyes — big dark rounds with a bright sparkle (cute, alive).
+
     g.fillColor = new Color(40, 22, 14, 255);
     g.circle(-eyeX, eyeY, 4.2);
     g.circle(eyeX, eyeY, 4.2);
@@ -233,7 +230,7 @@ export class SymbolView extends Component {
     g.circle(-eyeX + 1.5, eyeY + 1.5, 1.5);
     g.circle(eyeX + 1.5, eyeY + 1.5, 1.5);
     g.fill();
-    // Big open grin — a filled parabola mouth with a little tongue.
+
     g.fillColor = new Color(70, 30, 18, 255);
     const w = 15;
     const depth = 13;
@@ -262,7 +259,7 @@ export class SymbolView extends Component {
     if (this._currentId !== SYMBOLS.WILD) return;
     this.ensureHappyFace();
     if (!this.happyFace || !this.happyFaceOp) return;
-    // Render above the gingerbread sprite + fallback label (last sibling = top).
+
     const hfParent = this.happyFace.parent;
     if (hfParent) this.happyFace.setSiblingIndex(hfParent.children.length - 1);
     const ms = VIEW_CONFIG.win.wildHappyFace.fadeMs / 1000;
@@ -326,9 +323,6 @@ export class SymbolView extends Component {
     const bhalfBeat = bhalf * beatScale;
     const haloHalf = half * beatScale;
 
-    // Anticipation: a brief squash before the spring so the pop lands as an
-    // impact. Deeper on hotter symbols. Everything that should fire ON the pop
-    // (bounce, tilt, halo, sparkles) is shifted past the dip by `popStart`.
     const ant = VIEW_CONFIG.win.winAnticipation;
     const antDur = ant?.enabled ? ant.ms / 1000 : 0;
     const antDip = ant?.enabled ? 1 - (1 - ant.dip) * heat : 1;
@@ -371,14 +365,11 @@ export class SymbolView extends Component {
       this.glow.setScale(0.8, 0.8, 1);
     }
 
-    // Soft radial glow (not the symbol's own texture) so the win halo reads as
-    // a clean bloom, not a doubled copy of the candy art.
     const haloFrame = SymbolView.fxRadialFrame ?? this.sprite?.spriteFrame ?? null;
     if (haloFrame) this.ensureHalo();
     if (haloFrame && this.halo && this.haloOp && this.haloSp) {
       this.haloSp.spriteFrame = haloFrame;
-      // Tier warmth: lerp the halo tint from cool (low symbols) to warm-gold
-      // (premiums) by heat, so a glance at the glow reads the symbol's value.
+
       const ht = VIEW_CONFIG.win.haloTint;
       const span = Math.max(0.0001, ht.hotHeat - ht.coldHeat);
       const t = Math.min(1, Math.max(0, (heat - ht.coldHeat) / span));
@@ -416,14 +407,9 @@ export class SymbolView extends Component {
       this.playStarPop(popStart, heat);
     }
 
-    // The WILD gingerbread bursts into a laugh as it pops: swap idle->win face.
     this.swapWildWinFace(popStart);
   }
 
-  // Swap the WILD idle art for the laughing-win art at the bottom of the win
-  // pop's anticipation squash, so the laughing face springs out on the pop
-  // (squash-as-a-bridge masks the instant frame swap). Falls back to the
-  // procedural happy face if the win texture isn't loaded.
   private swapWildWinFace(delay: number): void {
     if (this._currentId !== SYMBOLS.WILD || !this.sprite) return;
     const winF = SymbolView.wildWinFrame;
@@ -678,14 +664,9 @@ export class SymbolView extends Component {
     }
   }
 
-  // Per-symbol landing impact merged into the reel stop: the symbol dips a touch
-  // under its own weight and squashes, then springs back with an overshoot
-  // (backOut). Staggered across rows by the caller, this turns a rigid strip stop
-  // into a top-level "symbols settle into place" landing.
   playLand(cell: number, dipFrac: number, sqFrac: number, durMs: number): void {
     Tween.stopAllByTarget(this.node);
-    // Cache the true rest slot once, so an interrupted landing can never leave
-    // the symbol permanently dipped (it always springs back to this baseline).
+
     if (!this.landRest) this.landRest = this.node.position.clone();
     const home = this.landRest;
     const d = Math.max(0.05, durMs / 1000);
