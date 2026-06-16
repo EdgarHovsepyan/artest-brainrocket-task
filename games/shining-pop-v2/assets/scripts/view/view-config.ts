@@ -129,6 +129,7 @@ export const VIEW_CONFIG = {
       elasticity: 1.0,
 
       wildRecoilScale: 1.045,
+      landRecoilScale: 1.03,
     },
   },
 

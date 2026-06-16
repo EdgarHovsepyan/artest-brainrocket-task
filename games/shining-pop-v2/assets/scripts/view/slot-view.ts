@@ -20,7 +20,15 @@ import {
   Vec3,
   view,
 } from 'cc';
-import { BONUS_MODES, BonusMode, GRID, PAYLINES, SCATTER, SYMBOLS } from '../logic/game-config';
+import {
+  BONUS_MODES,
+  BonusMode,
+  GRID,
+  PAYLINES,
+  SCATTER,
+  SCATTER_MIN,
+  SYMBOLS,
+} from '../logic/game-config';
 import { formatMoney } from '../logic/money';
 import {
   CONTROLS_LINES,
@@ -3250,6 +3258,8 @@ export class SlotView extends Component {
 
             reel.recoil(VIEW_CONFIG.spin.bounce.wildRecoilScale);
             this.audio.wildLand();
+          } else {
+            reel.recoil(VIEW_CONFIG.spin.bounce.landRecoilScale);
           }
           if (i >= 3) this.anticipation.clear();
         });
@@ -3258,6 +3268,14 @@ export class SlotView extends Component {
     this.audio.stopRush();
     this.pxLeanTarget = 0;
     this.anticipation.clear();
+    if (antic && earlyScatters >= minEarlyScatters && !this.reducedFx) {
+      let total = 0;
+      for (const reelRows of grid) for (const id of reelRows) if (id === SCATTER) total++;
+      if (total < SCATTER_MIN) {
+        this.audio.anticipation();
+        this.reels[this.reels.length - 1]?.recoil(1.06);
+      }
+    }
   }
 
   showWins(result: SpinResult): void {
