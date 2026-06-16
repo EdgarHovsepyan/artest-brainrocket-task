@@ -33,6 +33,7 @@ export class CeremonyView extends Component {
   private sparkleRoot!: Node;
   private sparkles: { node: Node; op: UIOpacity; spin: number }[] = [];
   private panelLightOp!: UIOpacity;
+  private panelLightG!: Graphics;
   private headerLabel!: Label;
   private amountLabel!: Label;
 
@@ -102,6 +103,7 @@ export class CeremonyView extends Component {
     const panelLightNode = this.mk('panelLight', 10, 10, ov);
     const panelLight = panelLightNode.addComponent(Graphics);
     this.drawSoftGlow(panelLight, 255, 206, 150, 96, 300);
+    this.panelLightG = panelLight;
     this.panelLightOp = panelLightNode.addComponent(UIOpacity);
     this.panelLightOp.opacity = 0;
 
@@ -365,19 +367,92 @@ export class CeremonyView extends Component {
     if (this.numberGlowOp) {
       Tween.stopAllByTarget(this.numberGlowOp);
       this.numberGlowOp.opacity = 0;
-      tween(this.numberGlowOp).to(0.3, { opacity: this.numberGlowBase }).start();
     }
     const ov = this.overlay;
     ov.active = true;
-    ov.setScale(0.6, 0.6, 1);
-    this.fireSparkleBurst();
-    this.fireDetonationFlash(0.6);
-    tween(ov)
-      .to(0.3, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+    ov.setScale(0, 0, 1);
+
+    // ── ACT 1 · ANTICIPATION ──────────────────────────────────────────────
+    // The screen darkens toward the mode colour and candy lights stream INWARD
+    // to the centre — a held breath before the reveal. The banner stays hidden
+    // (scale 0) so the reveal lands as an impact, not a fade-in.
+    Tween.stopAllByTarget(this.dim);
+    this.dim.opacity = 0;
+    tween(this.dim).to(0.42, { opacity: 178 }, { easing: 'quadOut' }).start();
+    this.convergeCandy();
+    this.onCountPip?.();
+
+    // ── ACT 2 · IMPACT (≈0.42s) ───────────────────────────────────────────
+    // A candy flash detonates, the lights burst back OUT, the banner SLAMS in
+    // with an overshoot, the mode glow ignites behind it and the screen kicks.
+    this.scheduleOnce(() => {
+      if (!ov.active) return;
+      this.fireDetonationFlash(0.85);
+      this.fireSparkleBurst();
+      this.igniteModeGlow(modeCol);
+      this.onDetonate?.(name);
+      tween(ov)
+        .to(0.16, { scale: new Vec3(1.22, 1.22, 1) }, { easing: 'quadOut' })
+        .to(0.1, { scale: new Vec3(0.94, 0.94, 1) }, { easing: 'quadIn' })
+        .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+        .start();
+      this.shake(18);
+      if (this.numberGlowOp) {
+        Tween.stopAllByTarget(this.numberGlowOp);
+        this.numberGlowOp.opacity = 0;
+        tween(this.numberGlowOp)
+          .to(0.18, { opacity: 205 }, { easing: 'quadOut' })
+          .to(0.5, { opacity: this.numberGlowBase }, { easing: 'sineInOut' })
+          .start();
+      }
+    }, 0.42);
+
+    // ── ACT 3 · HOLD + DISMISS.
+    this.scheduleOnce(() => this.hide(), 2.1);
+  }
+
+  // Candy lights stream inward from the rim to centre — the anticipation breath
+  // before the feature banner detonates.
+  private convergeCandy(): void {
+    const n = this.sparkles.length;
+    for (let i = 0; i < n; i++) {
+      const { node, op } = this.sparkles[i];
+      Tween.stopAllByTarget(node);
+      Tween.stopAllByTarget(op);
+      const a = (Math.PI * 2 * i) / n + (i % 2 ? 0.2 : -0.2);
+      const dist = 300 + (i % 5) * 34;
+      node.active = true;
+      node.setPosition(Math.cos(a) * dist, Math.sin(a) * dist, 0);
+      node.setScale(0.45, 0.45, 1);
+      node.angle = 0;
+      op.opacity = 0;
+      const lead = (i % 6) * 0.012;
+      tween(op)
+        .delay(lead)
+        .to(0.18, { opacity: 235 }, { easing: 'quadOut' })
+        .delay(0.1)
+        .to(0.14, { opacity: 0 }, { easing: 'quadIn' })
+        .start();
+      tween(node)
+        .delay(lead)
+        .to(0.42, { position: new Vec3(0, 0, 0) }, { easing: 'quadIn' })
+        .start();
+    }
+  }
+
+  // The mode-tinted stage glow behind the banner: a bright ignite on impact,
+  // then a gentle breathing hold.
+  private igniteModeGlow(col: Color): void {
+    if (!this.panelLightG || !this.panelLightOp) return;
+    this.panelLightG.clear();
+    this.drawSoftGlow(this.panelLightG, col.r, col.g, col.b, 150, 320);
+    Tween.stopAllByTarget(this.panelLightOp);
+    this.panelLightOp.opacity = 0;
+    tween(this.panelLightOp)
+      .to(0.16, { opacity: 230 }, { easing: 'quadOut' })
+      .to(0.5, { opacity: 165 }, { easing: 'sineInOut' })
+      .to(0.5, { opacity: 205 }, { easing: 'sineInOut' })
       .start();
-    this.shake(12);
-    tween(this.dim).to(0.1, { opacity: 130 }).start();
-    this.scheduleOnce(() => this.hide(), 1.6);
   }
 
   // Soft radial light: concentric circles, faint+wide (outer) to bright+tight
