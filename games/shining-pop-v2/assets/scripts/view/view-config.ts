@@ -42,6 +42,11 @@ export const VIEW_CONFIG = {
    *  + fill cost. Probed once at module load; high-tier default off-browser. */
   tier: detectDeviceTier(),
 
+  /** Per-symbol-id RENDER scale in the reel cell (1 = full). The premium GEM highs
+   *  (ids 1-4) sit 30% smaller per design; the wild (0) and candy lows (5-9) are
+   *  deliberately left at full size — do not add them here. */
+  symbolRenderScale: { 1: 0.7, 2: 0.7, 3: 0.7, 4: 0.7 } as Record<number, number>,
+
   /** Board layout (px). The view builds the whole scene from these numbers. */
   layout: {
     /** Square symbol cell size. */

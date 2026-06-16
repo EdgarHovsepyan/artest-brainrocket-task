@@ -66,6 +66,8 @@ export class SymbolView extends Component {
   private idlePhase = 0;
   private idleAmp = 0;
   private idleOn = false;
+  /** Per-symbol render scale (1 = full); set per id in setSymbol from config. */
+  private renderScale = 1;
 
   /** Build the cell's sprite + text fallback at `size` px square. `phase` desyncs
    *  this cell's idle breathing from its neighbours. */
@@ -144,6 +146,10 @@ export class SymbolView extends Component {
     // High-value symbols (wild + H1..H4 = ids 0..4) carry more visual "weight" —
     // they breathe a touch deeper, the textbook AAA cue that they matter more.
     this.idleAmp = id <= 4 ? 0.03 : 0.018;
+    // Per-symbol render scale (the premium gems sit smaller). Applied to `art` so
+    // it composes with the idle breathe + the cell-scaling win/land tweens.
+    this.renderScale = VIEW_CONFIG.symbolRenderScale[id] ?? 1;
+    if (this.art) this.art.setScale(this.renderScale, this.renderScale, 1);
   }
 
   /** SY1 idle breathing: a desynced sine scale on the art child while the reel is
@@ -153,14 +159,14 @@ export class SymbolView extends Component {
   update(dt: number): void {
     if (!this.idleOn || !this.art) return;
     this.idleT += dt;
-    const sc = 1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp;
+    const sc = (1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp) * this.renderScale;
     this.art.setScale(sc, sc, 1);
   }
 
   /** Toggle idle breathing (ReelView: on when settled, off while spinning). */
   setIdle(on: boolean): void {
     this.idleOn = on;
-    if (!on && this.art) this.art.setScale(1, 1, 1);
+    if (!on && this.art) this.art.setScale(this.renderScale, this.renderScale, 1);
   }
 
   /** Win pulse + light-up — driven by Cocos Tween. `delay` enables an L→R ripple.
