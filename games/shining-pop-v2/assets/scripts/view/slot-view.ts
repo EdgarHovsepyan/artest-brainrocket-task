@@ -783,7 +783,7 @@ export class SlotView extends Component {
       'u_intensity',
       VIEW_CONFIG.win.burst.intensity,
     );
-    this.getEffectMaterial('win-beam')?.setProperty('u_intensity', 1.15);
+    this.getEffectMaterial('win-beam')?.setProperty('u_intensity', 0.7); // softer, more elegant beam (was 1.15)
 
     // VFX layers above the reels/win-lines
     this.anticipation = this.mkNode('anticipation', 10, 10, this.node).addComponent(

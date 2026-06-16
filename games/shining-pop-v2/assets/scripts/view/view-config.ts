@@ -257,7 +257,7 @@ export const VIEW_CONFIG = {
      *  centres. This is the shader "win line" — no drawn stroke, no magenta
      *  geometry. heightPx = ribbon thickness; maxSegments = pooled sprites;
      *  fadeInMs/holdOpacity = reveal envelope. */
-    beams: { enabled: true, heightPx: 52, maxSegments: 16, fadeInMs: 180, holdOpacity: 225 },
+    beams: { enabled: true, heightPx: 26, maxSegments: 16, fadeInMs: 180, holdOpacity: 170 }, // thinner+softer = more elegant (was 52/225)
 
     /** CINEMA WAVE — soft-burst.effect replaces the 10-layer Graphics radial glow
      *  behind winners (it BANDED into visible concentric circles — rejected).
