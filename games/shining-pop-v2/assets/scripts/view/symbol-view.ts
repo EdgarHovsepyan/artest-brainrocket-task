@@ -312,10 +312,15 @@ export class SymbolView extends Component {
     const half = symbolPulseMs / 2 / 1000;
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
-    const pop = (1 + (symbolPulseScale - 1 + 0.12) * heat) * zoom;
+    // The Wild (and scatter art) are full-size — they already fill the cell, so
+    // the standard win-pop overshoot (~1.5x) shoves them past the reel/board
+    // border ("wild moving out to the outside"). Temper the overshoot + bounce
+    // jelly for full-size symbols so the win pop stays inside the board.
+    const fsTemper = FULL_SIZE_IDS.has(this._currentId) ? 0.35 : 1;
+    const pop = (1 + (symbolPulseScale - 1 + 0.12) * heat * fsTemper) * zoom;
     const bnc = VIEW_CONFIG.win.winBounceLoop;
 
-    const j = bnc.jelly * heat;
+    const j = bnc.jelly * heat * fsTemper;
     const bUp = new Vec3(zoom * (1 + j), zoom * (1 + j), 1);
     const bDn = new Vec3(zoom, zoom, 1);
     const bhalf = bnc.ms / 2 / 1000;
