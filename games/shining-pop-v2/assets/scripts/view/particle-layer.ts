@@ -1,29 +1,34 @@
-// MVC — VIEW. Acid/white diamond shards bursting from winning cells, scaled by
-// the win-to-bet multiple. As of CC-2 (Task 5.4), every shard is borrowed from a
-// sibling ParticlePool — no new/destroy in the hot path. Two new spawn paths land
-// for downstream tasks: sparkCascade(x,y) for 6.3 Svarka, coinGeyser() for the
-// Epic-tier ceremony.
-
 import { _decorator, Color, Component, tween, Vec3 } from 'cc';
 import { ParticlePool, PoolShard } from './particle-pool';
 import { VIEW_CONFIG } from './view-config';
+import { VfxGovernor, VfxStats } from './perf';
 
 const { ccclass } = _decorator;
-const ACID = new Color(234, 255, 0, 255);
 const WHITE = new Color(255, 255, 255, 255);
 const COIN = new Color(255, 196, 64, 255);
+
+const CANDY = [
+  new Color(255, 120, 180, 255),
+  new Color(255, 90, 156, 255),
+  new Color(126, 240, 192, 255),
+  new Color(255, 205, 90, 255),
+  new Color(200, 160, 255, 255),
+  new Color(255, 250, 252, 255),
+  new Color(150, 215, 255, 255),
+];
+const candy = () => CANDY[(Math.random() * CANDY.length) | 0]!;
 
 interface PhysParticle {
   slot: PoolShard;
   vx: number;
   vy: number;
-  /** Vertical acceleration (px/s²) — negative pulls a rising ember back. */
+
   g: number;
-  /** Per-frame velocity retention at 60fps (drag); <1 = damping. */
+
   damp: number;
   life: number;
   age: number;
-  /** Twinkle phase offset so the field never flickers in unison. */
+
   ph: number;
   s0: number;
 }
@@ -31,13 +36,27 @@ interface PhysParticle {
 @ccclass('ParticleLayer')
 export class ParticleLayer extends Component {
   private pool!: ParticlePool;
-  // CGI particles — a real integrator (velocity, gravity, drag, twinkle) instead
-  // of point-to-point tweens. One stepper runs only while particles are alive.
+
   private phys: PhysParticle[] = [];
   private physOn = false;
 
+  private readonly gov = new VfxGovernor(VIEW_CONFIG.vfx.quality);
+
   onLoad(): void {
     this.pool = this.node.getComponent(ParticlePool) ?? this.node.addComponent(ParticlePool);
+  }
+
+  update(dt: number): void {
+    this.gov.sample(dt);
+  }
+
+  vfxStats(): VfxStats {
+    return {
+      fps: this.gov.emaFps,
+      scale: this.gov.scale,
+      live: this.pool?.live ?? 0,
+      cap: VIEW_CONFIG.particles.poolCap,
+    };
   }
 
   private spawnPhys(
@@ -52,7 +71,7 @@ export class ParticleLayer extends Component {
     life: number,
   ): void {
     const slot = this.pool.get(x, y, color, s0);
-    if (!slot) return; // pool full — silent drop
+    if (!slot) return;
     this.phys.push({ slot, vx, vy, g, damp, life, age: 0, ph: Math.random() * 6.283, s0 });
     if (!this.physOn) {
       this.physOn = true;
@@ -76,7 +95,7 @@ export class ParticleLayer extends Component {
       const pos = n.position;
       n.setPosition(pos.x + p.vx * dt, pos.y + p.vy * dt, 0);
       const t = p.age / p.life;
-      // Envelope: quick ignite → sustained → fade; candle-twinkle on top.
+
       const fade = t < 0.12 ? t / 0.12 : t > 0.55 ? 1 - (t - 0.55) / 0.45 : 1;
       const tw = 0.75 + 0.25 * Math.sin(p.age * 14 + p.ph);
       p.slot.opacity.opacity = Math.round(255 * Math.max(0, fade) * tw);
@@ -89,13 +108,11 @@ export class ParticleLayer extends Component {
     }
   };
 
-  /** Burst shards from each centre; volume scales with `multiple` (win/total bet). */
   burst(centers: Vec3[], multiple: number): void {
     const { baseCount, perMultiple, maxCount } = VIEW_CONFIG.particles;
     const big = multiple >= VIEW_CONFIG.ceremony.showMinMultiple;
-    // Wave 1 — cap by the device tier so weak hardware spawns fewer shards.
-    const cap = Math.round(maxCount * VIEW_CONFIG.tier.particleScale);
-    const count = Math.min(cap, Math.round(baseCount + multiple * perMultiple));
+    const raw = Math.min(maxCount, Math.round(baseCount + multiple * perMultiple));
+    const count = this.gov.count(raw, big ? 8 : 4);
     const pts = centers.length ? centers : [new Vec3(0, VIEW_CONFIG.layout.reelCenterY, 0)];
     for (let i = 0; i < count; i++) {
       const p = pts[i % pts.length];
@@ -103,35 +120,21 @@ export class ParticleLayer extends Component {
     }
   }
 
-  /** FIRE EMBERS (2026-06-11): warm orange→gold motes rising from each winning
-   *  cell centre, drifting up + sideways and fading — the win indicator that
-   *  replaces the drawn payline. Reads as heat/embers off the symbol, no
-   *  geometry. */
   fireEmbers(centers: Vec3[]): void {
     const cfg = VIEW_CONFIG.win.fireEmbers;
     const life = cfg.lifeMs / 1000;
     const warm = [
-      new Color(255, 170, 60, 255), // amber
-      new Color(255, 120, 30, 255), // orange
-      new Color(255, 220, 130, 255), // gold
-      new Color(255, 248, 222, 255), // white-hot spark
+      new Color(255, 130, 190, 255),
+      new Color(255, 205, 90, 255),
+      new Color(140, 240, 200, 255),
+      new Color(255, 250, 250, 255),
     ];
-    // Wave 1 — spread a FIXED pool budget across ALL winning cells (scaled by the
-    // device tier) so a dense win shows embers on every cell instead of the first
-    // few cells draining the 64-shard pool and the rest silently dropping.
-    const poolCap = VIEW_CONFIG.particles.poolCap;
-    const headroom = Math.max(0, poolCap - this.pool.live);
-    const budget = Math.min(Math.round(poolCap * 0.85 * VIEW_CONFIG.tier.particleScale), headroom);
-    const perCell = Math.floor(budget / (centers.length || 1));
-    if (perCell <= 0) return; // no pool headroom — drop cleanly, don't half-spawn
-    // ~40% of each cell's share is the ignite ring; the rest rises (within caps).
-    const igniteN = Math.min(8, Math.max(1, Math.round(perCell * 0.4)));
-    const riseN = Math.min(cfg.perCell, Math.max(0, perCell - igniteN));
+
+    const ringCount = this.gov.count(8, 5);
+    const cellCount = this.gov.count(cfg.perCell, 3);
     for (const c of centers) {
-      // Phase 1 — IGNITE RING: a radial pop of fast, hard-damped light points
-      // (the energy leaving the symbol), settling within ~half a second.
-      for (let i = 0; i < igniteN; i++) {
-        const ang = (i / igniteN) * Math.PI * 2 + Math.random() * 0.4;
+      for (let i = 0; i < ringCount; i++) {
+        const ang = (i / ringCount) * Math.PI * 2 + Math.random() * 0.4;
         const v = 240 + Math.random() * 120;
         this.spawnPhys(
           c.x,
@@ -145,9 +148,8 @@ export class ParticleLayer extends Component {
           0.4 + Math.random() * 0.2,
         );
       }
-      // Phase 2 — EMBER RISE: buoyant motes that decelerate as they climb,
-      // drifting + twinkling; the white-hot quarter is faster and shorter.
-      for (let i = 0; i < riseN; i++) {
+
+      for (let i = 0; i < cellCount; i++) {
         const hot = i % 4 === 3;
         this.spawnPhys(
           c.x + (Math.random() - 0.5) * cfg.spreadPx,
@@ -164,105 +166,67 @@ export class ParticleLayer extends Component {
     }
   }
 
-  /** 6.3 Svarka cascade: short-lived hot-cyan sparks pulled down by gravity at (x,y). */
   sparkCascade(x: number, y: number): void {
     const cfg = VIEW_CONFIG.win.svarka;
     const color = new Color().fromHEX(cfg.sparkColor);
     const life = cfg.sparkLifeMs / 1000;
     const g = cfg.sparkGravity;
-    for (let i = 0; i < cfg.sparkPerStep; i++) {
+    const sparks = this.gov.count(cfg.sparkPerStep, 1);
+    for (let i = 0; i < sparks; i++) {
       const slot = this.pool.get(x, y, color, 0.6 + Math.random() * 0.4);
-      if (!slot) return; // pool full — silent drop
+      if (!slot) return;
       const vx = (Math.random() - 0.5) * 200;
-      const vy = -60 + Math.random() * 40; // small upward kick before gravity wins
+      const vy = -60 + Math.random() * 40;
       const endX = x + vx * life;
       const endY = y + vy * life - 0.5 * g * life * life;
       this.ballistic(slot, endX, endY, life, 'quadIn');
     }
   }
 
-  /** Epic-ceremony coin geyser — HERO coins. Each pops from the origin, arcs
-   *  up-and-out, decel-spins (catching the additive light), then falls + shrinks.
-   *  Per-coin stagger makes the top-tier payoff read as a shower, not a flat
-   *  simultaneous spray. */
-  coinGeyser(originX = 0, originY = VIEW_CONFIG.layout.reelCenterY, intensity = 1): void {
+  coinGeyser(originX = 0, originY = VIEW_CONFIG.layout.reelCenterY): void {
     const cfg = VIEW_CONFIG.particles.coin;
-    // Wave 6 — scale the shower by win intensity (continuous crescendo, not a fixed
-    // epic burst) and by the device tier. intensity in [0,1]; non-finite → full.
-    const i01 = Number.isFinite(intensity) ? Math.max(0, Math.min(1, intensity)) : 1;
-    const count = Math.max(
-      1,
-      Math.round(cfg.count * (0.5 + 0.5 * i01) * VIEW_CONFIG.tier.particleScale),
-    );
-    for (let i = 0; i < count; i++) {
-      const slot = this.pool.get(originX, originY, COIN, 0.2);
-      if (!slot) return; // pool full — silent drop
-      this.heroCoin(slot, originX, originY, i * cfg.staggerS);
+    const spread = (cfg.spreadDeg * Math.PI) / 180;
+    const pool = this.pool;
+    const coins = this.gov.count(cfg.count, 8);
+    for (let i = 0; i < coins; i++) {
+      const slot = pool.get(originX, originY, COIN, 1.2);
+      if (!slot) return;
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * spread;
+      const v = cfg.launchSpeed * (0.85 + Math.random() * 0.45);
+      const vx = Math.cos(ang) * v;
+      const vy = Math.sin(ang) * v;
+
+      const tApex = Math.max(0.18, Math.abs(vy) / cfg.gravity);
+      const apexX = originX + vx * tApex;
+      const apexY = originY + vy * tApex - 0.5 * cfg.gravity * tApex * tApex;
+      const fall = tApex + 0.55 + Math.random() * 0.35;
+      const endX = apexX + vx * fall * 0.65;
+      const endY = apexY - 0.5 * cfg.gravity * fall * fall;
+      const spin = Math.random() * 720 - 360;
+      const node = slot.node;
+      node.angle = 0;
+      tween(node)
+        .to(
+          tApex,
+          { position: new Vec3(apexX, apexY, 0), angle: spin * 0.4 },
+          { easing: 'quadOut' },
+        )
+        .to(fall, { position: new Vec3(endX, endY, 0), angle: spin }, { easing: 'quadIn' })
+        .start();
+      const total = tApex + fall;
+      tween(slot.opacity)
+        .delay(total * 0.72)
+        .to(total * 0.28, { opacity: 0 })
+        .call(() => pool.put(slot))
+        .start();
     }
   }
 
-  /** One cinematic hero coin. ALL tweens are FINITE (no repeatForever) so the
-   *  shard returns to the shared pool cleanly — a looping tween on a re-pooled
-   *  node is a known crash. Position / scale / spin / opacity run in parallel;
-   *  opacity outlives the motion so `pool.put` fires once, after the arc lands. */
-  private heroCoin(slot: PoolShard, ox: number, oy: number, delay: number): void {
-    const cfg = VIEW_CONFIG.particles.coin;
-    const pool = this.pool;
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    const life = cfg.heroLifeS;
-    const upDur = life * cfg.riseFrac;
-    const downDur = life - upDur;
-    const lateral = cfg.lateralPx * (0.4 + Math.random() * 0.6) * dir;
-    const apex = new Vec3(ox + lateral * 0.5, oy + cfg.risePx * (0.7 + Math.random() * 0.5), 0);
-    // DROP-BUG FIX: clamp the landing to the frame floor so coins fall TO the
-    // board, never hundreds of px BELOW it (the layer is unmasked, so on a big
-    // win the geyser coins kept falling out the bottom and read as "symbols
-    // dropping out of the reels"). reelCenterY - frameFloorPad keeps them in-frame.
-    const floorY = VIEW_CONFIG.layout.reelCenterY - cfg.frameFloorPad;
-    const land = new Vec3(
-      ox + lateral,
-      Math.max(floorY, oy - cfg.fallPx * (0.7 + Math.random() * 0.5)),
-      0,
-    );
-    const full = cfg.scalePop * (0.85 + Math.random() * 0.3);
-
-    slot.node.setPosition(ox, oy, 0);
-    slot.node.angle = 0;
-    slot.node.setScale(0.2, 0.2, 1);
-    slot.opacity.opacity = 0;
-
-    // arc: rise (decel) → fall (accel)
-    tween(slot.node)
-      .delay(delay)
-      .to(upDur, { position: apex }, { easing: 'quadOut' })
-      .to(downDur, { position: land }, { easing: 'quadIn' })
-      .start();
-    // pop-in → shrink as it falls
-    tween(slot.node)
-      .delay(delay)
-      .to(0.12, { scale: new Vec3(full, full, 1) }, { easing: 'backOut' })
-      .to(life - 0.12, { scale: new Vec3(cfg.scaleEnd, cfg.scaleEnd, 1) }, { easing: 'sineIn' })
-      .start();
-    // decelerating spin — finite, completes within `life`
-    tween(slot.node)
-      .delay(delay)
-      .to(life, { angle: cfg.spinDeg * dir }, { easing: 'quadOut' })
-      .start();
-    // ignite → hold → fade; outlives the motion so the slot returns to pool once
-    tween(slot.opacity)
-      .delay(delay)
-      .to(0.1, { opacity: 255 })
-      .delay(life * 0.6)
-      .to(life * 0.4, { opacity: 0 })
-      .call(() => pool.put(slot))
-      .start();
-  }
-
   private spawn(x: number, y: number, big: boolean): void {
-    const color = Math.random() < 0.5 ? ACID : WHITE;
-    const scale = big ? 0.9 : 0.6;
+    const color = Math.random() < 0.2 ? WHITE : candy();
+    const scale = big ? 0.95 : 0.62;
     const slot = this.pool.get(x, y, color, scale);
-    if (!slot) return; // pool full — silent drop
+    if (!slot) return;
     const ang = Math.random() * Math.PI * 2;
     const dist = (big ? 150 : 80) * (0.5 + Math.random());
     const life = 0.5 + Math.random() * 0.4;

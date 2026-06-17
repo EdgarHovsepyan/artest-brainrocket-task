@@ -1,33 +1,18 @@
-/* BettingBarMobile — Cocos Creator 3.8 component (betting part only, 540×684).
-   Shared control surface for every Cocos game; buy-bonus stays game state.
-
-   CRYSTAL-VIOLET re-theme: 1:1 with the current shining-pop Pixi bar
-   (betting-bar-mobile.js / -skin.js) — indigo darks → orchid/magenta, lavender
-   highlights, WHITE-SMOKE text + icons (the "kill purple text" decision), orchid
-   edges/dividers. cc.Graphics has no gradients, so each gradient is approximated
-   by a representative stop; depth comes from inner-gloss + rim strokes (swap to
-   baked gradient-texture Sprites for the final polish pass). Inter font: assign
-   in the editor for an exact match; falls back to the system font otherwise.
-
-   Stateful glyphs (spin arrow/stop, autoplay glyph/count, turbo glyph/pip,
-   stepper +/- , sound, demo) live in their OWN nodes so the live-state API can
-   toggle/dim them — matching the Pixi bar exactly.
-
-   Events: spin · bet:inc · bet:dec · autoplay · turbo · sound · menu
-   API: on · fit · setBalance · setCurrency · setLastWin · setBet · setDemo ·
-        setSoundOn · setSpinning · setAutoplay · setTurbo · setAffordable · setSteppers */
 import {
   _decorator,
   Component,
   Node,
   Graphics,
   Label,
+  LabelOutline,
+  LabelShadow,
   Color,
   resources,
   Sprite,
   SpriteFrame,
   UITransform,
   UIOpacity,
+  Vec2,
   Vec3,
   EventTarget,
   EventTouch,
@@ -35,21 +20,18 @@ import {
   Tween,
 } from 'cc';
 import { applyFont } from '../view/fonts';
+import { formatMoney } from '../logic/money';
 import { VIEW_CONFIG } from '../view/view-config';
 const { ccclass } = _decorator;
 
 const W = 540;
 const H = 684;
-const VOL = { x0: 408, w: 100, y: 452 }; // volume-slider track geometry (design coords)
-// Opaque control-band top (design-y). Everything ABOVE this stays transparent so
-// the reels show through / sit above the bar; the board reserves the band below
-// it (mobile parity with the web bar's CROP/RING_TOP fitBottom contract).
+const VOL = { x0: 408, w: 100, y: 452 };
+
 const BAND_TOP = 196;
 
-/** Device bottom safe-area (iOS home indicator / Android nav bar) in COCOS view
- *  px. Reads the CSS env() via a hidden probe and converts CSS-px → view-px with
- *  the visible/inner-height ratio. No-op (0) off-browser or where unsupported —
- *  e.g. the desktop preview — so it only ever lifts the bar on a real device. */
+const COMPACT_MAX_FRAC = 0.4;
+
 function safeAreaBottomCocos(viewH: number): number {
   if (typeof document === 'undefined' || typeof window === 'undefined') return 0;
   try {
@@ -66,7 +48,6 @@ function safeAreaBottomCocos(viewH: number): number {
   }
 }
 
-// Crystal-violet palette — representative stops from the shining-pop skin.
 const C = {
   stage: '#0d0826',
   panel: '#191140',
@@ -77,8 +58,8 @@ const C = {
   spin: '#15102e',
   centerRim: '#e8d0ff',
   edge: '#b86fda',
-  value: '#f5f7fa', // white-smoke (no purple text)
-  label: '#c9ced8', // muted white-smoke caption
+  value: '#f5f7fa',
+  label: '#c9ced8',
   cur: '#e9edf3',
   icon: '#f5f7fa',
   divider: '#b070da',
@@ -95,12 +76,17 @@ function col(hex: string, a?: number): Color {
 @ccclass('BettingBarMobile')
 export class BettingBarMobile extends Component {
   private events = new EventTarget();
-  private g!: Graphics; // static decoration layer
+  private g!: Graphics;
   private labels: Record<string, Label> = {};
 
-  // stateful element handles
-  private spinGroup!: Node; // dim target for setAffordable
+  private uiBoost = 1;
+
+  private currency = 'USD';
+
+  private spinGroup!: Node;
   private spinArrow!: Node;
+  private spinHalo: Node | null = null;
+  private spinHaloOp: UIOpacity | null = null;
   private spinStop!: Node;
   private autoGlyph!: Node;
   private autoCount!: Label;
@@ -114,7 +100,7 @@ export class BettingBarMobile extends Component {
   private soundPanel!: Node;
   private soundFill!: Graphics;
   private soundHandle!: Node;
-  private volume = 0.5; // matches AudioManager's default master gain
+  private volume = 0.5;
   private panelOpen = false;
 
   onLoad(): void {
@@ -131,19 +117,11 @@ export class BettingBarMobile extends Component {
     this.buildSoundMenu();
     this.buildDemo();
     this.buildSoundPanel();
-    // 2026-06-11 — the in-bar buildBuyControl was REMOVED: it drew a second
-    // circle in the deck ("two circles" bug) and duplicated the board FAB which
-    // is now THE buy-bonus component in both orientations (it docks bottom-left
-    // in portrait, matching the PixiJS reference). Buy is handled by the FAB's
-    // own tap → view.openBuyMenu(); the bar no longer emits 'buy'.
+
     this.makeLabels();
     this.makeHitAreas();
   }
 
-  /** Task 7.2 — portrait-bar Buy control. Candy pill ~ right of the spin ring,
-   *  emits 'buy' so slot-view can open the buy modal. Visual + hit are sized by
-   *  bar.buyControl tunables; ≥62 design-px hit clears the 44 CSS-px touch
-   *  minimum after the portrait fit scale (~0.72). */
   private buyControlNode: Node | null = null;
   private buyControlEnabled = true;
   private buildBuyControl(): void {
@@ -157,7 +135,7 @@ export class BettingBarMobile extends Component {
 
     const g = n.addComponent(Graphics);
     const r = cfg.size / 2;
-    // Candy pill: filled core + soft inner highlight + bright rim.
+
     g.fillColor = new Color(255, 90, 156, 255);
     g.circle(0, 0, r);
     g.fill();
@@ -169,8 +147,6 @@ export class BettingBarMobile extends Component {
     g.circle(0, 0, r - 1);
     g.stroke();
 
-    // "BUY" label centred on the pill (display font for hierarchy parity with
-    // the menu/buy-modal headings).
     const labelNode = new Node('buyLabel');
     n.addChild(labelNode);
     const lt = labelNode.addComponent(UITransform);
@@ -184,8 +160,6 @@ export class BettingBarMobile extends Component {
     lbl.isBold = true;
     applyFont(lbl, 'display');
 
-    // Press squash + emit 'buy'. Hit rect is the node itself; Wave A buyControl
-    // size (62) already ≥ touch minimum so no extra hit padding.
     n.on(Node.EventType.TOUCH_START, () => {
       Tween.stopAllByTarget(n);
       tween(n)
@@ -204,8 +178,6 @@ export class BettingBarMobile extends Component {
     this.buyControlNode = n;
   }
 
-  /** Task 7.2 — controller-gating for spin/bonus runs. Dimmed (50% alpha) and
-   *  non-interactive when disabled. */
   setBuyEnabled(on: boolean): void {
     this.buyControlEnabled = on;
     if (!this.buyControlNode) return;
@@ -214,12 +186,10 @@ export class BettingBarMobile extends Component {
     op.opacity = on ? 255 : 128;
   }
 
-  // top-down design y → Cocos y-up
   private Y(y: number): number {
     return -y;
   }
 
-  // create a full-size overlay Graphics node (anchor 0,1, same coord space)
   private gfx(name: string, parent: Node = this.node): Graphics {
     const n = new Node(name);
     parent.addChild(n);
@@ -230,10 +200,6 @@ export class BettingBarMobile extends Component {
   }
 
   private rr(g: Graphics, x: number, y: number, w: number, h: number, r: number): void {
-    // Built-in roundRect (the web bar's clean path). The previous hand-rolled
-    // arc path swept the LONG way around each corner, which rendered a full
-    // protruding circle at every capsule end + a stray chord line — the "dark
-    // circles" on the banners / stepper / footer and the crushed stop corners.
     g.roundRect(x, this.Y(y + h), w, h, r);
   }
   private panelInto(
@@ -255,7 +221,7 @@ export class BettingBarMobile extends Component {
       g.strokeColor = col(C.edge);
       g.stroke();
     }
-    // inner gloss highlight (depth without gradients)
+
     this.rr(g, x + 2, y + 2, w - 4, h - 4, Math.max(0, r - 2));
     g.lineWidth = 1.2;
     g.strokeColor = col(C.gloss, 0.06);
@@ -281,38 +247,34 @@ export class BettingBarMobile extends Component {
     }
   }
 
-  // ── static decoration (stage, scrim, banners, pill, circle bases, balance bar) ──
   private drawDecor(): void {
     const g = this.g;
     const Y = this.Y.bind(this);
 
-    // Opaque ONLY from BAND_TOP down — the reels show through / sit above the
-    // transparent upper region (was a full-surface fill that covered the board).
-    this.rr(g, 0, BAND_TOP, W, H - BAND_TOP, 0);
-    g.fillColor = col(C.stage);
-    g.fill();
-    this.rr(g, 0, 300, W, 384, 0);
-    g.fillColor = col('#000000', 0.12);
-    g.fill();
-    // Candy-pink top rim that lifts the band off the reels above (web-bar parity).
+    const bandAlpha = VIEW_CONFIG.bar.mobile.bandAlpha;
+    if (bandAlpha > 0) {
+      this.rr(g, 0, BAND_TOP, W, H - BAND_TOP, 0);
+      g.fillColor = col(C.stage, bandAlpha);
+      g.fill();
+      this.rr(g, 0, 300, W, 384, 0);
+      g.fillColor = col('#000000', 0.12);
+      g.fill();
+    }
+
     g.rect(0, Y(BAND_TOP), W, 2);
     g.fillColor = col(C.edge, 0.55);
     g.fill();
     g.rect(0, Y(BAND_TOP + 2), W, 6);
     g.fillColor = col('#ffffff', 0.05);
     g.fill();
-    // signature divider hairline at the inner band top
+
     g.rect(0, Y(301), W, 1.4);
     g.fillColor = col(C.divider, 0.5);
     g.fill();
-    // (spin hero glow removed — the soft disc read as a "circle shadow" under
-    // the spin button on small screens; the ring art carries the hero weight.)
 
-    // LAST WIN / TOTAL BET banners
     this.panelInto(g, 60, 210, 200, 46, 23, C.banner, 1.8);
     this.panelInto(g, 280, 210, 200, 46, 23, C.banner, 1.8);
 
-    // bet stepper pill body + dividers
     this.panelInto(g, 170, 479, 200, 54, 27, C.panel, 1.8);
     [237, 303].forEach((x) => {
       g.moveTo(x, Y(486));
@@ -322,26 +284,17 @@ export class BettingBarMobile extends Component {
     g.strokeColor = col(C.divider, 0.28);
     g.stroke();
 
-    // autoplay + turbo circle bases
     this.circleInto(g, 104, 506, 30, C.panel, 1.8);
     this.circleInto(g, 436, 506, 30, C.panel, 1.8);
 
-    // bottom balance bar + internal divider (moved left to x330 so the sound +
-    // menu utilities get ≥44px touch room to the right of the account readouts)
     this.panelInto(g, 14, 560, 512, 44, 22, C.panel, 1.8);
     g.moveTo(330, Y(568));
     g.lineTo(330, Y(596));
     g.lineWidth = 1.2;
     g.strokeColor = col(C.divider, 0.3);
     g.stroke();
-    // menu glyph moved to its own node in buildSoundMenu so the authored icon
-    // can replace it (lines in this shared decor layer could not be retired).
   }
 
-  /** ICON SET — authored `resources/icons/ic_*.png` sprites (white art, tinted)
-   *  replacing the hand-drawn glyphs. Async: the node stays hidden until the
-   *  frame lands and `onReady` retires the Graphics fallback, so a missing icon
-   *  can never leave a control glyph-less. Coordinates are design-space (Y()). */
   private icon(
     parent: Node,
     x: number,
@@ -373,8 +326,6 @@ export class BettingBarMobile extends Component {
     return n;
   }
 
-  // ── hero SPIN: ring + center in face; arrow + stop as toggleable nodes; group
-  //    carries a UIOpacity for setAffordable. ──
   private buildSpin(): void {
     const Y = this.Y.bind(this);
     this.spinGroup = new Node('spin');
@@ -416,9 +367,52 @@ export class BettingBarMobile extends Component {
     stop.fill();
     this.spinStop = stop.node;
     this.spinStop.active = false;
+
+    const halo = new Node('spinHalo');
+    halo.layer = this.node.layer;
+    this.spinGroup.addChild(halo);
+    const hui = halo.addComponent(UITransform);
+    hui.setAnchorPoint(0.5, 0.5);
+    hui.setContentSize(180, 180);
+    halo.setPosition(270, this.Y(392), 0);
+    halo.setSiblingIndex(0);
+    const hg = halo.addComponent(Graphics);
+    hg.fillColor = col(C.edge, 0.5);
+    hg.circle(0, 0, 80);
+    hg.fill();
+    this.spinHaloOp = halo.addComponent(UIOpacity);
+    this.spinHaloOp.opacity = 0;
+    this.spinHalo = halo;
+    this.startSpinBreathe();
   }
 
-  // ── autoplay: triangle glyph + a count label (count shown while running). ──
+  private startSpinBreathe(): void {
+    if (this.reducedMotion) return;
+    if (!this.spinHalo || !this.spinHaloOp) return;
+    Tween.stopAllByTarget(this.spinHalo);
+    Tween.stopAllByTarget(this.spinHaloOp);
+    this.spinHalo.active = true;
+    this.spinHalo.setScale(1, 1, 1);
+    tween(this.spinHalo)
+      .to(1.5, { scale: new Vec3(1.1, 1.1, 1) }, { easing: 'sineInOut' })
+      .to(1.5, { scale: new Vec3(1, 1, 1) }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+    tween(this.spinHaloOp)
+      .to(1.5, { opacity: 95 }, { easing: 'sineInOut' })
+      .to(1.5, { opacity: 40 }, { easing: 'sineInOut' })
+      .union()
+      .repeatForever()
+      .start();
+  }
+  private stopSpinBreathe(): void {
+    if (!this.spinHalo || !this.spinHaloOp) return;
+    Tween.stopAllByTarget(this.spinHalo);
+    Tween.stopAllByTarget(this.spinHaloOp);
+    this.spinHaloOp.opacity = 0;
+  }
+
   private buildAutoplay(): void {
     const Y = this.Y.bind(this);
     const glyph = this.gfx('autoGlyph');
@@ -428,7 +422,7 @@ export class BettingBarMobile extends Component {
     glyph.close();
     glyph.fillColor = col(C.active);
     glyph.fill();
-    // Loop-arrow icon reads "autoplay" clearer than the bare play triangle.
+
     this.icon(glyph.node, 104, 506, 36, 'ic_autoplay', C.active, () => glyph.clear());
     this.autoGlyph = glyph.node;
     this.autoCount = this.mkLabel('autoCount', 104, 506, 17, C.value, 0.5);
@@ -436,7 +430,6 @@ export class BettingBarMobile extends Component {
     this.autoCount.node.active = false;
   }
 
-  // ── stepper +/- glyphs as their own dimmable nodes (setSteppers). ──
   private buildStepperGlyphs(): void {
     const Y = this.Y.bind(this);
     const minus = this.gfx('minus');
@@ -460,7 +453,6 @@ export class BettingBarMobile extends Component {
     this.plusOp = plus.node.addComponent(UIOpacity);
   }
 
-  // ── turbo: bolt glyph (dimmable) + a pip shown in "active" mode. ──
   private buildTurbo(): void {
     const Y = this.Y.bind(this);
     const glyph = this.gfx('turboGlyph');
@@ -475,10 +467,10 @@ export class BettingBarMobile extends Component {
     glyph.fill();
     this.icon(glyph.node, 436, 507, 30, 'ic_bolt', C.active, () => glyph.clear());
     this.turboGlyphOp = glyph.node.addComponent(UIOpacity);
-    this.turboGlyphOp.opacity = 115; // off by default
+    this.turboGlyphOp.opacity = 115;
 
     const pip = this.gfx('turboPip');
-    const pr = 4; // diamond pip (NOT a circle — VFX-ban compliant)
+    const pr = 4;
     pip.moveTo(449, Y(519) + pr);
     pip.lineTo(449 + pr, Y(519));
     pip.lineTo(449, Y(519) - pr);
@@ -490,8 +482,6 @@ export class BettingBarMobile extends Component {
     this.turboPip.active = false;
   }
 
-  // ── sound glyph (own node so setSoundOn can dim it) + menu glyph (own node
-  //    so the authored icon can retire the drawn fallback). ──
   private buildSoundMenu(): void {
     const Y = this.Y.bind(this);
     const menu = this.gfx('menuGlyph');
@@ -503,8 +493,7 @@ export class BettingBarMobile extends Component {
     menu.strokeColor = col(C.icon);
     menu.stroke();
     this.icon(menu.node, 489, 582, 28, 'ic_menu', C.icon, () => menu.clear());
-    // Sound icon at design-x ~425 — paired NEXT TO the menu glyph (user request)
-    // with adjacent, non-overlapping ≥44px hit areas.
+
     const snd = this.gfx('sound');
     snd.moveTo(416, Y(577));
     snd.lineTo(421, Y(577));
@@ -522,7 +511,6 @@ export class BettingBarMobile extends Component {
     this.icon(snd.node, 425, 582, 28, 'ic_sound', C.icon, () => snd.clear());
     this.soundOp = snd.node.addComponent(UIOpacity);
 
-    // muted slash (shown when sound is OFF) — its own node so setSoundOn toggles it.
     const mute = this.gfx('soundMuted');
     mute.moveTo(414, Y(570));
     mute.lineTo(440, Y(596));
@@ -533,7 +521,6 @@ export class BettingBarMobile extends Component {
     this.soundMuted.active = false;
   }
 
-  // ── DEMO MODE badge (hidden by default, toggled by setDemo). ──
   private buildDemo(): void {
     this.demoGroup = new Node('demo');
     this.node.addChild(this.demoGroup);
@@ -546,8 +533,6 @@ export class BettingBarMobile extends Component {
     this.demoGroup.active = false;
   }
 
-  // ── volume slider popup: tap the sound icon to open; drag the handle to set
-  //    volume; the mini speaker mutes. Lives in an empty band above the stepper. ──
   private buildSoundPanel(): void {
     const Y = this.Y.bind(this);
     this.soundPanel = new Node('soundPanel');
@@ -558,7 +543,7 @@ export class BettingBarMobile extends Component {
 
     const plate = this.soundPanel.addComponent(Graphics);
     this.panelInto(plate, 360, 430, 166, 46, 12, C.panel, 1.8);
-    // mini speaker (mute) on the popup's left
+
     plate.moveTo(376, Y(447));
     plate.lineTo(381, Y(447));
     plate.lineTo(387, Y(442));
@@ -568,7 +553,7 @@ export class BettingBarMobile extends Component {
     plate.close();
     plate.fillColor = col(C.icon);
     plate.fill();
-    // track line
+
     plate.moveTo(VOL.x0, Y(VOL.y));
     plate.lineTo(VOL.x0 + VOL.w, Y(VOL.y));
     plate.lineWidth = 3;
@@ -599,13 +584,12 @@ export class BettingBarMobile extends Component {
     hdiamond();
     hg.stroke();
     this.soundHandle = handle;
-    // delta-based drag — robust against the bar's fit() scale; no keyboard (gate U2).
+
     handle.on(Node.EventType.TOUCH_MOVE, (e: EventTouch) => {
       const s = this.node.scale.x || 1;
       this.setVolume(this.volume + e.getDeltaX() / s / VOL.w);
     });
 
-    // mute hit (the mini speaker) → reuses the existing 'sound' (mute toggle) event
     const muteHit = new Node('volMute');
     this.soundPanel.addChild(muteHit);
     const mui = muteHit.addComponent(UITransform);
@@ -614,16 +598,10 @@ export class BettingBarMobile extends Component {
     muteHit.setPosition(new Vec3(372, Y(437), 0));
     muteHit.on(Node.EventType.TOUCH_END, () => this.events.emit('sound'));
 
-    this.setVolume(this.volume, false); // position handle + fill without emitting
+    this.setVolume(this.volume, false);
     this.soundPanel.active = false;
   }
 
-  /** Soft touch-ripple of LIGHT at a tap (2026-06-11 redesign). The old version
-   *  was a STROKED diamond outline expanding to 2.1× — it read as a "rotated box"
-   *  flickering on every button press (user-rejected). This replacement is a
-   *  FILLED, feathered, stacked-alpha glow that blooms briefly then fades: it
-   *  reads as a soft pulse of light, never a shape outline. Per pascal-vfx /
-   *  web-animations canon: tap feedback is light + transform, not geometry. */
   private ping(cx: number, cy: number): void {
     const n = new Node('tapGlow');
     this.node.addChild(n);
@@ -634,8 +612,7 @@ export class BettingBarMobile extends Component {
     n.setPosition(new Vec3(cx, this.Y(cy), 0));
     const g = n.addComponent(Graphics);
     const e = col(C.edge);
-    // 3 stacked FILLED soft diamonds — bright pinpoint core fading to a wide
-    // feathered halo. No stroke, no hard edge → reads as a glow, not a box.
+
     const ring = (rad: number, a: number) => {
       g.fillColor = new Color(e.r, e.g, e.b, a);
       g.moveTo(0, rad);
@@ -645,13 +622,12 @@ export class BettingBarMobile extends Component {
       g.close();
       g.fill();
     };
-    ring(22, 24); // wide soft halo
-    ring(13, 48); // mid
-    ring(6, 120); // bright pinpoint core
+    ring(22, 24);
+    ring(13, 48);
+    ring(6, 120);
     const op = n.addComponent(UIOpacity);
     op.opacity = 180;
-    // Gentle bloom: scale 0.7 → 1.25 (NOT 2.1× — no big expansion that reads
-    // as a growing box), fade out fast. A quick, soft, premium touch-light.
+
     n.setScale(0.7, 0.7, 1);
     tween(n)
       .to(0.22, { scale: new Vec3(1.25, 1.25, 1) }, { easing: 'quadOut' })
@@ -685,12 +661,25 @@ export class BettingBarMobile extends Component {
     const lab = n.addComponent(Label);
     lab.fontSize = size;
     lab.lineHeight = size + 2;
+    (n as unknown as { __baseFs: number }).__baseFs = size;
     lab.color = col(color);
     lab.isBold = true;
     applyFont(lab, color === C.value ? 'display' : 'body');
+
+    if (color === C.value) this.make3D(lab);
     n.setPosition(new Vec3(x, this.Y(y), 0));
     this.labels[name] = lab;
     return lab;
+  }
+
+  private make3D(l: Label): void {
+    const ls = l.node.addComponent(LabelShadow);
+    ls.color = col('#180527', 0.9);
+    ls.offset = new Vec2(0, -2);
+    ls.blur = 2;
+    const lo = l.node.addComponent(LabelOutline);
+    lo.color = col('#2d0b40');
+    lo.width = 2;
   }
   private makeLabels(): void {
     this.mkLabel('lastWinLabel', 100, 233, 13, C.label, 0.5).string = 'LAST WIN';
@@ -713,83 +702,91 @@ export class BettingBarMobile extends Component {
       ui.setAnchorPoint(0, 1);
       ui.setContentSize(w, h);
       n.setPosition(new Vec3(x, this.Y(y), 0));
-      n.on(Node.EventType.TOUCH_START, () => this.ping(x + w / 2, y + h / 2)); // creative tap FX
+      n.on(Node.EventType.TOUCH_START, () => this.ping(x + w / 2, y + h / 2));
       n.on(Node.EventType.TOUCH_END, fn);
     };
     const emit = (ev: string) => () => this.events.emit(ev);
-    // Hit areas sized ≥62 design-px so they clear the 44 CSS-px touch minimum
-    // after the portrait fit scale (~0.72). Centres unchanged; sound moved to
-    // match its relocated glyph so it no longer overlaps the menu hit.
+
     add('hitSpin', 200, 322, 140, 140, emit('spin'));
     add('hitAutoplay', 72, 474, 64, 64, emit('autoplay'));
     add('hitMinus', 170, 474, 67, 64, emit('bet:dec'));
     add('hitPlus', 303, 474, 67, 64, emit('bet:inc'));
     add('hitTurbo', 404, 474, 64, 64, emit('turbo'));
-    add('hitSound', 393, 550, 64, 64, () => this.toggleSoundPanel()); // opens the volume slider
+    add('hitSound', 393, 550, 64, 64, () => this.toggleSoundPanel());
     add('hitMenu', 457, 550, 64, 64, emit('menu'));
   }
 
-  // ───────────────────────── public API ─────────────────────────
   on(ev: string, cb: (...args: any[]) => void): this {
     this.events.on(ev, cb);
     return this;
   }
-  /** Portrait bottom-docked fit (master fitBottom parity with the web bar). The
-   *  540x684 surface width-fits and docks to the screen bottom — lifted by the
-   *  device safe-area — and only the OPAQUE control band (BAND_TOP→bottom) covers
-   *  the screen; the transparent top lets the reels show through/above. Returns
-   *  that control-band height in screen px so the controller can reserve it as
-   *  the board's bottom inset (the reels then lift ABOVE the spin cluster). */
+
   fit(viewW: number, viewH: number): number {
-    // Parent is the Canvas root — origin at SCREEN CENTRE. Anchor (0,1): the node
-    // origin is its top-left corner.
-    const s = Math.min(viewW / W, viewH / H);
+    let s = Math.min(viewW / W, viewH / H);
+
+    const maxBand = COMPACT_MAX_FRAC * viewH;
+    const bandPx = (H - BAND_TOP) * s;
+    if (bandPx > maxBand) s *= maxBand / bandPx;
     const safe = safeAreaBottomCocos(viewH);
     this.node.setScale(s, s, 1);
-    // Bottom edge sits `safe` px above the screen bottom; centred horizontally.
+
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + safe + H * s, 0));
+    this.applyTextScale(s);
     return safe + (H - BAND_TOP) * s;
   }
-  private fmt(n: number): string {
-    // Money renders with EXACTLY two decimals everywhere (approval gate N3/N4:
-    // "1,000" and "1000.5" style drift is a reviewer flag). Non-finite guard:
-    // a bad value renders as a clean 0.00, never "NaN"/"∞" on a money surface.
-    const v = Number.isFinite(n) ? n : 0;
-    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  private applyTextScale(s: number): void {
+    const boost = Math.min(3, Math.max(1, Math.ceil(s)));
+    if (boost === this.uiBoost) return;
+    this.uiBoost = boost;
+    for (const l of Object.values(this.labels)) {
+      const node = l.node as unknown as { __baseFs?: number };
+      const base = node.__baseFs ?? l.fontSize;
+      node.__baseFs = base;
+      l.fontSize = Math.round(base * boost);
+      l.lineHeight = Math.round((base + 2) * boost);
+      l.node.setScale(1 / boost, 1 / boost, 1);
+    }
   }
-  /** Shrink a value label so a long currency amount never escapes its slot
-   *  (mobile parity with the web bar's relayoutBanners shrink-to-fit). The
-   *  label's anchor is preserved, so only the rendered width collapses. */
+  private fmt(n: number): string {
+    return formatMoney(Number.isFinite(n) ? n : 0, this.currency, 9);
+  }
+
   private fitValue(name: string, maxW: number): void {
     const lab = this.labels[name];
     if (!lab) return;
-    lab.node.setScale(1, 1, 1);
+
+    const b = this.uiBoost;
+    lab.node.setScale(1 / b, 1 / b, 1);
     lab.updateRenderData(true);
     const w = lab.node.getComponent(UITransform)!.width;
-    if (w > maxW && maxW > 4) {
-      const k = maxW / w;
-      lab.node.setScale(k, k, 1);
+    const designW = w / b;
+    if (designW > maxW && maxW > 4) {
+      const k = maxW / designW;
+      lab.node.setScale(k / b, k / b, 1);
     }
   }
   setBalance(n: number): void {
     this.labels['balValue'].string = this.fmt(n);
-    this.fitValue('balValue', 84); // stop before the USD chip at x196
+    this.fitValue('balValue', 84);
   }
   setCurrency(c: string): void {
-    this.labels['balCur'].string = c;
+    this.currency = c;
+
+    this.labels['balCur'].string = '';
   }
   setLastWin(n: number): void {
     this.labels['lastWinValue'].string = this.fmt(n);
-    this.fitValue('lastWinValue', 76); // stay inside the LAST WIN banner (→x260)
+    this.fitValue('lastWinValue', 76);
   }
   setBet(n: number): void {
     const v = this.fmt(n);
     this.labels['stepValue'].string = v;
     this.labels['totalBetValue'].string = v;
     this.labels['betValue'].string = v;
-    this.fitValue('stepValue', 90); // inside the stepper pill, between −/+
-    this.fitValue('totalBetValue', 76); // inside the TOTAL BET banner (→x480)
-    this.fitValue('betValue', 54); // stop before the divider at x330
+    this.fitValue('stepValue', 90);
+    this.fitValue('totalBetValue', 76);
+    this.fitValue('betValue', 54);
   }
   setDemo(on: boolean): void {
     this.demoGroup.active = !!on;
@@ -798,7 +795,7 @@ export class BettingBarMobile extends Component {
     this.soundOp.opacity = on ? 255 : 140;
     if (this.soundMuted) this.soundMuted.active = !on;
   }
-  /** Set volume 0..1 — moves the slider handle + fill; emits 'volume' unless emit=false. */
+
   setVolume(v: number, emit = true): void {
     this.volume = Math.max(0, Math.min(1, v));
     const sy = this.Y(VOL.y);
@@ -814,10 +811,19 @@ export class BettingBarMobile extends Component {
     }
     if (emit) this.events.emit('volume', this.volume);
   }
-  // ── live game-state (matches the Pixi bar) ──
+
+  private reducedMotion = false;
+
+  setReducedFx(on: boolean): void {
+    this.reducedMotion = on;
+    if (on) this.stopSpinBreathe();
+    else this.startSpinBreathe();
+  }
   setSpinning(on: boolean): void {
     this.spinArrow.active = !on;
     this.spinStop.active = !!on;
+    if (on) this.stopSpinBreathe();
+    else this.startSpinBreathe();
   }
   setAutoplay(count: number | null): void {
     const active = count != null && count !== 0;

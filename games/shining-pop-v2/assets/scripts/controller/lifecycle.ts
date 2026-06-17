@@ -1,8 +1,3 @@
-// Production-grade lifecycle hooks: visibility (tab switch + minimize),
-// network (online/offline), and a debounced resize dispatcher. One install
-// point in the controller, one tear-down on destroy. No game-loop coupling --
-// the AudioContext does the audio gating, game.frameRate does the tick gating.
-
 import { game } from 'cc';
 
 export interface LifecycleHooks {
@@ -18,8 +13,6 @@ export interface LifecycleHandle {
 
 const RESIZE_DEBOUNCE_MS = 120;
 
-/** Install all browser lifecycle listeners. SAFE on non-browser runtimes
- *  (returns a no-op handle if `window` is absent). */
 export function installLifecycle(hooks: LifecycleHooks): LifecycleHandle {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return { dispose: () => undefined };
@@ -71,7 +64,6 @@ export function installLifecycle(hooks: LifecycleHooks): LifecycleHandle {
   window.addEventListener('online', onOnline, true);
   window.addEventListener('offline', onOffline, true);
 
-  // Boot-time network state.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) hooks.onNetwork(false);
 
   return {

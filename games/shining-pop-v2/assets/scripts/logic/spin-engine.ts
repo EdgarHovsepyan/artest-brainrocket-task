@@ -1,25 +1,22 @@
-// Pure spin engine: builds reel strips, spins, and evaluates line wins.
-// NO Cocos imports — fully testable and RTP-simulatable outside the editor.
-
-import { GRID, PAYLINES, PAYTABLE, REEL_WEIGHTS, SYMBOLS, WILD_STRIKE } from './game-config';
+import {
+  FREE_SPINS_AWARD,
+  GRID,
+  PAYLINES,
+  PAYTABLE,
+  REEL_WEIGHTS,
+  SCATTER,
+  SCATTER_MIN,
+  SCATTER_PAY,
+  SETTINGS,
+  SYMBOLS,
+  WILD_STRIKE,
+} from './game-config';
 import { Rng } from './rng';
 import { Grid, LineWin, SpinResult, SymbolId } from './types';
 
 const WILD = SYMBOLS.WILD;
+const SCAT = SCATTER;
 
-/**
- * Expand a reel's symbol-weight map into a concrete strip, spreading each
- * symbol's copies EVENLY around the strip instead of in one contiguous block.
- *
- * Why even spacing matters: the visible window is 3 consecutive strip cells, so
- * a blocked strip ([5,5,5,5,5,6,6,6,...]) shows the same symbol stacked on most
- * spins. That clusters every payout into rare "it all lines up" spins — low hit
- * frequency, streaky play. An even spread keeps the per-line odds (and therefore
- * base RTP) identical while letting small wins land on far more spins, which is
- * what lifts hit frequency. Each copy k of a symbol with `count` copies is
- * placed at fractional position (k + 0.5) / count; ties break by symbol id so
- * the layout is fully deterministic — runtime strips match the RTP simulations.
- */
 export function buildStrip(weights: Record<SymbolId, number>): SymbolId[] {
   const slots: { pos: number; symbol: SymbolId }[] = [];
   for (const key of Object.keys(weights)) {
@@ -31,10 +28,8 @@ export function buildStrip(weights: Record<SymbolId, number>): SymbolId[] {
   return slots.map((s) => s.symbol);
 }
 
-/** Concrete reel strips, derived from the data-driven weights. */
 export const REEL_STRIPS: SymbolId[][] = REEL_WEIGHTS.map(buildStrip);
 
-/** Spin all reels: pick a random stop per reel and read a 3-symbol window. */
 export function spinGrid(rng: Rng, strips: SymbolId[][] = REEL_STRIPS): Grid {
   const grid: Grid = [];
   for (let reel = 0; reel < GRID.reels; reel++) {
@@ -55,12 +50,6 @@ function payoutFor(symbol: SymbolId, count: number): number {
   return row[count] ?? 0;
 }
 
-/**
- * Evaluate one payline given its 5 left-to-right symbols.
- * Wild substitutes for any symbol. We consider both the "first non-wild symbol"
- * interpretation (wilds extend that symbol's run) and the pure-Wild run, then
- * keep whichever pays more — the standard left-aligned slot rule.
- */
 export interface LineEval {
   symbol: SymbolId;
   count: number;
@@ -81,7 +70,7 @@ export function evaluateLine(lineSymbols: SymbolId[]): LineEval | null {
 
   let base: SymbolId = -1;
   for (const s of lineSymbols) {
-    if (s !== WILD) {
+    if (s !== WILD && s !== SCAT) {
       base = s;
       break;
     }
@@ -100,7 +89,16 @@ export function evaluateLine(lineSymbols: SymbolId[]): LineEval | null {
   return best;
 }
 
-/** Evaluate all paylines on a grid. */
+export function countScatters(grid: Grid): number {
+  let n = 0;
+  for (let reel = 0; reel < grid.length; reel++) {
+    for (let row = 0; row < grid[reel].length; row++) {
+      if (grid[reel][row] === SCAT) n++;
+    }
+  }
+  return n;
+}
+
 export function evaluateSpin(grid: Grid): SpinResult {
   const lineWins: LineWin[] = [];
   let totalPayout = 0;
@@ -113,15 +111,18 @@ export function evaluateSpin(grid: Grid): SpinResult {
       totalPayout += win.payout;
     }
   }
-  return { grid, lineWins, totalPayout };
+
+  const scatters = countScatters(grid);
+  const tier = Math.min(scatters, 5);
+  const scatterPay = scatters >= SCATTER_MIN ? (SCATTER_PAY[tier] ?? 0) * SETTINGS.activeLines : 0;
+  const freeSpins = scatters >= SCATTER_MIN ? (FREE_SPINS_AWARD[tier] ?? 0) : 0;
+  return { grid, lineWins, totalPayout, scatters, scatterPay, freeSpins };
 }
 
-/** Spin + evaluate in one call. */
 export function spin(rng: Rng, strips: SymbolId[][] = REEL_STRIPS): SpinResult {
   return evaluateSpin(spinGrid(rng, strips));
 }
 
-/** Count Wild symbols anywhere on the grid. */
 export function countWilds(grid: Grid): number {
   let n = 0;
   for (let reel = 0; reel < grid.length; reel++) {
@@ -132,10 +133,6 @@ export function countWilds(grid: Grid): number {
   return n;
 }
 
-/**
- * WILD STRIKE multiplier: when >= minWilds Wilds land, the spin's line wins are
- * multiplied by the wild count (capped). Returns 1 when untriggered.
- */
 export function wildStrikeMultiplier(grid: Grid): number {
   const wilds = countWilds(grid);
   if (wilds < WILD_STRIKE.minWilds) return 1;
