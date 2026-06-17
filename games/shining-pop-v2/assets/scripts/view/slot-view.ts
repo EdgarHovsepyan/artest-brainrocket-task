@@ -2363,7 +2363,9 @@ export class SlotView extends Component {
         104,
         46,
         () => {
+          // Restore the betting bar via the overlay-sync path (see quick-bet).
           panel.active = false;
+          this.scheduleOverlaySync();
           this.autoplayStartCb?.(n);
         },
         panel,
@@ -2841,7 +2843,11 @@ export class SlotView extends Component {
         104,
         46,
         () => {
+          // Close via the overlay-sync path so onOverlay(false) fires and the
+          // betting bar is restored — a bare panel.active=false strands the bar
+          // hidden and the player can't continue.
           panel.active = false;
+          this.scheduleOverlaySync();
           this.betSelectCb?.(cents);
         },
         panel,
