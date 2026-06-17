@@ -90,8 +90,14 @@ export class CeremonyView extends Component {
     this.dim = dimNode.addComponent(UIOpacity);
     this.dim.opacity = 0;
 
-    const ov = this.mk('ceremony', 760, 520, this.node);
-    ov.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    // Win-callout banner + Spine model rendered 2x smaller (was oversized / low
+    // quality on every win). Wrap it in a half-scale container centred on the
+    // reels — the reveal/dismiss tweens + the setScale(1,1,1) reset all run on
+    // `ov` INSIDE the wrapper, so they still play but render at half size.
+    const ovWrap = this.mk('ceremonyScale', 10, 10, this.node);
+    ovWrap.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    ovWrap.setScale(0.5, 0.5, 1);
+    const ov = this.mk('ceremony', 760, 520, ovWrap);
     ov.active = false;
 
     this.sparkleRoot = this.mk('sparkles', 10, 10, ov);

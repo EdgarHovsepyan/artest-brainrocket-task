@@ -656,6 +656,9 @@ export class SlotView extends Component {
       46,
       () => {
         layer.destroy();
+        // Reality-check modal isn't a popClose panel, so restore the betting bar
+        // via the overlay-sync path or it stays hidden and the game is stuck.
+        this.scheduleOverlaySync();
         onStop();
       },
       card,
@@ -668,6 +671,7 @@ export class SlotView extends Component {
       46,
       () => {
         layer.destroy();
+        this.scheduleOverlaySync();
         onContinue();
       },
       card,
