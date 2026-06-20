@@ -80,7 +80,9 @@ export class SlotController extends Component {
   private muted = false;
 
   onLoad(): void {
-    game.frameRate = 120;
+    // 60fps locked — 120 doubled GPU/thermal load on high-refresh panels for no
+    // perceptible gain on a 60Hz-feel slot (SOP §1 thermal gate).
+    game.frameRate = 60;
     this.model = new SlotModel({ balanceCents: this.startBalanceCents, betCents: this.betCents });
     this.session = newSession(this.nowMs());
     const viewNode = new Node('SlotView');

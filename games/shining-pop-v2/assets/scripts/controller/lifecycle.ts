@@ -30,7 +30,7 @@ export function installLifecycle(hooks: LifecycleHooks): LifecycleHandle {
   const resume = (): void => {
     if (!suspended) return;
     suspended = false;
-    game.frameRate = frozenFps || 120;
+    game.frameRate = frozenFps || 60;
     hooks.onResume();
   };
 
@@ -78,7 +78,7 @@ export function installLifecycle(hooks: LifecycleHooks): LifecycleHandle {
       window.removeEventListener('online', onOnline, true);
       window.removeEventListener('offline', onOffline, true);
       if (suspended) {
-        game.frameRate = frozenFps || 120;
+        game.frameRate = frozenFps || 60;
       }
     },
   };
