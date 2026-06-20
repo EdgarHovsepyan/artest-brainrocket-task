@@ -121,6 +121,54 @@ export function iconSpin(s, col = THEME.icon) {
   return g;
 }
 
+// a small 4-point sparkle star (candy "shine").
+function sparkleStar(g, cx, cy, rad, col = 0xffffff, alpha = 0.95) {
+  g.poly([
+    cx, cy - rad,
+    cx + rad * 0.26, cy - rad * 0.26,
+    cx + rad, cy,
+    cx + rad * 0.26, cy + rad * 0.26,
+    cx, cy + rad,
+    cx - rad * 0.26, cy + rad * 0.26,
+    cx - rad, cy,
+    cx - rad * 0.26, cy - rad * 0.26,
+  ]).fill({ color: col, alpha });
+}
+
+// draws the two spin arrows (arcs + heads) once, in a single colour/width.
+function spinArrowPath(g, r, w, headK, col) {
+  const head = r * headK;
+  g.arc(0, 0, r, -Math.PI * 0.86, Math.PI * 0.30).stroke({ width: w, color: col, cap: 'round' });
+  g.arc(0, 0, r, Math.PI * 0.14, Math.PI * 1.30).stroke({ width: w, color: col, cap: 'round' });
+  [Math.PI * 0.30, Math.PI * 1.30].forEach((a) => {
+    const px = Math.cos(a) * r, py = Math.sin(a) * r;
+    const tx = -Math.sin(a), ty = Math.cos(a); // tangent
+    g.poly([
+      px + tx * head, py + ty * head,
+      px - tx * head * 0.5 + (px / r) * head, py - ty * head * 0.5 + (py / r) * head,
+      px - tx * head * 0.5 - (px / r) * head, py - ty * head * 0.5 - (py / r) * head,
+    ]).fill(col);
+  });
+}
+
+// SPIN (candy) — glossy candy circular-arrows: deep-magenta candy outline, a
+// bright candy-cream body, a top gloss sheen and sparkle shines. Gamified hero
+// glyph for the spin button (replaces the flat utilitarian refresh ring).
+export function iconSpinCandy(s, opts = {}) {
+  const g = new PIXI.Graphics();
+  const main = opts.main != null ? opts.main : 0xfff2fb;
+  const outline = opts.outline != null ? opts.outline : 0x9a2370;
+  const r = s * 0.86;
+  const w = Math.max(2.5, s * 0.23);
+  // candy outline (dark magenta, thicker) → bright candy-cream body
+  spinArrowPath(g, r, w + Math.max(2, s * 0.13), 0.42, outline);
+  spinArrowPath(g, r, w, 0.30, main);
+  // sparkle shines — placed clear of the ring (top-right + bottom-left)
+  sparkleStar(g, s * 0.92, -s * 0.86, s * 0.34, 0xffffff, 0.98);
+  sparkleStar(g, -s * 1.02, s * 0.66, s * 0.22, 0xffe9fa, 0.9);
+  return g;
+}
+
 // PLAY ▶ (autoplay / start) — rounded equilateral triangle.
 export function iconPlay(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
@@ -240,9 +288,9 @@ export function spinButton(R, opts = {}) {
   base.ellipse(0, -R * 0.30, R * 0.42, R * 0.18).fill({ color: THEME.gloss, alpha: 0.16 });
   g.addChild(base);
 
-  // arrow glyph (circular spin arrow)
+  // arrow glyph (gamified candy circular-arrows)
   const a = new PIXI.Container();
-  a.addChild(iconSpin(R * 0.34, THEME.icon));
+  a.addChild(iconSpinCandy(R * 0.40));
   g.addChild(a);
 
   // stop glyph (square)
