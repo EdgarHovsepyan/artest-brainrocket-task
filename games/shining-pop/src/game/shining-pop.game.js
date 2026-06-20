@@ -1226,27 +1226,30 @@
       
 
       x.save();
-      x.shadowColor = 'rgba(255,255,255,0.55)';   
-      x.shadowBlur  = S * 0.028;
+      x.shadowColor = 'rgba(255,255,255,0.55)';
+      x.shadowBlur  = S * 0.026;
       x.lineJoin = 'round'; x.lineCap = 'round';
-      x.strokeStyle = '#ffffff';                   
-      const ar = S * 0.22, lw = S * 0.072;
+      x.strokeStyle = '#ffffff';
+      x.fillStyle   = '#ffffff';
+      // Twin circular-arrow "spin" glyph — two ~165° arcs 180° apart, each ending
+      // in a leading arrowhead. Reads unambiguously as rotate/spin; the old single
+      // arc + one head read as a browser "reload".
+      const ar = S * 0.205, lw = S * 0.064;
       x.lineWidth = lw;
-      x.beginPath();
-      x.arc(0, 0, ar, Math.PI * 0.16, Math.PI * 1.84);
-      x.stroke();
-      
-      const a = Math.PI * 1.84;
-      const ex = ar * Math.cos(a), ey = ar * Math.sin(a);
-      const tx = -Math.sin(a),     ty = Math.cos(a);
-      const px = Math.cos(a),      py = Math.sin(a);
-      const head = lw * 1.85, halfW = lw * 1.55;
-      x.fillStyle = '#ffffff';
-      x.beginPath();
-      x.moveTo(ex + tx*head, ey + ty*head);
-      x.lineTo(ex + px*halfW, ey + py*halfW);
-      x.lineTo(ex - px*halfW, ey - py*halfW);
-      x.closePath(); x.fill();
+      const arrowArc = (a0, a1) => {
+        x.beginPath(); x.arc(0, 0, ar, a0, a1); x.stroke();
+        const ex = ar * Math.cos(a1), ey = ar * Math.sin(a1);
+        const tx = -Math.sin(a1),     ty = Math.cos(a1);   // clockwise tangent (travel dir)
+        const rx = Math.cos(a1),      ry = Math.sin(a1);   // radial (outward)
+        const head = lw * 1.7, halfW = lw * 1.42;
+        x.beginPath();
+        x.moveTo(ex + tx * head,  ey + ty * head);
+        x.lineTo(ex + rx * halfW, ey + ry * halfW);
+        x.lineTo(ex - rx * halfW, ey - ry * halfW);
+        x.closePath(); x.fill();
+      };
+      arrowArc(-0.30 * Math.PI, 0.62 * Math.PI);
+      arrowArc( 0.70 * Math.PI, 1.62 * Math.PI);
       x.restore();
     }
     x.restore();

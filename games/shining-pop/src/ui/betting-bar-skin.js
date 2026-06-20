@@ -25,7 +25,7 @@ export const BAR = {
   ringInner:  0xffe4fb, 
   centerRim:  0xffd6f4, 
   gloss:      0xffffff, 
-  cyan:       0xbfe8ff, 
+  cyan:       0xffe0f4,
   activeEdge: 0x6e1f56, 
   spinGlow:   0xff4ad8, 
   dark:       0x24082c, 
@@ -82,7 +82,7 @@ export function makeSkin(PIXI) {
       .stroke({ width: ew, color: BAR.edge, alpha: 1 });
     if (opts.inner !== false)
       g.roundRect(x + 2, y + 2, w - 4, h - 4, Math.max(0, r - 2))
-        .stroke({ width: 1.1, color: BAR.cyan, alpha: 0.16 });   
+        .stroke({ width: 1.3, color: BAR.cyan, alpha: 0.26 });
   }
 
 
@@ -153,15 +153,25 @@ export function makeSkin(PIXI) {
 
     
     const arrow = new PIXI.Container();
-    const ar = R * 0.4;
+    // Twin circular-arrow spin glyph — two ~145° arms 180° apart, each with a
+    // leading arrowhead (replaces the single reload-style arc).
+    const ar = R * 0.40, lw = R * 0.098;
     const a = new PIXI.Graphics();
-    a.arc(0, 0, ar, -1.206, -1.936 + 2 * Math.PI)
-      .stroke({ width: R * 0.107, color: BAR.value, cap: 'round' });
-    const tip = ar + R * 0.02;
-    a.moveTo(0, -tip - R * 0.03)
-      .lineTo(-R * 0.114, -ar + R * 0.06)
-      .lineTo(-R * 0.171, -tip - R * 0.07)
-      .fill(BAR.value);
+    const span = Math.PI * 0.80;
+    const arm = (a0) => {
+      const a1 = a0 + span;
+      a.arc(0, 0, ar, a0, a1).stroke({ width: lw, color: BAR.value, cap: 'round' });
+      const ex = ar * Math.cos(a1), ey = ar * Math.sin(a1);
+      const tx = -Math.sin(a1), ty = Math.cos(a1);   // clockwise tangent (travel dir)
+      const rx = Math.cos(a1),  ry = Math.sin(a1);   // radial (outward)
+      const head = lw * 1.65, halfW = lw * 1.40;
+      a.moveTo(ex + tx * head,  ey + ty * head)
+        .lineTo(ex + rx * halfW, ey + ry * halfW)
+        .lineTo(ex - rx * halfW, ey - ry * halfW)
+        .fill(BAR.value);
+    };
+    arm(-0.30 * Math.PI);
+    arm( 0.70 * Math.PI);
     arrow.addChild(a);
     face.addChild(arrow);
 

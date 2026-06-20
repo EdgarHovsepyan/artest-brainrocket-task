@@ -136,13 +136,16 @@ function sparkleStar(g, cx, cy, rad, col = 0xffffff, alpha = 0.95) {
 }
 
 // draws the two spin arrows (arcs + heads) once, in a single colour/width.
+// Two distinct ~144° arms 180° apart with clear gaps top + bottom, so it reads
+// as a chasing twin-arrow "spin" — not a near-complete "refresh ring".
 function spinArrowPath(g, r, w, headK, col) {
   const head = r * headK;
-  g.arc(0, 0, r, -Math.PI * 0.86, Math.PI * 0.30).stroke({ width: w, color: col, cap: 'round' });
-  g.arc(0, 0, r, Math.PI * 0.14, Math.PI * 1.30).stroke({ width: w, color: col, cap: 'round' });
-  [Math.PI * 0.30, Math.PI * 1.30].forEach((a) => {
-    const px = Math.cos(a) * r, py = Math.sin(a) * r;
-    const tx = -Math.sin(a), ty = Math.cos(a); // tangent
+  const A = -0.42 * Math.PI, B = 0.38 * Math.PI;
+  [0, Math.PI].forEach((off) => {
+    const a1 = B + off;
+    g.arc(0, 0, r, A + off, a1).stroke({ width: w, color: col, cap: 'round' });
+    const px = Math.cos(a1) * r, py = Math.sin(a1) * r;
+    const tx = -Math.sin(a1), ty = Math.cos(a1); // tangent (cw, travel dir)
     g.poly([
       px + tx * head, py + ty * head,
       px - tx * head * 0.5 + (px / r) * head, py - ty * head * 0.5 + (py / r) * head,
