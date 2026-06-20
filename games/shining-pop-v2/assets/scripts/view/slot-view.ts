@@ -3833,7 +3833,10 @@ export class SlotView extends Component {
   private tickWin = (dt: number): void => {
     this.winCountElapsed += dt;
     const p = Math.min(1, this.winCountElapsed / this.winCountDur);
-    const v = Math.round(this.winCountTo * p);
+    // Ease-out-expo: the win number rushes up then decelerates into the total
+    // (was a flat linear odometer — the most-seen win moment now has life).
+    const e = p >= 1 ? 1 : 1 - Math.pow(2, -10 * p);
+    const v = Math.round(this.winCountTo * e);
     this.setWin(v);
     if (p - this.winCountLastTick > 0.12) {
       this.winCountLastTick = p;

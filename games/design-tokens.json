@@ -18,7 +18,7 @@
   "ceremonyTiers": {
     "EPIC": "#ff1e8c",
     "SUPER": "#ff5ab0",
-    "MEGA": "#ffb000",
-    "BIG": "#ffe14d"
+    "MEGA": "#ff79c4",
+    "BIG": "#ffa8dc"
   }
 }

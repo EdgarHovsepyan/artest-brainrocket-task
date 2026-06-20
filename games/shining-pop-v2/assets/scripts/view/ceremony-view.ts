@@ -25,7 +25,7 @@ const { ccclass } = _decorator;
 
 const RIM = new Color().fromHEX(PAL.accent);
 const CRYSTAL = new Color().fromHEX(PAL.valueText);
-const WARM = new Color(255, 196, 92, 255);
+const WARM = new Color(255, 130, 200, 255);
 const TITLE = new Color().fromHEX(PAL.title);
 
 const fmt = (cents: number) => formatMoney((Number.isFinite(cents) ? cents : 0) / 100, 'USD');
@@ -122,13 +122,13 @@ export class CeremonyView extends Component {
     this.numberGlowOp = glowNode.addComponent(UIOpacity);
     this.numberGlowOp.opacity = 0;
 
-    this.amountShadow = this.mkLabel(ov, 4, -21, 66, new Color(28, 8, 2, 235));
+    this.amountShadow = this.mkLabel(ov, 4, -21, 66, new Color(40, 8, 34, 235));
     this.amountLabel = this.mkLabel(ov, 0, -16, 66, CRYSTAL);
     this.badgeLabel = this.mkLabel(ov, 0, -86, 30, Color.WHITE);
 
     for (const l of [this.headerLabel, this.amountLabel]) {
       l.enableOutline = true;
-      l.outlineColor = new Color(82, 34, 4, 255);
+      l.outlineColor = new Color(60, 14, 52, 255);
       l.outlineWidth = 3;
     }
 
