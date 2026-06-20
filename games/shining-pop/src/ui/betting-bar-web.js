@@ -1,7 +1,14 @@
 
 import * as PIXI from 'pixi.js';
+import {
+  glassCircle, spinButton, iconPlay, iconBolt, iconSound, iconMenu, iconClose, iconCoins,
+} from './ui-kit.js';
 
 const DPR = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
+
+// glyph accent colours
+const GLYPH = 0xfdf2ff;       // utility icons
+const ACCENT = 0xff66bd;      // active accent (autoplay / turbo)
 
 
 const G = {
@@ -29,13 +36,6 @@ function fg(stops, dir) {
     colorStops: stops.map((s) => ({ offset: s[0], color: s[1] })), textureSpace: 'local',
   });
 }
-function fgRad(stops, cx, cy) {
-  return new PIXI.FillGradient({
-    type: 'radial', center: { x: cx, y: cy }, innerRadius: 0,
-    outerCenter: { x: 0.5, y: 0.5 }, outerRadius: 0.62,
-    colorStops: stops.map((s) => ({ offset: s[0], color: s[1] })), textureSpace: 'local',
-  });
-}
 function panel(w, h, rx, fill, ew, horiz) {
   const g = new PIXI.Graphics();
   g.roundRect(0, 0, w, h, rx).fill(fg(fill, horiz ? 'h' : 'v'));
@@ -43,17 +43,6 @@ function panel(w, h, rx, fill, ew, horiz) {
   g.roundRect(2.5, 2, w - 5, h * 0.42, Math.max(0, rx - 2)).fill({ color: COL.gloss, alpha: 0.12 });
   g.roundRect(2, 2, w - 4, h - 4, Math.max(0, rx - 2)).stroke({ width: 1.1, color: COL.cyan, alpha: 0.15 });
   if (ew) g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: COL.edge });
-  return g;
-}
-function cbase(r, fill, sw) {
-  const g = new PIXI.Graphics();
-  g.circle(0, 0, r).fill(fg(fill, 'v'));
-  g.ellipse(-r * 0.18, -r * 0.34, r * 0.62, r * 0.4).fill({ color: COL.gloss, alpha: 0.12 });   
-  if (sw) {
-    
-    g.circle(0, 0, r - sw * 0.5).stroke({ width: sw, color: COL.edge, alpha: 0.92 });
-    g.circle(0, 0, r - sw - 0.5).stroke({ width: 1, color: COL.cyan, alpha: 0.13 });
-  }
   return g;
 }
 function T(t, sz, col, w, ax, mid, ls) {
@@ -82,28 +71,13 @@ export class BettingBarWeb extends PIXI.Container {
   _emit(ev, arg) { (this._cbs[ev] || []).forEach((cb) => { try { cb(arg); } catch (e) {} }); }
 
   _spin(cx, cy, R) {
-    const g = new PIXI.Container(); g.position.set(cx, cy); const inner = R * 0.7857;
-    const base = new PIXI.Graphics();
-    base.circle(0, 0, R).fill(fg(G.ring, 'd'));
-    base.circle(0, 0, R - 1).stroke({ width: R * 0.057, color: COL.ringInner, alpha: 0.6 });
-    base.circle(0, 0, inner).fill(fgRad(G.spin, 0.4, 0.34));
-    base.circle(0, 0, inner).stroke({ width: R * 0.031, color: COL.centerRim, alpha: 0.4 });
-    base.ellipse(-R * 0.23, -R * 0.26, R * 0.49 / 2, R * 0.21 / 2).fill({ color: COL.gloss, alpha: 0.07 });
-    g.addChild(base);
-    const a = new PIXI.Container(); const ar = R * 0.4;
-    a.addChild(new PIXI.Graphics().arc(0, 0, ar, -1.206, -1.936 + 2 * Math.PI).stroke({ width: R * 0.107, color: COL.value, cap: 'round' }));
-    const tip = ar + R * 0.02;
-    a.addChild(new PIXI.Graphics().moveTo(0, -tip - R * 0.03).lineTo(-R * 0.114, -ar + R * 0.06).lineTo(-R * 0.171, -tip - R * 0.07).fill(COL.value));
-    g.addChild(a);
-    const stop = new PIXI.Graphics().roundRect(-R * 0.26, -R * 0.26, R * 0.52, R * 0.52, R * 0.12).fill({ color: COL.value, alpha: 0.98 }).stroke({ color: 0x8a2bc0, width: R * 0.03, alpha: 0.9 });
-    stop.visible = false; g.addChild(stop);
-    g._arrow = a; g._stop = stop;
-    g.spin = () => { if (g.__s) return; g.__s = true; const s = performance.now(); const tk = () => { const t = (performance.now() - s) / 700; a.rotation = Math.min(t, 1) * Math.PI * 2; if (t < 1) requestAnimationFrame(tk); else { a.rotation = 0; g.__s = false; } }; requestAnimationFrame(tk); };
+    const g = spinButton(R);
+    g.position.set(cx, cy);
     return g;
   }
   _circleBtn(cx, cy, r, glyphFn) {
     const c = new PIXI.Container(); c.position.set(cx, cy);
-    c.addChild(cbase(r, G.panel, 1.8));
+    c.addChild(glassCircle(r));
     if (glyphFn) glyphFn(c);
     return c;
   }
@@ -115,11 +89,10 @@ export class BettingBarWeb extends PIXI.Container {
     
     const acc = new PIXI.Container(); acc.position.set(40, 148); this.addChild(acc);
     acc.addChild(panel(440, 76, 38, G.panel, 2, false));
-    const menu = new PIXI.Graphics(); [27, 38, 49].forEach((y) => menu.moveTo(40, y).lineTo(70, y)); menu.stroke({ width: 3.2, color: COL.icon, cap: 'round' });
+    const menu = iconMenu(15, COL.icon); menu.position.set(55, 38);
     const menuB = new PIXI.Container(); menuB.addChild(menu); menuB.eventMode = 'static'; menuB.cursor = 'pointer'; menuB.hitArea = new PIXI.Rectangle(20, 0, 70, 76); menuB.on('pointertap', () => this._emit('menu')); acc.addChild(menuB);
-    const snd = new PIXI.Graphics().moveTo(112, 32).lineTo(118, 32).lineTo(126, 25).lineTo(126, 51).lineTo(118, 44).lineTo(112, 44).fill(COL.icon);
-    snd.arc(120, 38, 11, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon }); snd.arc(120, 38, 17, -0.9, 0.9).stroke({ width: 2.6, color: COL.icon });
-    const sndSlash = new PIXI.Graphics().moveTo(106, 24).lineTo(134, 52).stroke({ width: 3, color: COL.icon, cap: 'round' }); sndSlash.visible = false; 
+    const snd = iconSound(14, COL.icon, false); snd.position.set(120, 38);
+    const sndSlash = iconSound(14, COL.icon, true); sndSlash.position.set(120, 38); sndSlash.visible = false;
     const sndB = new PIXI.Container(); sndB.addChild(snd, sndSlash); sndB.eventMode = 'static'; sndB.cursor = 'pointer'; sndB.hitArea = new PIXI.Rectangle(100, 12, 44, 52);
     sndB.on('pointerdown', () => sndB.scale.set(0.9)); sndB.on('pointerup', () => sndB.scale.set(1)); sndB.on('pointerupoutside', () => sndB.scale.set(1));
     sndB.on('pointertap', () => { if (this._volPanel) this._volPanel.visible = !this._volPanel.visible; });
@@ -199,42 +172,38 @@ export class BettingBarWeb extends PIXI.Container {
     E.selector = sel;
 
     
-    const coins = this._circleBtn(1980, 186, 38, (c) => {
-      const mk = (yc, fill) => c.addChild(new PIXI.Graphics().ellipse(0, yc - 186, 19, 6.5).fill(fill).ellipse(0, yc - 186, 19, 6.5).stroke({ width: 1, color: COL.activeEdge }));
-      mk(197, 0x9a4bd0); mk(189, 0xc06fda);
-      c.addChild(new PIXI.Graphics().ellipse(0, 181 - 186, 19, 6.5).fill(0xe0a0ff));
-    });
+    const coins = this._circleBtn(1980, 186, 38, (c) => { c.addChild(iconCoins(17)); });
     hit(coins, new PIXI.Circle(0, 0, 38), () => this._emit('betmenu')); this.addChild(coins); E.coins = coins;   
     const gamble = this._circleBtn(2090, 186, 38, null);
     const gx2 = T('×2', 25, COL.value, 700, 0.5, true); gx2.position.set(0, 0); gamble.addChild(gx2);
     hit(gamble, new PIXI.Circle(0, 0, 38), () => this._emit('bet:double'));
     this.addChild(gamble); E.gamble = gamble;
     const turbo = this._circleBtn(2200, 150, 30, (c) => {
-      const gl = new PIXI.Graphics().poly([4, -12, -9, 3, -1, 3, -5, 14, 8, -2, 0, -2]).fill(fg(G.active, 'v')); c.addChild(gl); c._glyph = gl;
+      const gl = iconBolt(15, ACCENT); c.addChild(gl); c._glyph = gl;
       const pip = new PIXI.Graphics(); pip.visible = false; c.addChild(pip); c._pip = pip;
     });
     hit(turbo, new PIXI.Circle(0, 0, 30), () => this._emit('turbo')); this.addChild(turbo); E.turbo = turbo;
     const auto = this._circleBtn(2200, 222, 30, (c) => {
-      const ar = new PIXI.Graphics().arc(0, 0, 12, -1.231, -1.9106 + 2 * Math.PI).stroke({ width: 3, color: 0xe0a0ff, cap: 'round' });
-      ar.moveTo(2, -13).lineTo(-3, -7).lineTo(-5, -15).fill(0xe0a0ff); c.addChild(ar); c._glyph = ar;
+      const ar = iconPlay(14, ACCENT); c.addChild(ar); c._glyph = ar;
       const cnt = T('', 22, COL.value, 700, 0.5, true); cnt.visible = false; c.addChild(cnt); c._count = cnt;
     });
     hit(auto, new PIXI.Circle(0, 0, 30), () => this._emit('autoplay')); this.addChild(auto); E.autoplay = auto;
     const spin = this._spin(2330, 186, 70); hit(spin, new PIXI.Circle(0, 0, 70), () => { if (!spin._stop.visible) spin.spin(); this._emit('spin'); }); this.addChild(spin); E.spin = spin;
+    if (spin._setIdle) spin._setIdle(true);
 
 
     const vp = new PIXI.Container(); vp.position.set(70, 10); vp.visible = false; this.addChild(vp); this._volPanel = vp; E.volPanel = vp;
     const VPW = 240, VPH = 98;
     vp.addChild(panel(VPW, VPH, 20, G.panel, 2, false));
     const vtl = T('VOLUME', 16, COL.label, 700, 0, false, 2); vtl.position.set(20, 14); vp.addChild(vtl);
-    const xg = new PIXI.Graphics().moveTo(-7, -7).lineTo(7, 7).moveTo(7, -7).lineTo(-7, 7).stroke({ width: 3, color: COL.icon, cap: 'round' });
+    const xg = iconClose(7, COL.icon);
     const xb = new PIXI.Container(); xb.addChild(xg); xb.position.set(VPW - 22, 24); xb.eventMode = 'static'; xb.cursor = 'pointer'; xb.hitArea = new PIXI.Rectangle(-16, -16, 32, 32);
     xb.on('pointertap', () => { vp.visible = false; }); vp.addChild(xb);
     const TX = 60, TY = 66, TW = VPW - TX - 26;
     vp.addChild(new PIXI.Graphics().roundRect(TX, TY - 5, TW, 10, 5).fill({ color: COL.dark, alpha: 0.85 }).roundRect(TX, TY - 5, TW, 10, 5).stroke({ width: 1, color: COL.edge, alpha: 0.5 }));
     const vfill = new PIXI.Graphics(); vp.addChild(vfill);
     const knob = new PIXI.Graphics().circle(0, 0, 12).fill(fg(G.active, 'v')).circle(0, 0, 12).stroke({ width: 2, color: COL.pillStroke }); knob.position.set(TX, TY); vp.addChild(knob);
-    const spk = new PIXI.Graphics().moveTo(22, TY - 5).lineTo(27, TY - 5).lineTo(33, TY - 11).lineTo(33, TY + 11).lineTo(27, TY + 5).lineTo(22, TY + 5).fill(COL.icon);
+    const spk = iconSound(9, COL.icon, false); spk.position.set(30, TY);
     const spkB = new PIXI.Container(); spkB.addChild(spk); spkB.eventMode = 'static'; spkB.cursor = 'pointer'; spkB.hitArea = new PIXI.Rectangle(16, TY - 16, 30, 32); vp.addChild(spkB);
     let vol = 0.6, lastNonZero = 0.6;
     const vredraw = () => { knob.x = TX + TW * vol; vfill.clear().roundRect(TX, TY - 5, Math.max(0.001, TW * vol), 10, 5).fill(fg(G.active, 'h')); };
@@ -285,11 +254,11 @@ export class BettingBarWeb extends PIXI.Container {
   }
   setSoundOn(on) {
     const a = this.elements.account;
-    if (a && a._snd) { a._snd.alpha = on ? 1 : 0.5; if (a._sndSlash) a._sndSlash.visible = !on; }   
+    if (a && a._snd) { a._snd.visible = !!on; if (a._sndSlash) a._sndSlash.visible = !on; }
   }
   
   setVolume(v) { if (this._volPanel && this._volPanel._setVol) this._volPanel._setVol(v); this.setSoundOn(v > 0.001); }
-  setSpinning(on) { if (on && this._volPanel) this._volPanel.visible = false; const s = this.elements.spin; s._arrow.visible = !on; s._stop.visible = !!on; }
+  setSpinning(on) { if (on && this._volPanel) this._volPanel.visible = false; const s = this.elements.spin; s._arrow.visible = !on; s._stop.visible = !!on; if (s._setIdle) s._setIdle(!on); }
   setAutoplay(count) {
     const au = this.elements.autoplay; const active = count != null && count !== false;
     au._count.text = (count === Infinity || count === 0) ? '∞' : String(count);
