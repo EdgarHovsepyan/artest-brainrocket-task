@@ -30,7 +30,7 @@ export const BAR = {
   spinGlow:   0xff4ad8, 
   dark:       0x24082c, 
 
-  FONT: "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif",
+  FONT: "Fredoka, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif",
 };
 
 export function makeSkin(PIXI) {

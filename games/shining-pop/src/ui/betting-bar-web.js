@@ -26,7 +26,7 @@ const COL = {
   activeEdge: 0x6e1f56, dark: 0x24082c, pillStroke: 0xffc8ef, gloss: 0xffffff, cyan: 0xbfe8ff,
 };
 const FS = 1.1;   
-const FONT = "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
+const FONT = "Fredoka, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
 
 
 function fg(stops, dir) {

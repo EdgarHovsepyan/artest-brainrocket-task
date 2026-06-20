@@ -2010,7 +2010,7 @@
   
   const skin = (typeof window !== 'undefined' && window.__makeSkin) ? window.__makeSkin(PIXI) : null;
 
-  const BAR_FONT = (skin && skin.BAR && skin.BAR.FONT) || "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
+  const BAR_FONT = (skin && skin.BAR && skin.BAR.FONT) || "Fredoka, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
 
   
 

@@ -24,7 +24,7 @@ const G = {
 
 const COL = { edge: 0xff7ad0, label: 0xe9d6f5, value: 0xfdf2ff, cur: 0xeaddf8, icon: 0xfdf2ff, divider: 0xcf78e0, gloss: 0xffffff, cyan: 0xbfe8ff };
 const FS = 1.1;   
-const FONT = "Inter, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
+const FONT = "Fredoka, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif";
 
 
 function fg(stops, dir) {
