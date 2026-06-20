@@ -302,7 +302,15 @@ export class SymbolView extends Component {
   ): void {
     this.ensureBurst();
 
-    if (lift && worldCenter) this.liftForWin(lift, worldCenter);
+    // Full-size symbols (Wild, Scatter) already fill the cell. Lifting them out
+    // of the per-column reel mask un-crops the win-pop + halo, but a bottom-row
+    // Wild then spills below the board frame into the betting bar — it reads as
+    // the Wild "moving down" and leaving an empty slot (the win-celebration
+    // crush bug). Only the smaller (0.85-fill) symbols gain from the un-crop and
+    // stay within the frame, so gate the lift to them; full-size symbols pop in
+    // place, cropped to their window.
+    if (lift && worldCenter && !FULL_SIZE_IDS.has(this._currentId))
+      this.liftForWin(lift, worldCenter);
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
 
     const heat = VIEW_CONFIG.win.symbolProfiles[this._currentId]?.heat ?? 1.0;
