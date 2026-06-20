@@ -5786,10 +5786,10 @@
       
       
       const o1 = ctx.createOscillator(); o1.type = 'triangle'; o1.frequency.value = 294;    
-      const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 296.7;   
+      const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 294.6;   
       const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2000; lp.Q.value = 0.7;
-      const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 5.2;
-      const lfoG = ctx.createGain(); lfoG.gain.value = 520;
+      const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 0.9;
+      const lfoG = ctx.createGain(); lfoG.gain.value = 140;
       lfo.connect(lfoG); lfoG.connect(lp.frequency);
       const padG = ctx.createGain(); padG.gain.setValueAtTime(0, t0); padG.gain.linearRampToValueAtTime(0.045, t0 + 0.16);
       o1.connect(lp); o2.connect(lp); lp.connect(padG); padG.connect(this.busGameplay);
@@ -5803,9 +5803,9 @@
         const t = ctx.currentTime + 0.02, f = PAT[step % PAT.length]; step++;
         const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
         const g = ctx.createGain();
-        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.038, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.024, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
         o.connect(g); g.connect(this.busGameplay); o.start(t); o.stop(t + 0.2);
-        if(this.rushSource) this.rushSource._pipT = setTimeout(pip, 145);
+        if(this.rushSource) this.rushSource._pipT = setTimeout(pip, 260);
       };
       pip();
     },

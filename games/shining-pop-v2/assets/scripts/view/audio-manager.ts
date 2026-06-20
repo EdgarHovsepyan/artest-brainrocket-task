@@ -225,13 +225,14 @@ export class AudioManager {
       o.type = 'triangle';
       o.frequency.value = freq;
       const og = this.ctx!.createGain();
-      og.gain.value = 0.045;
+      og.gain.value = 0.032;
       o.connect(og);
       og.connect(lp);
       o.start(t);
       return o;
     };
-    this.rushOsc = [mk(220), mk(223.5)];
+    // Gentle 0.7Hz shimmer instead of a buzzy 3.5Hz beat on the spin drone.
+    this.rushOsc = [mk(220), mk(220.7)];
     this.rushGain = g;
     const pips = [523.25, 659.25, 783.99, 659.25];
     let step = 0;
@@ -243,13 +244,13 @@ export class AudioManager {
       o.frequency.value = pips[step++ % pips.length];
       const pg = this.ctx.createGain();
       pg.gain.setValueAtTime(0, pt);
-      pg.gain.linearRampToValueAtTime(0.06, pt + 0.012);
+      pg.gain.linearRampToValueAtTime(0.034, pt + 0.012);
       pg.gain.exponentialRampToValueAtTime(0.0001, pt + 0.18);
       o.connect(pg);
       pg.connect(this.buses.gameplay!);
       o.start(pt);
       o.stop(pt + 0.2);
-    }, 240) as unknown as number;
+    }, 320) as unknown as number;
   }
 
   stopRush(): void {
