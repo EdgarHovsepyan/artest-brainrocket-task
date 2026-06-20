@@ -6,6 +6,7 @@ import {
   EffectAsset,
   Graphics,
   Label,
+  Mask,
   Material,
   Node,
   resources,
@@ -858,7 +859,14 @@ export class SlotView extends Component {
 
     this.buildReels();
 
-    this.winLift = this.mkNode('winLift', 10, 10, this.node);
+    // Lifted winning cells live here: un-clipped by the per-reel masks (so a
+    // popped symbol is never cropped) BUT bounded to the board so the pop + glow
+    // halo never bleed out past the frame. The pad keeps the symbol pop itself
+    // unclipped; only the soft outer glow is contained at the board edge.
+    this.winLift = this.mkNode('winLift', this.gw + 60, this.gh + 60, this.node);
+    this.winLift.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
+    const winLiftMask = this.winLift.addComponent(Mask);
+    winLiftMask.type = Mask.Type.GRAPHICS_RECT;
 
     const tap = this.mkNode('paylineTap', this.gw, this.gh, this.node);
     tap.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);

@@ -7,9 +7,9 @@ CCEffect %{
   - passes:
     - vert: sprite-vs:vert
       frag: sprite-fs:frag
-      depthStencilState:
-        depthTest: false
-        depthWrite: false
+      # No explicit depthStencilState: an explicit block makes this custom-material
+      # glow ESCAPE a parent Mask (the win halo bled out past the reel board). Let
+      # the engine inject the mask stencil so the halo is clipped to the board.
       blendState:
         targets:
         - blend: true

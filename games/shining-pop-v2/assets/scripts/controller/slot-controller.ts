@@ -181,6 +181,24 @@ export class SlotController extends Component {
           feature: (name = 'STICKY WILDS') => this.view.showFeatureUnlocked(name),
           buy: (mode: BonusMode = 'reels') => void this.onBuy(mode),
           vfx: () => this.view.vfxHud(),
+          // Force a wild win on the given paylines — debug/QA only (?debug).
+          win: (lines: number[] = [0, 1, 2]) => {
+            const grid: number[][] = Array.from({ length: 5 }, () => [0, 0, 0]);
+            this.view.showGrid(grid);
+            this.view.showWins({
+              grid,
+              lineWins: lines.map((lineIndex) => ({
+                lineIndex,
+                symbol: 0,
+                count: 5,
+                payout: this.model.bet,
+              })),
+              totalPayout: this.model.bet * lines.length,
+              scatters: 0,
+              scatterPay: 0,
+              freeSpins: 0,
+            });
+          },
         };
       }
     } catch {}

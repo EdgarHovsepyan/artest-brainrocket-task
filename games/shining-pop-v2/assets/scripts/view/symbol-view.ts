@@ -186,7 +186,9 @@ export class SymbolView extends Component {
 
   private ensureHalo(): void {
     if (this.halo || !SymbolView.fxHaloMat) return;
-    const s = this.size * 1.75;
+    // Tighter halo (was 1.75) so the win glow stays near the symbol; the winLift
+    // mask now also clips whatever remains at the board edge.
+    const s = this.size * 1.35;
     const n = new Node('winHalo');
     n.layer = this.node.layer;
     n.addComponent(UITransform).setContentSize(s, s);
@@ -290,7 +292,10 @@ export class SymbolView extends Component {
     this.homeSibling = this.node.getSiblingIndex();
     this.homePos = this.node.position.clone();
     this.node.setParent(overlay, false);
-    this.node.setPosition(worldCenter);
+    // worldCenter is in slot-view space; the overlay is offset to the board centre,
+    // so position the cell relative to the overlay (keeps it landing on its cell).
+    const op = overlay.position;
+    this.node.setPosition(worldCenter.x - op.x, worldCenter.y - op.y, 0);
   }
 
   playWin(
