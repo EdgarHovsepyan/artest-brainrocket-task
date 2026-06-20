@@ -761,6 +761,10 @@ export class SlotView extends Component {
     l.color = col;
     l.isBold = true;
     l.horizontalAlign = Label.HorizontalAlign.CENTER;
+    // Subtle dark outline so labels stay crisp + legible over the busy candy bg.
+    l.enableOutline = true;
+    l.outlineColor = new Color(18, 7, 22, 200);
+    l.outlineWidth = 2;
     applyFont(l, display ? 'display' : 'body');
     return l;
   }

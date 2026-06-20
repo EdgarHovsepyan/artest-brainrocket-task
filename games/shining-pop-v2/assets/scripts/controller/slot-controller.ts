@@ -127,6 +127,19 @@ export class SlotController extends Component {
       this.refreshBuyMenu();
     });
 
+    // Honour the OS reduced-motion preference on first load (accessibility / WCAG 2.3.3).
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        this.applySetting('reducedFx', true);
+      }
+    } catch {
+      // matchMedia unavailable — ignore.
+    }
+
     this.view.buildIntro(() => {
       this.introActive = false;
       this.view.wipe('intro', 1, 1.15);
@@ -364,6 +377,8 @@ export class SlotController extends Component {
   }
 
   private onKey(e: EventKeyboard): void {
+    // Ignore shortcuts during the intro splash and while any modal/overlay is open.
+    if (this.introActive || this.view.anyOverlayOpen()) return;
     if (e.keyCode === KeyCode.SPACE) this.onSpinPressed();
     else if (e.keyCode === KeyCode.KEY_A) this.toggleAuto();
     else if (e.keyCode === KeyCode.KEY_T) this.toggleTurbo();
