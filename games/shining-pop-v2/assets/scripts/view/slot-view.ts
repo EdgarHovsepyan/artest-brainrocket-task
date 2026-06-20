@@ -66,17 +66,20 @@ const PLATE_EDGE = new Color(184, 111, 218, 255);
 const SHADOW = new Color(5, 2, 12, 170);
 const MUTED = new Color(201, 206, 216, 255);
 
+// Win-line colours = the on-brand pink/violet ring (was a rainbow with
+// gold/cyan/green/orange/lime — off-brand on the single most-watched element).
+// Mirrors PAL.lineColors so the win line reads as one brand system.
 const LINE_HUES = [
-  '#ff4fa3',
-  '#ffd23f',
-  '#3fe0ff',
-  '#7cff5c',
-  '#ff7a3f',
-  '#b98cff',
-  '#ff6b6b',
-  '#5cffd0',
-  '#ffa6e6',
-  '#c6ff4f',
+  '#ff007f',
+  '#c566ff',
+  '#ff5cc8',
+  '#9a3bd6',
+  '#ff8ad0',
+  '#d84bff',
+  '#ff2f93',
+  '#e0185c',
+  '#ff5ab0',
+  '#b86bf0',
 ].map((h) => new Color().fromHEX(h));
 
 const SYM_RES = [
