@@ -490,11 +490,22 @@ export class SymbolView extends Component {
       ];
       for (const [x, y] of corners) {
         const n = new Node('spark');
-        n.addComponent(UITransform).setContentSize(12, 12);
+        n.addComponent(UITransform).setContentSize(16, 16);
         n.setPosition(x, y, 0);
         const g = n.addComponent(Graphics);
-        g.fillColor = new Color(255, 224, 255, 200);
-        g.circle(0, 0, 5.5);
+        // 4-point twinkle star (cuter than a plain dot)
+        g.fillColor = new Color(255, 240, 255, 220);
+        const R = 7,
+          r = 1.8;
+        for (let k = 0; k < 8; k++) {
+          const rad = k % 2 === 0 ? R : r;
+          const a = (k * Math.PI) / 4;
+          const px = Math.cos(a) * rad,
+            py = Math.sin(a) * rad;
+          if (k === 0) g.moveTo(px, py);
+          else g.lineTo(px, py);
+        }
+        g.close();
         g.fill();
         n.addComponent(UIOpacity).opacity = 0;
         this.node.addChild(n);
@@ -507,9 +518,10 @@ export class SymbolView extends Component {
       Tween.stopAllByTarget(n);
       op.opacity = 0;
       n.setScale(0.4, 0.4, 1);
+      n.angle = 0;
       tween(op)
         .delay(delay + i * 0.18)
-        .to(0.16, { opacity: 230 })
+        .to(0.16, { opacity: 235 })
         .to(0.3, { opacity: 0 })
         .delay(0.7)
         .union()
@@ -517,8 +529,8 @@ export class SymbolView extends Component {
         .start();
       tween(n)
         .delay(delay + i * 0.18)
-        .to(0.16, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
-        .to(0.3, { scale: new Vec3(0.4, 0.4, 1) })
+        .to(0.16, { scale: new Vec3(1, 1, 1), angle: 45 }, { easing: 'backOut' })
+        .to(0.3, { scale: new Vec3(0.4, 0.4, 1), angle: 90 })
         .delay(0.7)
         .union()
         .repeatForever()
@@ -527,21 +539,24 @@ export class SymbolView extends Component {
   }
 
   private playStarPop(delay: number, heat: number): void {
-    const N = 6;
+    const N = 9; // more confetti
     if (this.starPops.length === 0) {
       const candy = [
-        new Color(255, 214, 96, 255),
-        new Color(255, 150, 205, 255),
-        new Color(255, 255, 255, 255),
-        new Color(150, 240, 220, 255),
+        new Color(255, 214, 96, 255), // gold
+        new Color(255, 150, 205, 255), // bubblegum
+        new Color(255, 255, 255, 255), // white
+        new Color(150, 240, 220, 255), // mint
+        new Color(200, 170, 255, 255), // lavender
+        new Color(255, 190, 150, 255), // peach
       ];
       for (let i = 0; i < N; i++) {
         const n = new Node('winStar');
         n.layer = this.node.layer;
-        n.addComponent(UITransform).setContentSize(20, 20);
+        n.addComponent(UITransform).setContentSize(22, 22);
         const g = n.addComponent(Graphics);
-
-        if (i % 2 === 1) {
+        const kind = i % 3;
+        if (kind === 0) {
+          // heart
           const h = 9;
           g.fillColor = new Color(255, 138, 196, 255);
           g.moveTo(0, h * 0.32);
@@ -549,9 +564,28 @@ export class SymbolView extends Component {
           g.bezierCurveTo(-h * 1.05, h * 0.1, -h * 0.55, h * 0.95, 0, h * 0.32);
           g.close();
           g.fill();
+        } else if (kind === 1) {
+          // 5-point candy star
+          g.fillColor = candy[i % candy.length];
+          const R = 9.5,
+            r = R * 0.44;
+          for (let k = 0; k < 10; k++) {
+            const rad = k % 2 === 0 ? R : r;
+            const a = -Math.PI / 2 + (k * Math.PI) / 5;
+            const px = Math.cos(a) * rad,
+              py = Math.sin(a) * rad;
+            if (k === 0) g.moveTo(px, py);
+            else g.lineTo(px, py);
+          }
+          g.close();
+          g.fill();
         } else {
+          // glossy candy dot (highlight gives it a 3D jelly read)
           g.fillColor = candy[i % candy.length];
           g.circle(0, 0, 8);
+          g.fill();
+          g.fillColor = new Color(255, 255, 255, 170);
+          g.circle(-2.4, 2.4, 2.6);
           g.fill();
         }
         n.addComponent(UIOpacity).opacity = 0;
@@ -567,6 +601,8 @@ export class SymbolView extends Component {
       const ang = (i / N) * Math.PI * 2 + (i % 2 ? 0.42 : -0.34);
       const tx = Math.cos(ang) * spread,
         ty = Math.sin(ang) * spread;
+      const peak = spread * 0.3; // gentle upward hop = celebratory confetti
+      const spin = (i % 2 ? 1 : -1) * (55 + (i % 3) * 28);
       op.opacity = 0;
       n.setPosition(0, 0, 0);
       n.setScale(0.2, 0.2, 1);
@@ -574,29 +610,35 @@ export class SymbolView extends Component {
       tween(op)
         .delay(delay + i * 0.04)
         .to(0.16, { opacity: 245 })
-        .to(0.34, { opacity: 0 })
-        .delay(0.95)
+        .to(0.4, { opacity: 0 })
+        .delay(0.9)
         .union()
         .repeatForever()
         .start();
       tween(n)
         .delay(delay + i * 0.04)
+        // pop up-and-out to the arc apex, with a spin
         .to(
-          0.16,
-          { position: new Vec3(tx * 0.6, ty * 0.6, 0), scale: new Vec3(1.15, 1.15, 1), angle: 35 },
+          0.18,
+          {
+            position: new Vec3(tx * 0.55, ty * 0.55 + peak, 0),
+            scale: new Vec3(1.2, 1.2, 1),
+            angle: spin * 0.4,
+          },
           { easing: 'backOut' },
         )
+        // arc down to the landing (gentle gravity) + finish the spin
         .to(
-          0.34,
-          { position: new Vec3(tx, ty, 0), scale: new Vec3(0.45, 0.45, 1), angle: 80 },
-          { easing: 'quadOut' },
+          0.4,
+          { position: new Vec3(tx, ty, 0), scale: new Vec3(0.4, 0.4, 1), angle: spin },
+          { easing: 'sineIn' },
         )
         .call(() => {
           n.setPosition(0, 0, 0);
           n.setScale(0.2, 0.2, 1);
           n.angle = 0;
         })
-        .delay(0.95)
+        .delay(0.9)
         .union()
         .repeatForever()
         .start();
