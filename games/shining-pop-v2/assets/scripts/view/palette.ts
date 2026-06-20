@@ -35,7 +35,7 @@ export const PAL = {
     '#ff8ad0',
     '#d84bff',
     '#ff2f93',
-    '#7fe7ff',
+    '#e0185c',
     '#ff5ab0',
     '#b86bf0',
   ],

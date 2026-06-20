@@ -79,7 +79,7 @@ export const VIEW_CONFIG = {
 
     stopMinGapMs: { off: 0, turbo: 34, max: 22 },
 
-    accelFraction: 0.1,
+    accelFraction: 0.15,
     decelFraction: 0.34,
 
     landSquash: 0.9,
@@ -88,12 +88,12 @@ export const VIEW_CONFIG = {
 
     quickStopArmMs: { off: 180, turbo: 110, max: 70 },
 
-    windupMs: 0,
+    windupMs: 70,
     windupAmpFrac: 0.85,
     windupSquash: 1.0,
 
     blur: {
-      enabled: false,
+      enabled: true,
       triggerSpd: 0.12,
       span: 0.25,
       strengthYFrac: 0.03,
@@ -121,7 +121,7 @@ export const VIEW_CONFIG = {
     },
 
     bounce: {
-      overtravelFrac: 0,
+      overtravelFrac: 0.07,
       bounceMs: 170,
       easing: 'backOut',
       weight: 1.05,
@@ -336,8 +336,8 @@ export const VIEW_CONFIG = {
 
   world: {
     parallax: {
-      spinLeanPx: 0,
-      winPulsePx: 0,
+      spinLeanPx: 8,
+      winPulsePx: 6,
       leanLerp: 5,
       pulseDecay: 2.0,
     },
@@ -346,7 +346,7 @@ export const VIEW_CONFIG = {
   land: {
     armAt: 0.965,
     symDurMs: { off: 250, turbo: 165, max: 130 },
-    symStagMs: { off: 16, turbo: 11, max: 7 },
+    symStagMs: { off: 42, turbo: 22, max: 7 },
     landDip: { off: 0.052, turbo: 0.038, max: 0.03 },
     landSq: { off: 0.055, turbo: 0.042, max: 0.034 },
   },
