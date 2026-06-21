@@ -1338,11 +1338,23 @@ export class SlotView extends Component {
         const idx = b;
         const n = this.winBeams[b++];
 
-        // len*1.22 about the midpoint is INTENTIONAL: win-beam.effect feathers the
-        // outer ~14% of each beam to zero (smoothstep on uv.x), so the bright core
-        // lands on the symbol centres and adjacent segments melt together. Leave it.
-        n.getComponent(UITransform)!.setContentSize(len * 1.22, cfg.heightPx);
-        n.setPosition((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, 0);
+        // Span each beam from symbol to symbol, overlapping ONLY at interior joints
+        // (never past the line's first/last symbol). The old len*1.22 about the
+        // midpoint overshot every endpoint by 11%; on a steep terminal segment that
+        // tail juts visibly into empty space past the last reel. Clamp the outer
+        // ends to the symbol centres; keep interior overlap so joints still merge.
+        const ux = dx / len;
+        const uy = dy / len;
+        const pad = cfg.heightPx * 0.9;
+        const startExt = i === 1 ? 0 : pad;
+        const endExt = i === pts.length - 1 ? 0 : pad;
+        const beamLen = len + startExt + endExt;
+        n.getComponent(UITransform)!.setContentSize(beamLen, cfg.heightPx);
+        n.setPosition(
+          (p0.x + p1.x) / 2 + (ux * (endExt - startExt)) / 2,
+          (p0.y + p1.y) / 2 + (uy * (endExt - startExt)) / 2,
+          0,
+        );
         n.angle = (Math.atan2(dy, dx) * 180) / Math.PI;
         n.active = true;
         const op = n.getComponent(UIOpacity)!;
