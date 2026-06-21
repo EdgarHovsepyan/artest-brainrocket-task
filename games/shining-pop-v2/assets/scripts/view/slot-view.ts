@@ -2578,13 +2578,20 @@ export class SlotView extends Component {
       });
       let y = top - 28;
       for (const row of paytableRows()) {
-        this.mkLabel(row.name, -w / 2 + info.leftMargin, y, 12, MUTED, panel).horizontalAlign =
+        // the actual symbol art, so each payout is unmistakably tied to its candy
+        const icon = this.mkNode('payIcon', 26, 26, panel);
+        icon.setPosition(-w / 2 + info.leftMargin + 12, y + 5, 0);
+        const isp = icon.addComponent(Sprite);
+        isp.sizeMode = Sprite.SizeMode.CUSTOM;
+        isp.type = Sprite.Type.SIMPLE;
+        isp.spriteFrame = this.frames[row.id] ?? null;
+        this.mkLabel(row.name, -w / 2 + info.leftMargin + 32, y, 12, MUTED, panel).horizontalAlign =
           Label.HorizontalAlign.LEFT;
         [row.pay3, row.pay4, row.pay5].forEach((pay, i) => {
           const v = this.mkLabel(String(pay), w / 2 - 170 + i * 62, y, 12, MUTED, panel);
           v.horizontalAlign = Label.HorizontalAlign.RIGHT;
         });
-        y -= 30;
+        y -= 32;
       }
       wrapLine('Pays are line-bet multiples.', y - 6, info.captionSize);
 
