@@ -2702,11 +2702,7 @@
     _flyUpPool.push(t);
   }
   function spawnFlyUpAmount(cx, cy, amountX6){
-
-    
-
-    
-    return;
+    // (removed a leftover debug `return;` that disabled fly-up "+amount" win text)
     if(isReduced() || amountX6 <= 0) return;
     const t = _flyUpPool.find(x => !x._busy);
     if(!t) return;   
