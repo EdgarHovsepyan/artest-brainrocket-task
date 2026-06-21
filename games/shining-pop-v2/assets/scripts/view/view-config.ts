@@ -181,7 +181,8 @@ export const VIEW_CONFIG = {
 
     beams: {
       enabled: true,
-      heightPx: 30,
+      // slimmer win line (was 30) — thin + elegant per owner request
+      heightPx: 15,
       // 10 paylines x 4 segments = 40 worst case; 16 starved later lines mid-draw
       // (a beam pool shared across all wins via a running counter), dropping their
       // last segment.
@@ -196,7 +197,10 @@ export const VIEW_CONFIG = {
     burst: { enabled: false, intensity: 1.2, scale: 1.1 },
 
     symbolFx: {
-      enabled: true,
+      // Reverted to false: enabling this per-winning-symbol shader overlay
+      // correlated with "symbols hiding / crushed" reports on real GPU (it was
+      // shipped disabled). Re-enable only after a real-device visual check.
+      enabled: false,
       intensity: 1.45,
       rimWidth: 0.035,
       sweepSpeed: 0.85,
