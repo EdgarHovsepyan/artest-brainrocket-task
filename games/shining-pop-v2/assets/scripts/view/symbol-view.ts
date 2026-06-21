@@ -379,14 +379,18 @@ export class SymbolView extends Component {
     const tlt = VIEW_CONFIG.win.winTilt;
     if (tlt?.enabled && bnc.enabled) {
       const td = tlt.ms / 1000;
+      // Full-size Wild/Scatter get a SMALLER win rotate — a big symbol rocking the
+      // full 13deg reads as tipping over, so they use fullSizeWinRotate.deg for a
+      // gentle in-plane sway that still gives them distinct, alive win motion.
+      const tiltDeg = fs ? VIEW_CONFIG.win.fullSizeWinRotate.deg : tlt.deg;
       this.node.eulerAngles = new Vec3(0, 0, 0);
       tween(this.node)
         .delay(popStart + half * 2)
         // Z-axis (in-plane) rock — a Y-axis tilt turned the symbol edge-on /
         // foreshortened it; the in-plane sway keeps it full-face while it
         // celebrates.
-        .to(td, { eulerAngles: new Vec3(0, 0, tlt.deg) }, { easing: 'sineInOut' })
-        .to(td, { eulerAngles: new Vec3(0, 0, -tlt.deg) }, { easing: 'sineInOut' })
+        .to(td, { eulerAngles: new Vec3(0, 0, tiltDeg) }, { easing: 'sineInOut' })
+        .to(td, { eulerAngles: new Vec3(0, 0, -tiltDeg) }, { easing: 'sineInOut' })
         .union()
         .repeatForever()
         .start();
@@ -429,15 +433,12 @@ export class SymbolView extends Component {
         .repeatForever()
         .start();
     }
+    // Sparkles fire on EVERY winning symbol (cheap 4-corner twinkle) so no win cell
+    // is ever particle-less; the heavier shader + confetti stars + bubbles stay on
+    // focused (rich) wins to avoid stacking into a wash on dense full-reel wins.
+    this.playSparkles(popStart);
     if (rich) {
-      if (winMat && VIEW_CONFIG.win.symbolFx.enabled) {
-        this.playWinShader(popStart, winMat);
-
-        this.playSparkles(popStart);
-      } else {
-        this.playSparkles(popStart);
-      }
-
+      if (winMat && VIEW_CONFIG.win.symbolFx.enabled) this.playWinShader(popStart, winMat);
       this.playStarPop(popStart, heat);
       this.playBubbles(popStart, heat);
     }
@@ -512,13 +513,14 @@ export class SymbolView extends Component {
       ];
       for (const [x, y] of corners) {
         const n = new Node('spark');
-        n.addComponent(UITransform).setContentSize(16, 16);
+        n.addComponent(UITransform).setContentSize(12, 12);
         n.setPosition(x, y, 0);
         const g = n.addComponent(Graphics);
-        // 4-point twinkle star (cuter than a plain dot)
+        // 4-point twinkle star (cuter than a plain dot) — smaller for a delicate
+        // candy sparkle, not a chunky dot (owner: "particles smaller").
         g.fillColor = new Color(255, 240, 255, 220);
-        const R = 7,
-          r = 1.8;
+        const R = 5,
+          r = 1.3;
         for (let k = 0; k < 8; k++) {
           const rad = k % 2 === 0 ? R : r;
           const a = (k * Math.PI) / 4;
@@ -589,7 +591,7 @@ export class SymbolView extends Component {
         } else if (kind === 1) {
           // 5-point candy star
           g.fillColor = candy[i % candy.length];
-          const R = 9.5,
+          const R = 7,
             r = R * 0.44;
           for (let k = 0; k < 10; k++) {
             const rad = k % 2 === 0 ? R : r;
@@ -604,10 +606,10 @@ export class SymbolView extends Component {
         } else {
           // glossy candy dot (highlight gives it a 3D jelly read)
           g.fillColor = candy[i % candy.length];
-          g.circle(0, 0, 8);
+          g.circle(0, 0, 5.5);
           g.fill();
           g.fillColor = new Color(255, 255, 255, 170);
-          g.circle(-2.4, 2.4, 2.6);
+          g.circle(-1.7, 1.7, 1.8);
           g.fill();
         }
         n.addComponent(UIOpacity).opacity = 0;
@@ -696,7 +698,7 @@ export class SymbolView extends Component {
         } else {
           // translucent candy bubble: soft body + bright rim + gloss highlight
           const t = tints[i % tints.length];
-          const r = 6 + (i % 3) * 2.4;
+          const r = 4 + (i % 3) * 1.6;
           g.fillColor = new Color(t.r, t.g, t.b, 60);
           g.circle(0, 0, r);
           g.fill();

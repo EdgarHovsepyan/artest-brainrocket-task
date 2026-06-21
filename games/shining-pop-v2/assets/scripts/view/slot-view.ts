@@ -667,7 +667,7 @@ export class SlotView extends Component {
       },
       card,
     );
-    this.mkTextButton(
+    const cont = this.mkTextButton(
       'CONTINUE',
       110,
       -h / 2 + 40,
@@ -679,7 +679,12 @@ export class SlotView extends Component {
         onContinue();
       },
       card,
-    ).setActive(true);
+    );
+    cont.setActive(true);
+    // BUGFIX: setActive(true) recolours the label to INK (near-black 20,10,32),
+    // which on the ACID hot-pink primary fill read as wrong/low-contrast. CONTINUE
+    // is the primary CTA — force WHITE so it stays crisp on the pink highlight.
+    cont.label.color = Color.WHITE;
   }
 
   private surfChrome(parent: Node, w: number, h: number, titleDivAt = 0): Graphics {

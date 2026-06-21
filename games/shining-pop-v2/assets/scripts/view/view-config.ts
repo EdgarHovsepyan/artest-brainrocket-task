@@ -36,7 +36,17 @@ export const VIEW_CONFIG = {
 
     bgCoverOverscan: 1.06,
 
-    windowFeatherPx: 18,
+    windowFeatherPx: 24,
+    /** ANTI-CROP (owner, 2026-06-21): each per-reel GRAPHICS_RECT mask is the cell
+     *  width, so a winning symbol's pop (up to ~1.6x) was clipped on its LEFT/RIGHT
+     *  by its own reel mask. Widen the mask HORIZONTALLY by this margin each side so
+     *  the pop shows un-cropped. Safe: the strip is only `cell` px wide so nothing
+     *  new shows during a spin; the extra width is empty (background/inter-reel gap),
+     *  and a popped symbol bleeding over a neighbour is normal slot behaviour. Kept
+     *  horizontal-only — widening vertically would reveal the off-window buffer cells.
+     *  (Lifting winners into an overlay was the alternative but it collapses them to
+     *  the centre reel — see win.liftWinSymbols — so the mask-widen is the safe path.) */
+    winPopMaskMargin: 34,
 
     portraitWidthFill: 0.99,
     landscapeWidthFill: 1.0,
@@ -169,6 +179,9 @@ export const VIEW_CONFIG = {
     // these full-size symbols visibly DANCE on a win. (Used by symbol-view.playWin.)
     fullSizePopTemper: 0.42,
     fullSizeJellyTemper: 0.8,
+    // Smaller in-plane win rotate for full-size Wild/Scatter (vs the standard
+    // winTilt.deg used by the rest) — gentle alive motion that never tips them out.
+    fullSizeWinRotate: { deg: 7, ms: 380 },
 
     winAnticipation: { enabled: true, dip: 0.9, ms: 80 },
 

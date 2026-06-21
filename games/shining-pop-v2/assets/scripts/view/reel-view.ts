@@ -86,7 +86,12 @@ export class ReelView extends Component {
     this.startY = spinBuffer * this.pitch;
 
     const ut = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    ut.setContentSize(cell, windowH);
+    // ANTI-CROP: the clip rect is WIDER than the cell (by winPopMaskMargin each
+    // side) so a winning symbol's pop is not side-clipped by its own reel mask.
+    // Height stays windowH (vertical buffer must stay clipped). The strip + cells
+    // below remain `cell` wide, so the spin shows nothing new in the extra width.
+    const maskMargin = VIEW_CONFIG.layout.winPopMaskMargin;
+    ut.setContentSize(cell + maskMargin * 2, windowH);
     const mask = this.node.addComponent(Mask);
     mask.type = Mask.Type.GRAPHICS_RECT;
 
