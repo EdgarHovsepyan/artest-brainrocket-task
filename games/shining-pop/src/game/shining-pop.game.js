@@ -8142,10 +8142,13 @@
           hr.visible = true;
           hr.texture = _stex;
           hr.anchor.set(_o.anchor.x, _o.anchor.y);
-          const _lp = winHeroLayer.toLocal(_o.getGlobalPosition());
-          const _wt = _o.worldTransform, _ht = winHeroLayer.worldTransform;
-          const _oWS = Math.hypot(_wt.a, _wt.b), _hWS = Math.hypot(_ht.a, _ht.b) || 1;
-          const _baseS = _oWS / _hWS;                        
+          // Robust scale + REST position. Previously derived from
+          // _o.worldTransform / getGlobalPosition(): if that read came back
+          // zero/stale the hero scaled to 0 or jumped off-screen -> the winning
+          // symbol VANISHED (owner-flagged "winning symbols hide"), and it tracked
+          // the live land-wobble -> the symbol drifted. symScale + cellCenter
+          // (cc, already computed above) never fail and never move.
+          const _baseS = symScale(_stex, CELL * 0.92);
 
           
 
@@ -8160,9 +8163,9 @@
           const _rise  = 1 - Math.pow(1 - Math.min(1, _ct2/240), 3);                    
           const _punch = Math.sin(Math.min(Math.PI, Math.max(0,_ct2-55)/85)) * Math.exp(-_ct2/280); 
           const _breathe = _ct2 > 620 ? 0.013 * Math.sin(now*0.0047 + c.r*0.7) : 0;     
-          const _s = _baseS * (1 + _antic + 0.10*_rise + 0.14*_punch + _breathe);       
-          hr.position.set(_lp.x, _lp.y);                     
-          hr.scale.set(_s, _s);                              
+          const _s = _baseS * (1 + _antic + 0.10*_rise + 0.14*_punch + _breathe);
+          hr.position.set(cc.x, cc.y);
+          hr.scale.set(_s, _s);
           hr.skew.x = 0; hr.rotation = 0;
           hr.alpha = 1;
           _o.alpha = 0; _o._winHidden = true;               
