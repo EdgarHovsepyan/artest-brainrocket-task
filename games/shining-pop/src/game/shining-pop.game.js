@@ -7801,7 +7801,11 @@
   
   function settleCurve(tau){
     if(tau<=0 || tau>=1) return 0;
-    return 19.2 * tau * Math.exp(-6.5*tau) * Math.sin(tau*6.28319);
+    // Damped spring: slower decay envelope + 1.5 oscillations (ends on sin=0 at
+    // tau=1, so no end-snap). The eye now sees a real dip -> overshoot -> small
+    // dip settle within the SAME duration, instead of one dip-and-freeze (the
+    // owner-flagged 'damping after stop feels off'). Peak matches the old curve.
+    return 15.0 * tau * Math.exp(-5.0*tau) * Math.sin(tau*6.28319*1.5);
   }
   let allReelsSpinning = false;
 
