@@ -7801,11 +7801,12 @@
   
   function settleCurve(tau){
     if(tau<=0 || tau>=1) return 0;
-    // Damped spring: slower decay envelope + 1.5 oscillations (ends on sin=0 at
-    // tau=1, so no end-snap). The eye now sees a real dip -> overshoot -> small
-    // dip settle within the SAME duration, instead of one dip-and-freeze (the
-    // owner-flagged 'damping after stop feels off'). Peak matches the old curve.
-    return 15.0 * tau * Math.exp(-5.0*tau) * Math.sin(tau*6.28319*1.5);
+    // Firm, CLEAN stop: a small single overshoot that decays fast (~1/3 the old
+    // amplitude). A larger multi-bounce made symbols visibly keep moving after
+    // the reels stopped -- and the win-hero tracks the live symbol position, so
+    // the winning symbols drifted during the celebration too (owner-flagged
+    // "damping after stop / symbols changing position").
+    return 7.0 * tau * Math.exp(-7.5*tau) * Math.sin(tau*6.28319);
   }
   let allReelsSpinning = false;
 
