@@ -7920,10 +7920,13 @@
     const sz=CELL*0.92, now=performance.now();   
     
     const tm = State.turboMode;
-    const symDur  = tm===2 ? 130 : tm===1 ? 165 : 250; 
-    const symStag = tm===2 ?  18 : tm===1 ?  26 :  40; 
-    const landDip = tm===2 ? 0.030 : tm===1 ? 0.038 : 0.052; 
-    const landSq  = tm===2 ? 0.034 : tm===1 ? 0.042 : 0.055; 
+    const symDur  = tm===2 ? 130 : tm===1 ? 165 : 250;
+    const symStag = tm===2 ?  18 : tm===1 ?  26 :  40;
+    // Clean, crisp stop: NO column "dump" -- the reel decelerates smoothly via
+    // reelEase (monotonic, no overshoot) and lands flat with no post-stop bob.
+    // Keep only a small single land-squash for a firm impact, not a bouncy dump.
+    const landDip = 0;
+    const landSq  = tm===2 ? 0.018 : tm===1 ? 0.024 : 0.032;
     const reduced = isReduced();
 
     
