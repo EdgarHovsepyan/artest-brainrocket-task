@@ -8008,11 +8008,16 @@
 
           const ampK = isCrown ? 1.7 : isStar ? 1.25 : isSeven ? 1.35 : 0.42;
           const ph = r*0.9 + k*1.7;
-          const wob = Math.sin(now*0.0021 + ph) * 0.030 * ampK * env;
+          // Idle "breathing" trimmed to near-static. The vertical POSITION bob was
+          // the reels still visibly BOUNCING after they stopped (up to ~4.4px on
+          // premium symbols, forever) -- removed entirely. Scale + rotation life
+          // cut to a whisper so the board isn't frozen-dead. Symbols now settle
+          // and STAY (expert clean stop); the premium tint-pulse below is
+          // colour-only, no motion.
+          const wob = Math.sin(now*0.0021 + ph) * 0.008 * ampK * env;
           sqx *= 1 + wob;
           sqy *= 1 + wob;
-          s.y += Math.sin(now*0.0017 + ph*1.3) * 2.6 * ampK * env;
-          rot   = Math.sin(now*0.0015 + ph) * 0.020 * ampK * env;
+          rot   = Math.sin(now*0.0015 + ph) * 0.005 * ampK * env;
          if(isPremium){
 
           
