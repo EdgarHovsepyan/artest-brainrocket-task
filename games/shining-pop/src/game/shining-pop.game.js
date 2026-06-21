@@ -1016,7 +1016,14 @@
     return o;
   }
   const _blankC = (() => { const c=document.createElement('canvas'); c.width=c.height=4; return c; })();
-  const T = (c) => PIXI.Texture.from(c);
+  const ICON_DPR = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
+  // If a canvas was drawn at ICON_DPR scale (the procedural icons/plaques), tag its
+  // CanvasSource resolution so it stays S logical px but uploads dpr x the pixels =
+  // crisp on retina. Image-baked textures (no _iconDpr) keep resolution 1.
+  const T = (c) =>
+    c && c._iconDpr
+      ? new PIXI.Texture({ source: new PIXI.CanvasSource({ resource: c, resolution: c._iconDpr }) })
+      : PIXI.Texture.from(c);
   function proc(img, maxDim, doTrim, lo, hi){
     if(!img) return T(_blankC);
     const c = stripCanvas(img, maxDim, lo, hi);
@@ -1054,8 +1061,8 @@
 
   
   const balTex = (() => {
-    const W=640, H=264, c=document.createElement('canvas'); c.width=W; c.height=H;
-    const x=c.getContext('2d'); const m=8, r=50, pw=W-2*m, ph=H-2*m;
+    const W=640, H=264, c=document.createElement('canvas'); c.width=W*ICON_DPR; c.height=H*ICON_DPR; c._iconDpr=ICON_DPR;
+    const x=c.getContext('2d'); x.scale(ICON_DPR, ICON_DPR); const m=8, r=50, pw=W-2*m, ph=H-2*m;
     rr(x,m,m,pw,ph,r); x.fillStyle='#1e1914'; x.fill();
     rr(x,m+3,m+3,pw-6,ph-6,r-3); x.lineWidth=4; x.strokeStyle='#b88e40'; x.stroke();
     rr(x,m+11,m+11,pw-22,ph-22,r-11); x.lineWidth=1.5; x.strokeStyle='rgba(232,197,118,0.24)'; x.stroke();
@@ -1083,8 +1090,10 @@
     
     
     const S = 240, c = document.createElement('canvas');
-    c.width = c.height = S;
+    c.width = c.height = S * ICON_DPR;
+    c._iconDpr = ICON_DPR;
     const x = c.getContext('2d');
+    x.scale(ICON_DPR, ICON_DPR);
     x.save();
     x.translate(S/2, S/2);
     x.lineJoin = 'round';
@@ -1102,8 +1111,10 @@
 
   function spinTex(kind){
     const S = 360, c = document.createElement('canvas');
-    c.width = c.height = S;
+    c.width = c.height = S * ICON_DPR;
+    c._iconDpr = ICON_DPR;
     const x = c.getContext('2d');
+    x.scale(ICON_DPR, ICON_DPR);
     const cx = S/2, cy = S/2, R = S * 0.42;
     
     x.save();
