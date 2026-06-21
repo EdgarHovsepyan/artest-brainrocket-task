@@ -106,9 +106,11 @@ test('win anticipation dip is a brief, real squash (never inverted or sluggish)'
 test('per-symbol reel-landing config is sane across speed modes', () => {
   const L = VIEW_CONFIG.land;
   for (const key of ['off', 'turbo', 'max'] as const) {
-    // a landing dip + squash must be a small positive fraction (a subtle settle,
-    // not a second full bounce) and the per-row duration/stagger must be positive.
-    assert.ok(L.landDip[key] > 0 && L.landDip[key] < 0.2, `${key} landDip out of (0,0.2)`);
+    // CRISP-STOP (2026-06-21): landDip may be 0 — the reel now lands FLAT with no
+    // post-stop column bob (the dip was the "dump"). It must never be negative or
+    // large. The land-SQUASH is kept as a small POSITIVE firm impact (never 0, so
+    // the land still has a "thunk"), bounded so it can't become a full bounce.
+    assert.ok(L.landDip[key] >= 0 && L.landDip[key] < 0.2, `${key} landDip out of [0,0.2)`);
     assert.ok(L.landSq[key] > 0 && L.landSq[key] < 0.2, `${key} landSq out of (0,0.2)`);
     assert.ok(L.symDurMs[key] > 0, `${key} symDurMs must be positive`);
     assert.ok(L.symStagMs[key] >= 0, `${key} symStagMs must be >= 0`);

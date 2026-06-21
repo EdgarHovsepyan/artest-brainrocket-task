@@ -121,18 +121,30 @@ export const VIEW_CONFIG = {
     },
 
     bounce: {
-      overtravelFrac: 0.07,
+      // CRISP-STOP (owner, 2026-06-21): overtravelFrac 0.07 -> 0. The strip used
+      // to decel to y = -overshoot (a ~6.7px dip BELOW rest) then ride back up to
+      // 0 — a visible post-land settle/"dump". With 0, `bounceEnabled` is false in
+      // reel-view.spinTo, so the strip runs ONE monotonic reelEase tween straight
+      // to y=0 (velocity -> 0 at the target): a clean DEAD stop, no overshoot, no
+      // ride-back. This matches the Pixi sister-game stop ("reelEase already
+      // monotonic, no overshoot"). The rest of the knobs are inert at 0; re-bump
+      // overtravelFrac only to restore the strip over-travel feel.
+      overtravelFrac: 0,
       bounceMs: 190,
-      // quadOut (was backOut): the strip settles smoothly into rest instead of
-      // overshooting up past it, so the per-symbol land-squash reads as one fluid
-      // motion rather than two competing bounces.
       easing: 'quadOut',
       weight: 1.05,
       speed: 1,
       elasticity: 1.0,
 
+      // Whole-reel scale "recoil" pop fired on each reel stop (ReelView.recoil,
+      // via slot-view playSpin). recoil() early-returns when amp <= 1.
+      // CRISP-STOP (owner, 2026-06-21): landRecoilScale 1.03 -> 1.0 kills the
+      // every-spin whole-reel bounce after each stop (the reel now just holds).
+      // wildRecoilScale is KEPT (a wild-LAND celebration beat that pairs with
+      // flashWilds, a special event — not the resting stop); set it to 1.0 too if
+      // the owner wants wild lands dead-crisp as well.
       wildRecoilScale: 1.045,
-      landRecoilScale: 1.03,
+      landRecoilScale: 1.0,
     },
   },
 
@@ -366,8 +378,16 @@ export const VIEW_CONFIG = {
     armAt: 0.965,
     symDurMs: { off: 250, turbo: 165, max: 130 },
     symStagMs: { off: 42, turbo: 22, max: 7 },
-    landDip: { off: 0.052, turbo: 0.038, max: 0.03 },
-    landSq: { off: 0.055, turbo: 0.042, max: 0.034 },
+    // CRISP-STOP (owner, 2026-06-21) — mirrors the Pixi sister-game fix exactly.
+    // landDip was the per-symbol column "dump": each cell dropped cell*dip px AFTER
+    // the reel had already reached rest, reading as a post-stop bob. Zeroed -> the
+    // reel lands FLAT, no positional bob. landSq is kept but TRIMMED to a small,
+    // FIRM single land-squash (impact "thunk", not a bouncy dump): off .055->.032,
+    // turbo .042->.024, max .034->.018. (playLand's return easing was also changed
+    // backOut->quadOut so even this small squash settles firm, with no scale
+    // overshoot.) Prior values preserved in this comment for a designer restore.
+    landDip: { off: 0, turbo: 0, max: 0 },
+    landSq: { off: 0.032, turbo: 0.024, max: 0.018 },
   },
 
   reveal: {
@@ -410,6 +430,13 @@ export const VIEW_CONFIG = {
     idleProfiles: {
       base: { amp: 1.0, freq: 1.9 },
     } as Record<string, { amp: number; freq: number }>,
+    /** Idle-breathe scale amplitude per symbol weight (sine on the `art` child).
+     *  CRISP-STOP (owner, 2026-06-21): cut to a WHISPER so symbols settle and STAY
+     *  after a reel lands instead of visibly bob-breathing forever — mirrors the
+     *  Pixi sister-game "kill the idle breathing bob" (0.030 -> 0.008). A faint
+     *  whisper is kept (not 0) so the board reads alive, not frozen-dead. Wild uses
+     *  0 (its land/win FX carry it). high = ids 0..4 (wild+H1..H4), low = the rest. */
+    idleBreatheAmp: { high: 0.008, low: 0.005 },
   },
 
   decor: {

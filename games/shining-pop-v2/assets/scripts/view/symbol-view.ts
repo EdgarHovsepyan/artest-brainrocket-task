@@ -143,7 +143,10 @@ export class SymbolView extends Component {
     if (this.sprite) this.sprite.spriteFrame = frame;
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
 
-    this.idleAmp = id === SYMBOLS.WILD ? 0 : id <= 4 ? 0.03 : 0.018;
+    // Idle-breathe amplitude is data-driven + cut to a whisper for the crisp stop
+    // (see VIEW_CONFIG.symbols.idleBreatheAmp). Wild stays 0 (its own FX carry it).
+    const ba = VIEW_CONFIG.symbols.idleBreatheAmp;
+    this.idleAmp = id === SYMBOLS.WILD ? 0 : id <= 4 ? ba.high : ba.low;
 
     this.artBaseScale = FULL_SIZE_IDS.has(id) ? 1 : SYMBOL_SHRINK;
     if (this.art) this.art.setScale(this.artBaseScale, this.artBaseScale, 1);
@@ -840,9 +843,13 @@ export class SymbolView extends Component {
     this.node.setScale(1, 1, 1);
     const dip = new Vec3(home.x, home.y - cell * dipFrac, home.z);
     const squash = new Vec3(1 + sqFrac, 1 - sqFrac, 1);
+    // CRISP-STOP: return with quadOut (was backOut). backOut overshot scale past 1
+    // on the recovery — a small post-land scale bounce. quadOut settles the firm
+    // land-squash straight back to 1 with no overshoot. With dipFrac now 0 the
+    // position never moves; this is a pure, single, firm squash "thunk".
     tween(this.node)
       .to(d * 0.3, { position: dip, scale: squash }, { easing: 'quadOut' })
-      .to(d * 0.7, { position: home, scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
+      .to(d * 0.7, { position: home, scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
       .start();
   }
 
