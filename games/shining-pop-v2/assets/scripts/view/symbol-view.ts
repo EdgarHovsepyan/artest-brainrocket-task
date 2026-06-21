@@ -53,6 +53,8 @@ export class SymbolView extends Component {
 
   private starPops: Node[] = [];
 
+  private bubbles: Node[] = [];
+
   private winOverlay: Node | null = null;
   private winOverlaySp: Sprite | null = null;
   private winOverlayOp: UIOpacity | null = null;
@@ -416,6 +418,7 @@ export class SymbolView extends Component {
       }
 
       this.playStarPop(popStart, heat);
+      this.playBubbles(popStart, heat);
     }
 
     this.swapWildWinFace(popStart);
@@ -456,12 +459,10 @@ export class SymbolView extends Component {
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.type = Sprite.Type.SIMPLE;
 
-      sp.color = new Color(
-        Math.floor(Math.random() * 256),
-        Math.floor(Math.random() * 256),
-        255,
-        255,
-      );
+      // Stable warm candy-white tint (was a random R,G per cell, which gave
+      // winning symbols inconsistent blue-ish sheens) — lets the shader's own
+      // iridescence read clean and on-brand.
+      sp.color = new Color(255, 246, 252, 255);
       this.winOverlay = n;
       this.winOverlaySp = sp;
       this.winOverlayOp = n.addComponent(UIOpacity);
@@ -645,6 +646,93 @@ export class SymbolView extends Component {
     });
   }
 
+  // Rising candy bubbles + little hearts that drift up off a winning symbol —
+  // adds soft, cute candy "fizz" on top of the confetti burst. Pooled + looped.
+  private playBubbles(delay: number, heat: number): void {
+    const N = 7;
+    if (this.bubbles.length === 0) {
+      const tints = [
+        new Color(255, 180, 220, 255), // pink
+        new Color(180, 230, 255, 255), // blue
+        new Color(255, 232, 150, 255), // gold
+        new Color(200, 255, 210, 255), // mint
+        new Color(210, 185, 255, 255), // lavender
+      ];
+      for (let i = 0; i < N; i++) {
+        const n = new Node('winBubble');
+        n.layer = this.node.layer;
+        n.addComponent(UITransform).setContentSize(26, 26);
+        const g = n.addComponent(Graphics);
+        if (i % 3 === 2) {
+          // little floating heart
+          const h = 7;
+          g.fillColor = new Color(255, 150, 200, 235);
+          g.moveTo(0, h * 0.32);
+          g.bezierCurveTo(h * 0.55, h * 0.95, h * 1.05, h * 0.1, 0, -h * 0.7);
+          g.bezierCurveTo(-h * 1.05, h * 0.1, -h * 0.55, h * 0.95, 0, h * 0.32);
+          g.close();
+          g.fill();
+        } else {
+          // translucent candy bubble: soft body + bright rim + gloss highlight
+          const t = tints[i % tints.length];
+          const r = 6 + (i % 3) * 2.4;
+          g.fillColor = new Color(t.r, t.g, t.b, 60);
+          g.circle(0, 0, r);
+          g.fill();
+          g.lineWidth = 1.6;
+          g.strokeColor = new Color(255, 255, 255, 140);
+          g.circle(0, 0, r);
+          g.stroke();
+          g.fillColor = new Color(255, 255, 255, 210);
+          g.circle(-r * 0.32, r * 0.32, r * 0.28);
+          g.fill();
+        }
+        n.addComponent(UIOpacity).opacity = 0;
+        this.node.addChild(n);
+        this.bubbles.push(n);
+      }
+    }
+    const sz = this.size;
+    this.bubbles.forEach((n, i) => {
+      const op = n.getComponent(UIOpacity)!;
+      Tween.stopAllByTarget(op);
+      Tween.stopAllByTarget(n);
+      const baseX = (((i * 53) % 100) / 100 - 0.5) * sz * 0.55;
+      const rise = sz * (0.72 + 0.22 * heat);
+      const wob = (i % 2 ? 1 : -1) * sz * 0.07;
+      const dur = 1.05 + (i % 3) * 0.16;
+      const stag = delay + i * 0.12;
+      const baseY = -sz * 0.32;
+      op.opacity = 0;
+      n.setPosition(baseX, baseY, 0);
+      n.setScale(0.35, 0.35, 1);
+      tween(op)
+        .delay(stag)
+        .to(0.24, { opacity: 210 })
+        .delay(dur * 0.35)
+        .to(dur * 0.5, { opacity: 0 })
+        .delay(0.5)
+        .union()
+        .repeatForever()
+        .start();
+      tween(n)
+        .delay(stag)
+        .to(
+          dur,
+          { position: new Vec3(baseX + wob, baseY + rise, 0), scale: new Vec3(1, 1, 1) },
+          { easing: 'sineOut' },
+        )
+        .call(() => {
+          n.setPosition(baseX, baseY, 0);
+          n.setScale(0.35, 0.35, 1);
+        })
+        .delay(0.5)
+        .union()
+        .repeatForever()
+        .start();
+    });
+  }
+
   private stopWinFx(): void {
     if (this.halo && this.haloOp) {
       Tween.stopAllByTarget(this.halo);
@@ -666,6 +754,14 @@ export class SymbolView extends Component {
       }
     });
     this.starPops.forEach((n) => {
+      Tween.stopAllByTarget(n);
+      const op = n.getComponent(UIOpacity);
+      if (op) {
+        Tween.stopAllByTarget(op);
+        op.opacity = 0;
+      }
+    });
+    this.bubbles.forEach((n) => {
       Tween.stopAllByTarget(n);
       const op = n.getComponent(UIOpacity);
       if (op) {
