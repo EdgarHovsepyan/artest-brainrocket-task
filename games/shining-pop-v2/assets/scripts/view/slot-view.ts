@@ -1338,6 +1338,9 @@ export class SlotView extends Component {
         const idx = b;
         const n = this.winBeams[b++];
 
+        // len*1.22 about the midpoint is INTENTIONAL: win-beam.effect feathers the
+        // outer ~14% of each beam to zero (smoothstep on uv.x), so the bright core
+        // lands on the symbol centres and adjacent segments melt together. Leave it.
         n.getComponent(UITransform)!.setContentSize(len * 1.22, cfg.heightPx);
         n.setPosition((p0.x + p1.x) / 2, (p0.y + p1.y) / 2, 0);
         n.angle = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -3489,8 +3492,24 @@ export class SlotView extends Component {
         chain = chain.to(0.085, { position: longest[i] }, { easing: 'sineInOut' });
       }
       chain.call(() => tween(sop).to(0.2, { opacity: 0 }, { easing: 'quadIn' }).start()).start();
+      // Hard backstop: the spark MUST go dark after it finishes travelling, even
+      // if the fade callback is pre-empted. It was sticking lit at the line end —
+      // the "detached" bright mark past the last reel that the owner circled.
+      this.unschedule(this.hideCandySpark);
+      this.scheduleOnce(this.hideCandySpark, (longest.length - 1) * 0.085 + 0.45);
     }
   }
+
+  private hideCandySpark = (): void => {
+    if (!this.candySpark) return;
+    Tween.stopAllByTarget(this.candySpark);
+    const op = this.candySpark.getComponent(UIOpacity);
+    if (op) {
+      Tween.stopAllByTarget(op);
+      op.opacity = 0;
+    }
+    this.candySpark.active = false;
+  };
 
   private paintCandyLines(): void {
     const g = this.winLineG;
@@ -3614,6 +3633,7 @@ export class SlotView extends Component {
     this.lineWinPops.length = 0;
     this.winLines = [];
     this.unschedule(this.tickCandyLine);
+    this.unschedule(this.hideCandySpark);
     this.candyLinePts = [];
     this.winLineG?.clear();
 

@@ -182,7 +182,10 @@ export const VIEW_CONFIG = {
     beams: {
       enabled: true,
       heightPx: 30,
-      maxSegments: 16,
+      // 10 paylines x 4 segments = 40 worst case; 16 starved later lines mid-draw
+      // (a beam pool shared across all wins via a running counter), dropping their
+      // last segment.
+      maxSegments: 40,
       fadeInMs: 150,
       holdOpacity: 235,
       revealStaggerMs: 70,
