@@ -3851,6 +3851,14 @@ export class SlotView extends Component {
     }
   };
 
+  /** One-shot background depth "whoosh" — fired on big-win detonation + feature
+   *  entry (buy-bonus / free-spins). Spikes the parallax pulse; it eases back on
+   *  its own via pulseDecay, so the bg stays calm the rest of the time. */
+  private bgDepthPush(): void {
+    if (this.reducedFx || !this.parallaxLayers.length) return;
+    this.pxPulse = Math.max(this.pxPulse, VIEW_CONFIG.world.parallax.winBurstPulse);
+  }
+
   playCeremony(winCents: number, betCents: number, multiplier: number): boolean {
     this.ceremony.onDetonate = () => {
       if (!this.reducedFx) {
@@ -3858,6 +3866,7 @@ export class SlotView extends Component {
 
         const mult = betCents > 0 ? winCents / betCents : 0;
         this.cinematicBloom(Math.min(1, mult / 100));
+        this.bgDepthPush();
       }
     };
     this.ceremony.onCountPip = () => this.audio.countTick(0.6);
@@ -3877,6 +3886,7 @@ export class SlotView extends Component {
   ): void {
     this.ceremony.showFeatureUnlocked(name, mode, scatterCount);
     this.scheduleOnce(() => this.cinematicBloom(0.9), 0.42);
+    this.bgDepthPush();
   }
 
   burstParticles(result: SpinResult, multiple: number): void {

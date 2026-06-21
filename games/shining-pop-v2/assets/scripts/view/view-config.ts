@@ -122,8 +122,11 @@ export const VIEW_CONFIG = {
 
     bounce: {
       overtravelFrac: 0.07,
-      bounceMs: 170,
-      easing: 'backOut',
+      bounceMs: 190,
+      // quadOut (was backOut): the strip settles smoothly into rest instead of
+      // overshooting up past it, so the per-symbol land-squash reads as one fluid
+      // motion rather than two competing bounces.
+      easing: 'quadOut',
       weight: 1.05,
       speed: 1,
       elasticity: 1.0,
@@ -340,6 +343,9 @@ export const VIEW_CONFIG = {
       winPulsePx: 6,
       leanLerp: 5,
       pulseDecay: 2.0,
+      // one-shot bg depth "whoosh" amplitude (× winPulsePx) fired on big-win
+      // detonation + feature entry; decays via pulseDecay.
+      winBurstPulse: 4.5,
     },
   },
 
