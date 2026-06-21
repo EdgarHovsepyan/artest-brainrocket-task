@@ -74,26 +74,25 @@ export function makeSkin(PIXI) {
   
   function panelInto(g, x, y, w, h, r, opts) {
     opts = opts || {};
-    const ew = opts.edge != null ? opts.edge : 1.8;
+    // ONE crisp integer edge — no stacked low-alpha inner hairline (that muddied
+    // the border). Single top gloss band for the glass read.
+    const ew = Math.max(1, Math.round(opts.edge != null ? opts.edge : 2));
     g.roundRect(x, y, w, h, r).fill(lin('panel', G.panel, false));
-
-    g.roundRect(x + 2.5, y + 2, w - 5, h * 0.42, Math.max(0, r - 2)).fill({ color: BAR.gloss, alpha: 0.13 });
-    if (ew) g.roundRect(x + ew / 2, y + ew / 2, w - ew, h - ew, Math.max(0, r - ew / 2))
-      .stroke({ width: ew, color: BAR.edge, alpha: 1 });
-    if (opts.inner !== false)
-      g.roundRect(x + 2, y + 2, w - 4, h - 4, Math.max(0, r - 2))
-        .stroke({ width: 1.3, color: BAR.cyan, alpha: 0.26 });
+    g.roundRect(x + 2.5, y + 2, w - 5, h * 0.42, Math.max(0, r - 2)).fill({ color: BAR.gloss, alpha: 0.12 });
+    g.roundRect(x + ew / 2, y + ew / 2, w - ew, h - ew, Math.max(0, r - ew / 2)).stroke({
+      width: ew,
+      color: BAR.edge,
+      alpha: 1,
+    });
   }
 
 
   function bannerInto(g, x, y, w, h) {
     const r = h / 2;
     g.roundRect(x, y, w, h, r).fill(lin('banner', G.banner, true));
-    g.roundRect(x + 2, y + 1.5, w - 4, h * 0.46, r - 1.5).fill({ color: BAR.gloss, alpha: 0.11 });   
-    g.roundRect(x + 0.9, y + 0.9, w - 1.8, h - 1.8, r - 0.9)
-      .stroke({ width: 1.8, color: BAR.edge, alpha: 1 });
-    g.roundRect(x + 2, y + 2, w - 4, h - 4, r - 2)
-      .stroke({ width: 1.1, color: BAR.cyan, alpha: 0.13 });
+    g.roundRect(x + 2, y + 1.5, w - 4, h * 0.46, r - 1.5).fill({ color: BAR.gloss, alpha: 0.1 });
+    // single crisp edge (was edge + a muddy cyan hairline)
+    g.roundRect(x + 1, y + 1, w - 2, h - 2, r - 1).stroke({ width: 2, color: BAR.edge, alpha: 1 });
   }
 
   
@@ -115,10 +114,11 @@ export function makeSkin(PIXI) {
   
   function circleInto(g, cx, cy, r) {
     g.circle(cx, cy, r).fill(lin('panel', G.panel, false));
-    
+    // top gloss highlight + ONE crisp edge + a soft bottom rim-light (replaces the
+    // muddy concentric cyan ring).
     g.ellipse(cx - r * 0.18, cy - r * 0.34, r * 0.62, r * 0.4).fill({ color: BAR.gloss, alpha: 0.12 });
-    g.circle(cx, cy, r - 1.4).stroke({ width: 1, color: BAR.cyan, alpha: 0.14 });
-    g.circle(cx, cy, r).stroke({ width: 1.8, color: BAR.edge, alpha: 1 });
+    g.arc(cx, cy, r - 2, 0.5, Math.PI - 0.5).stroke({ width: 1.4, color: BAR.gloss, alpha: 0.16, cap: 'round' });
+    g.circle(cx, cy, r - 1).stroke({ width: 2, color: BAR.edge, alpha: 1 });
   }
 
   

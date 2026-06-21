@@ -175,25 +175,28 @@ export function iconSpinCandy(s, opts = {}) {
 // PLAY ▶ (autoplay / start) — rounded equilateral triangle.
 export function iconPlay(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
-  const w = s * 1.02, h = s * 1.12;
+  const w = s * 1.04, h = s * 1.14;
   g.poly([-w * 0.42, -h * 0.5, w * 0.58, 0, -w * 0.42, h * 0.5]).fill(col);
-  if (typeof col === 'number') g.stroke({ width: Math.max(1.5, s * 0.16), color: col, alpha: 1, join: 'round' });
+  // thin round join only to soften corners — NOT a fat same-colour outline (which
+  // bloated the silhouette unevenly).
+  if (typeof col === 'number')
+    g.stroke({ width: Math.max(1, Math.round(s * 0.07)), color: col, alpha: 1, join: 'round', cap: 'round' });
   return g;
 }
 
-// TURBO — a clean, symmetric lightning bolt.
+// TURBO — a clean lightning bolt, point-symmetric through the origin.
 export function iconBolt(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
   const x = s * 0.74, y = s * 1.06;
   g.poly([
-    x * 0.30, -y,        // top
-    -x * 0.62, y * 0.16, // left waist
-    -x * 0.04, y * 0.16, // inner left
-    -x * 0.30, y,        // bottom
-    x * 0.62, -y * 0.16, // right waist
-    x * 0.04, -y * 0.16, // inner right
+    x * 0.18, -y, // top tip
+    -x * 0.45, y * 0.1, // upper-left
+    x * 0.02, y * 0.1, // inner notch
+    -x * 0.18, y, // bottom tip (mirror of top)
+    x * 0.45, -y * 0.1, // lower-right (mirror)
+    -x * 0.02, -y * 0.1, // inner notch (mirror)
   ]).fill(col);
-  if (typeof col === 'number') g.stroke({ width: Math.max(1, s * 0.07), color: col, join: 'round' });
+  if (typeof col === 'number') g.stroke({ width: Math.max(1, Math.round(s * 0.06)), color: col, join: 'round' });
   return g;
 }
 
@@ -214,23 +217,24 @@ export function iconMinus(s, col = THEME.icon) {
 // SOUND — speaker cone + two waves; `off` swaps the waves for a slash.
 export function iconSound(s, col = THEME.icon, off = false) {
   const g = new PIXI.Graphics();
-  const w = Math.max(1.6, s * 0.13);
-  // speaker body (cone) — filled
+  const w = Math.max(2, Math.round(s * 0.13));
+  // clean speaker: back box + trapezoid cone on one vertical seam, symmetric about y=0
   g.poly([
-    -s * 0.95, -s * 0.30,
-    -s * 0.55, -s * 0.30,
-    -s * 0.05, -s * 0.72,
-    -s * 0.05, s * 0.72,
-    -s * 0.55, s * 0.30,
-    -s * 0.95, s * 0.30,
+    -s * 0.92, -s * 0.3,
+    -s * 0.52, -s * 0.3,
+    -s * 0.02, -s * 0.7,
+    -s * 0.02, s * 0.7,
+    -s * 0.52, s * 0.3,
+    -s * 0.92, s * 0.3,
   ]).fill(col);
   if (off) {
-    g.moveTo(s * 0.18, -s * 0.55).lineTo(s * 0.95, s * 0.55)
-      .moveTo(s * 0.95, -s * 0.55).lineTo(s * 0.18, s * 0.55)
+    g.moveTo(s * 0.22, -s * 0.5).lineTo(s * 0.92, s * 0.5)
+      .moveTo(s * 0.92, -s * 0.5).lineTo(s * 0.22, s * 0.5)
       .stroke({ width: w, color: col, cap: 'round' });
   } else {
-    g.arc(-s * 0.05, 0, s * 0.55, -0.9, 0.9).stroke({ width: w, color: col, cap: 'round' });
-    g.arc(-s * 0.05, 0, s * 0.92, -0.8, 0.8).stroke({ width: w, color: col, cap: 'round' });
+    // two CONCENTRIC waves, same centre + same sweep
+    g.arc(-s * 0.02, 0, s * 0.5, -0.8, 0.8).stroke({ width: w, color: col, cap: 'round' });
+    g.arc(-s * 0.02, 0, s * 0.85, -0.8, 0.8).stroke({ width: w, color: col, cap: 'round' });
   }
   return g;
 }
