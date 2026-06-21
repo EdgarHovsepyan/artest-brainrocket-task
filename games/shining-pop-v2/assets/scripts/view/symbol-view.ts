@@ -371,8 +371,11 @@ export class SymbolView extends Component {
       this.node.eulerAngles = new Vec3(0, 0, 0);
       tween(this.node)
         .delay(popStart + half * 2)
-        .to(td, { eulerAngles: new Vec3(0, tlt.deg, 0) }, { easing: 'sineInOut' })
-        .to(td, { eulerAngles: new Vec3(0, -tlt.deg, 0) }, { easing: 'sineInOut' })
+        // Z-axis (in-plane) rock — a Y-axis tilt turned the symbol edge-on /
+        // foreshortened it; the in-plane sway keeps it full-face while it
+        // celebrates.
+        .to(td, { eulerAngles: new Vec3(0, 0, tlt.deg) }, { easing: 'sineInOut' })
+        .to(td, { eulerAngles: new Vec3(0, 0, -tlt.deg) }, { easing: 'sineInOut' })
         .union()
         .repeatForever()
         .start();

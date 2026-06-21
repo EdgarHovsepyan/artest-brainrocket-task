@@ -1607,6 +1607,10 @@ export class SlotView extends Component {
       const sp = photo.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.spriteFrame = this.brandFrames.bg;
+      // Cool/desaturate the busy candyscape (parity with the Pixi game's
+      // bg.tint = 0xb8b8c8) so the warm foreground symbols stop fighting it and
+      // the board reads with more depth.
+      sp.color = new Color(184, 184, 200);
       photo.getComponent(UITransform)!.setContentSize(w, w / ratio);
       const op = photo.addComponent(UIOpacity);
       op.opacity = 235;
