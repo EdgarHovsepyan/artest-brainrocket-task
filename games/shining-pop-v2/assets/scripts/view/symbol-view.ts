@@ -288,7 +288,7 @@ export class SymbolView extends Component {
     this.happyFace.active = false;
   }
 
-  private liftForWin(overlay: Node, worldCenter: Vec3): void {
+  private liftForWin(overlay: Node, _worldCenter: Vec3): void {
     // Capture home ONLY when the cell is in its real reel — never from the overlay
     // itself. The old `if (homeParent) return` could (a) record homeParent = winLift
     // when a cell was already lifted, corrupting its way back, and (b) skip the
@@ -300,11 +300,14 @@ export class SymbolView extends Component {
       this.homeSibling = this.node.getSiblingIndex();
       this.homePos = this.node.position.clone();
     }
-    if (this.node.parent !== overlay) this.node.setParent(overlay, false);
-    // ALWAYS reposition (worldCenter is in slot-view space; the overlay is offset
-    // to the board centre) so any stale/centre position is corrected every lift.
-    const op = overlay.position;
-    this.node.setPosition(worldCenter.x - op.x, worldCenter.y - op.y, 0);
+    // Reparent KEEPING the world transform so the symbol stays EXACTLY at its
+    // own cell. The previous manual slot-view -> overlay-local conversion
+    // (worldCenter.x - op.x) collapsed every winning symbol onto the CENTRE reel
+    // at runtime (measured: lifted cells landed at the board centre, real cells
+    // empty). Letting Cocos preserve the world position is correct and needs no
+    // cellCenter math; the overlay only lifts the symbol above the reel mask for
+    // an unclipped pop.
+    if (this.node.parent !== overlay) this.node.setParent(overlay, true);
   }
 
   playWin(
@@ -890,6 +893,29 @@ export class SymbolView extends Component {
     if (this.glowOp) {
       Tween.stopAllByTarget(this.glowOp);
       this.glowOp.opacity = 0;
+    }
+    this.stopWinFx();
+  }
+
+  /**
+   * Hard-reset this cell back to its strip home and clear ANY stale win-lift
+   * state. Called at the start of every spin so a win-lift that wasn't cleanly
+   * restored can never leave a symbol parented to winLift or at a stale localX
+   * (which renders it in the WRONG column, even off-board, and persists). This
+   * is authoritative; clear() only undoes a lift while homeParent is still set,
+   * which is not guaranteed once a new spin interrupts a live win.
+   */
+  resetHome(strip: Node, localPos: Vec3): void {
+    Tween.stopAllByTarget(this.node);
+    if (this.node.parent !== strip) this.node.setParent(strip, false);
+    this.node.setPosition(localPos);
+    this.node.setScale(1, 1, 1);
+    this.node.eulerAngles = new Vec3(0, 0, 0);
+    this.homeParent = null;
+    this.homePos = null;
+    if (this.artOp) {
+      Tween.stopAllByTarget(this.artOp);
+      this.artOp.opacity = 255;
     }
     this.stopWinFx();
   }

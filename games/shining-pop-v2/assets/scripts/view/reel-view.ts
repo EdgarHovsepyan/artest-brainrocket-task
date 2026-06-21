@@ -121,6 +121,16 @@ export class ReelView extends Component {
     const rows = GRID.rows;
     const len = this.stripCells.length;
 
+    // Hard-reset every cell to its strip home BEFORE spinning. A win-lift that
+    // wasn't cleanly restored could leave a symbol parented to winLift or at a
+    // stale localX -> it then renders in the WRONG column (measured: a winning
+    // symbol stuck one pitch left, overlapping the next reel, persisting across
+    // spins). Resetting here makes every spin start from a clean, correctly
+    // placed grid.
+    this.stripCells.forEach((c, k) =>
+      c.resetHome(strip, new Vec3(0, this.pitch - k * this.pitch, 0)),
+    );
+
     this.cells.forEach((c) => c.setIdle(false));
 
     const launchTop = len - rows;

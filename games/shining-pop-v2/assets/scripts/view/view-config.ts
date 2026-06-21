@@ -161,7 +161,13 @@ export const VIEW_CONFIG = {
 
     winSustainScale: 1.16,
 
-    liftWinSymbols: true,
+    // Disabled: lifting winning symbols into the winLift overlay (a Mask node)
+    // collapsed them onto the centre reel at runtime regardless of the position
+    // math (manual cellCenter conversion AND keepWorldTransform both measured the
+    // symbols landing at the board centre, real cells empty -- the owner-reported
+    // "symbols hide from their correct place"). With the lift off, winning symbols
+    // pop IN PLACE at their real cells; displacement is structurally impossible.
+    liftWinSymbols: false,
 
     winTilt: { enabled: true, deg: 13, ms: 540 },
 
