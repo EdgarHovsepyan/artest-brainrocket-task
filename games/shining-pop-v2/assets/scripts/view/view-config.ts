@@ -27,7 +27,7 @@ export const VIEW_CONFIG = {
     designWidth: 760,
     designHeight: 760,
 
-    spinBuffer: 12,
+    spinBuffer: 14,
 
     contentTopPx: 372,
 
@@ -71,7 +71,12 @@ export const VIEW_CONFIG = {
   },
 
   spin: {
-    minSpinMs: 440,
+    // SPIN FEEL (owner, 2026-06-21): a touch longer base spin so the cruise reads
+    // as a continuous looping tape (440 -> 480), paired with a snappier launch +
+    // firmer decel below and a bigger off-screen buffer (layout.spinBuffer) so the
+    // reel never looks steppy. The "candy damping" land (land.landSq + playLand)
+    // finishes the motion with a satisfying jelly bounce that still holds still.
+    minSpinMs: 480,
 
     reelStopStaggerMs: 88,
 
@@ -79,8 +84,11 @@ export const VIEW_CONFIG = {
 
     stopMinGapMs: { off: 0, turbo: 34, max: 22 },
 
-    accelFraction: 0.15,
-    decelFraction: 0.34,
+    // SPIN FEEL: snappier launch (0.15 -> 0.12) + firmer, more committed decel
+    // (0.34 -> 0.30) so the reel reads pro/confident, not spongy. The remaining
+    // ~58% cruise is the steady "looping" band; the land-jelly carries the impact.
+    accelFraction: 0.12,
+    decelFraction: 0.3,
 
     landSquash: 0.9,
 
@@ -151,6 +159,16 @@ export const VIEW_CONFIG = {
   win: {
     symbolPulseScale: 1.3,
     symbolPulseMs: 240,
+
+    // FULL-SIZE WIN CELEBRATION (owner, 2026-06-21). The Wild (id 0) and Scatter
+    // (id 8) fill the whole cell, so the normal win-pop overshoot shoves them past
+    // the reel/board edge — they used to be tempered to a flat 0.35 on BOTH the
+    // pop AND the jelly, which made their win celebration read as "not animating".
+    // Split the two: keep the POSITIONAL pop conservative (popTemper, avoids the
+    // overflow/clip) but let the JELLY wobble run much stronger (jellyTemper) so
+    // these full-size symbols visibly DANCE on a win. (Used by symbol-view.playWin.)
+    fullSizePopTemper: 0.42,
+    fullSizeJellyTemper: 0.8,
 
     winAnticipation: { enabled: true, dip: 0.9, ms: 80 },
 
@@ -364,12 +382,20 @@ export const VIEW_CONFIG = {
 
   world: {
     parallax: {
-      spinLeanPx: 8,
+      // BG PARALLAX = BIG-WINS ONLY (owner, 2026-06-21). The bg used to lean on
+      // EVERY spin (spinLeanPx, driven by pxLeanTarget=1 at spin start) — owner
+      // wants the background still during normal play and the depth motion
+      // reserved for big-win moments. spinLeanPx 8 -> 0 kills the per-spin lean;
+      // the per-win pulse (pxPulse=1 in showWins) was also removed. The ONLY
+      // remaining bg motion is the big-win/feature "whoosh" (bgDepthPush ->
+      // winBurstPulse), fired on ceremony detonation + buy-bonus/free-spins entry.
+      spinLeanPx: 0,
       winPulsePx: 6,
       leanLerp: 5,
       pulseDecay: 2.0,
       // one-shot bg depth "whoosh" amplitude (× winPulsePx) fired on big-win
-      // detonation + feature entry; decays via pulseDecay.
+      // detonation + feature entry; decays via pulseDecay. This is now the sole
+      // bg-parallax driver.
       winBurstPulse: 4.5,
     },
   },
@@ -386,8 +412,14 @@ export const VIEW_CONFIG = {
     // turbo .042->.024, max .034->.018. (playLand's return easing was also changed
     // backOut->quadOut so even this small squash settles firm, with no scale
     // overshoot.) Prior values preserved in this comment for a designer restore.
+    // CANDY DAMPING (owner, 2026-06-21): landDip STAYS 0 (no positional "dump" —
+    // that read as a post-stop bob and was rejected). The land feel is now a
+    // SCALE jelly in playLand: squash (1+sq, 1-sq) -> rebound stretch -> damped
+    // settle to 1, all quadOut. landSq is the squash depth — bumped back up from
+    // the dead-crisp 0.032 so the land has a satisfying candy "boing" that still
+    // resolves in one motion and holds still after (no lingering wobble).
     landDip: { off: 0, turbo: 0, max: 0 },
-    landSq: { off: 0.032, turbo: 0.024, max: 0.018 },
+    landSq: { off: 0.055, turbo: 0.042, max: 0.03 },
   },
 
   reveal: {

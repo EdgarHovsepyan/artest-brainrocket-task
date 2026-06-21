@@ -3384,7 +3384,9 @@ export class SlotView extends Component {
         const progress = winningReels.length > 1 ? order / (winningReels.length - 1) : 0;
         this.scheduleOnce(() => this.audio.countTick(progress), reelIdx * waveStagger);
       });
-      this.pxPulse = 1;
+      // BG PARALLAX = BIG-WINS ONLY (owner, 2026-06-21): the per-win bg pulse was
+      // removed so regular wins no longer nudge the background. Big wins still get
+      // the depth "whoosh" via bgDepthPush() (ceremony detonation / feature entry).
     }
 
     const anyWinFx =

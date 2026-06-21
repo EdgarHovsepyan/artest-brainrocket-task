@@ -336,11 +336,16 @@ export class SymbolView extends Component {
     // the standard win-pop overshoot (~1.5x) shoves them past the reel/board
     // border ("wild moving out to the outside"). Temper the overshoot + bounce
     // jelly for full-size symbols so the win pop stays inside the board.
-    const fsTemper = FULL_SIZE_IDS.has(this._currentId) ? 0.35 : 1;
-    const pop = (1 + (symbolPulseScale - 1 + 0.12) * heat * fsTemper) * zoom;
+    const fs = FULL_SIZE_IDS.has(this._currentId);
+    // Full-size symbols (Wild/Scatter): keep the POP conservative so the overshoot
+    // doesn't shove them past the board edge, but let the JELLY run strong so they
+    // still visibly celebrate. Non-full-size symbols are unaffected (temper = 1).
+    const fsPop = fs ? VIEW_CONFIG.win.fullSizePopTemper : 1;
+    const fsJelly = fs ? VIEW_CONFIG.win.fullSizeJellyTemper : 1;
+    const pop = (1 + (symbolPulseScale - 1 + 0.12) * heat * fsPop) * zoom;
     const bnc = VIEW_CONFIG.win.winBounceLoop;
 
-    const j = bnc.jelly * heat * fsTemper;
+    const j = bnc.jelly * heat * fsJelly;
     const bUp = new Vec3(zoom * (1 + j), zoom * (1 + j), 1);
     const bDn = new Vec3(zoom, zoom, 1);
     const bhalf = bnc.ms / 2 / 1000;
@@ -841,15 +846,18 @@ export class SymbolView extends Component {
     const d = Math.max(0.05, durMs / 1000);
     this.node.setPosition(home);
     this.node.setScale(1, 1, 1);
-    const dip = new Vec3(home.x, home.y - cell * dipFrac, home.z);
+    // CANDY DAMPING (owner, 2026-06-21): a satisfying jelly land — SQUASH on impact
+    // (wide+short) -> REBOUND stretch (tall+narrow, ~70% amplitude) -> DAMPED settle
+    // to 1. All quadOut, each phase smaller than the last, so it reads as ONE soft
+    // candy "boing" that resolves in a single motion and HOLDS still after — never
+    // the old multi-oscillation wobble. Scale-only (dipFrac is 0 => no position dump).
+    const dip = dipFrac > 0 ? new Vec3(home.x, home.y - cell * dipFrac, home.z) : home;
     const squash = new Vec3(1 + sqFrac, 1 - sqFrac, 1);
-    // CRISP-STOP: return with quadOut (was backOut). backOut overshot scale past 1
-    // on the recovery — a small post-land scale bounce. quadOut settles the firm
-    // land-squash straight back to 1 with no overshoot. With dipFrac now 0 the
-    // position never moves; this is a pure, single, firm squash "thunk".
+    const rebound = new Vec3(1 - sqFrac * 0.5, 1 + sqFrac * 0.7, 1);
     tween(this.node)
-      .to(d * 0.3, { position: dip, scale: squash }, { easing: 'quadOut' })
-      .to(d * 0.7, { position: home, scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
+      .to(d * 0.26, { position: dip, scale: squash }, { easing: 'quadOut' })
+      .to(d * 0.34, { position: home, scale: rebound }, { easing: 'quadOut' })
+      .to(d * 0.4, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
       .start();
   }
 
