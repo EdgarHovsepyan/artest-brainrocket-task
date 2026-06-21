@@ -289,13 +289,20 @@ export class SymbolView extends Component {
   }
 
   private liftForWin(overlay: Node, worldCenter: Vec3): void {
-    if (this.homeParent) return;
-    this.homeParent = this.node.parent;
-    this.homeSibling = this.node.getSiblingIndex();
-    this.homePos = this.node.position.clone();
-    this.node.setParent(overlay, false);
-    // worldCenter is in slot-view space; the overlay is offset to the board centre,
-    // so position the cell relative to the overlay (keeps it landing on its cell).
+    // Capture home ONLY when the cell is in its real reel — never from the overlay
+    // itself. The old `if (homeParent) return` could (a) record homeParent = winLift
+    // when a cell was already lifted, corrupting its way back, and (b) skip the
+    // reposition on a re-lift, stranding the symbol at the centre reel (localX=0)
+    // while its true cell rendered empty — the "symbols crammed in the middle +
+    // empty reels" bug.
+    if (!this.homeParent && this.node.parent !== overlay) {
+      this.homeParent = this.node.parent;
+      this.homeSibling = this.node.getSiblingIndex();
+      this.homePos = this.node.position.clone();
+    }
+    if (this.node.parent !== overlay) this.node.setParent(overlay, false);
+    // ALWAYS reposition (worldCenter is in slot-view space; the overlay is offset
+    // to the board centre) so any stale/centre position is corrected every lift.
     const op = overlay.position;
     this.node.setPosition(worldCenter.x - op.x, worldCenter.y - op.y, 0);
   }

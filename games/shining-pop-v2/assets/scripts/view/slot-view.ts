@@ -3364,16 +3364,15 @@ export class SlotView extends Component {
 
     const winMat = this.reducedFx ? null : this.getEffectMaterial('symbol-win');
     const waveStagger = VIEW_CONFIG.win.highlightWaveStagger;
-    this.reels.forEach((reel, i) =>
-      reel.highlight(
-        byReel[i] ?? [],
-        i * waveStagger,
-        rich,
-        winMat,
-        VIEW_CONFIG.win.liftWinSymbols ? this.winLift : null,
-        (row) => this.cellCenter(i, row),
-      ),
-    );
+    const lift = VIEW_CONFIG.win.liftWinSymbols ? this.winLift : null;
+    this.reels.forEach((reel, i) => {
+      const rows = byReel[i] ?? [];
+      // bake the centres NOW with this reel's `i`, then hand concrete values to
+      // highlight (a deferred `(row)=>cellCenter(i,row)` closure resolved the
+      // wrong reel for some cells -> symbols stacked on the centre reel).
+      const centers = rows.map((row) => this.cellCenter(i, row));
+      reel.highlight(rows, i * waveStagger, rich, winMat, lift, centers);
+    });
 
     if (!this.reducedFx && totalCells > 0) {
       const winningReels = this.reels.map((_, i) => i).filter((i) => (byReel[i]?.length ?? 0) > 0);
@@ -3604,10 +3603,10 @@ export class SlotView extends Component {
     const byReel: number[][] = Array.from({ length: GRID.reels }, () => []);
     cells.forEach((c) => byReel[c.reel]?.push(c.row));
     byReel.forEach((rows, reel) => {
-      if (rows.length)
-        this.reels[reel]?.highlight(rows, reel * 0.1, true, winMat, this.winLift, (r) =>
-          this.cellCenter(reel, r),
-        );
+      if (rows.length) {
+        const centers = rows.map((r) => this.cellCenter(reel, r));
+        this.reels[reel]?.highlight(rows, reel * 0.1, true, winMat, this.winLift, centers);
+      }
     });
     this.audio.win(Math.min(5, Math.max(2, count - 1)));
     this.cinematicBloom(Math.min(1, 0.5 + count * 0.1));

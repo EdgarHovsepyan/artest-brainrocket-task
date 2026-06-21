@@ -247,10 +247,15 @@ export class ReelView extends Component {
     rich = true,
     winMat: Material | null = null,
     lift: Node | null = null,
-    centerOf?: (row: number) => Vec3,
+    centers?: (Vec3 | null)[],
   ): void {
-    rows.forEach((row, i) =>
-      this.cells[row]?.playWin(delay + i * 0.04, rich, winMat, lift, centerOf?.(row) ?? null),
+    // `centers` is pre-computed by the caller (parallel to `rows`) with concrete
+    // Vec3 values. Passing a `(row)=>cellCenter(i,row)` closure here mis-resolved
+    // the reel index `i` for some cells once it crossed this function boundary
+    // (winning symbols collapsed onto the centre reel, leaving empty cells), so
+    // we take baked values instead of a deferred closure.
+    rows.forEach((row, j) =>
+      this.cells[row]?.playWin(delay + j * 0.04, rich, winMat, lift, centers?.[j] ?? null),
     );
 
     this.cells.forEach((c, row) => {
