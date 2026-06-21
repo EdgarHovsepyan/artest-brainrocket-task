@@ -8403,8 +8403,11 @@
   function showLineWins(grid,lineWins){
     winCells=[]; winLines=[];
     lineWins.forEach(w => {
-      winLines.push({ line:w.line, count:w.count });   
       const pat=LINES[w.line];
+      // skip malformed/short entries — never draw a beam through unlit cells if a
+      // server line_win lacks a valid line index or count (would default to 0).
+      if(!pat || !(w.count>=3)) return;
+      winLines.push({ line:w.line, count:w.count });
       for(let r=0;r<w.count;r++) winCells.push({ r, row:pat[r] });
     });
     if(isReduced()) return;
@@ -10615,24 +10618,15 @@
 
             
 
-            if(drawProg > 0.55){
-              const _tail=[];
-              for(let r=count;r<REELS;r++){
-                const cc=cellCenter(r,pat[r]);
-                if(cc.x<GX-2||cc.x>GX+GW+2||cc.y<GY-2||cc.y>GY+GH+2) break;
-                _tail.push(cc);
-              }
-              if(_tail.length){
-                const _ta=Math.min(1,(drawProg-0.55)/0.45);
-                const _tp=[full[n-1].x, full[n-1].y];
-                for(const c of _tail) _tp.push(c.x, c.y);
-                lineG.poly(_tp,false).stroke({ color:cMid,    width:1.6, alpha:0.13*_ta });
-                lineG.poly(_tp,false).stroke({ color:0xfff4fb, width:0.7, alpha:0.20*_ta });
-                
-              }
-            }
+            // (removed) the dim lead-out _tail used to continue the payline
+            // PATTERN from the last winning reel out to the remaining reels via
+            // cellCenter(r, pat[r]). On a V / inverted-V payline those trailing
+            // rows bend hard across rows 0<->2 through cells that are PAST the win
+            // and never lit, drawing a colored line jutting through dark cells
+            // (the owner-reported "old bug"). The win beam now spans ONLY the lit
+            // winning run (full[0..count-1]).
 
-            
+
             lineG.poly(pts,false).stroke({ color:cGlow, width:(_lineBonus?13:10)+3.5*pulse, alpha:(0.12+0.06*pulse)*drawProg });
             lineG.poly(pts,false).stroke({ color:cGlow, width:(_lineBonus?7:5)+1.8*pulse, alpha:(0.22+0.08*pulse)*drawProg });
             
