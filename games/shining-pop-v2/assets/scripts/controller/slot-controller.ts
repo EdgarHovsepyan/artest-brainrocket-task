@@ -46,6 +46,7 @@ import {
   SETTINGS,
 } from '../logic/game-config';
 import { evaluateSpin } from '../logic/spin-engine';
+import { BonusResult } from '../logic/bonus-engine';
 import { VIEW_CONFIG } from '../view/view-config';
 
 const { ccclass, property } = _decorator;
@@ -523,18 +524,27 @@ export class SlotController extends Component {
     this.state = 'resolving';
     if (outcome.wildStrike > 1) this.view.setBanner(`WILD ×${outcome.wildStrike}`);
 
+    // When this spin ALSO triggers free spins, the win shown now is only the
+    // IMMEDIATE base spin (line wins + scatter pay); the free-spins winnings are
+    // counted up after those rounds actually play (below). Otherwise the full win.
+    const lineBet = this.model.bet / SETTINGS.activeLines;
+    const fsCents = outcome.freeSpins ? Math.round(outcome.freeSpins.totalPayout * lineBet) : 0;
+    const immediateCents = outcome.winCents - fsCents;
+
     if (outcome.winCents > 0) {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
-      this.view.countUp(outcome.winCents);
-      this.view.playCeremony(outcome.winCents, outcome.betCents, outcome.wildStrike);
-      this.bar.setLastWin(outcome.winCents / 100);
-
-      if (outcome.winCents > outcome.betCents) {
-        const mult = outcome.winCents / outcome.betCents;
-
-        const tier = mult >= 50 ? 5 : mult >= 30 ? 4 : mult >= 10 ? 3 : mult >= 2 ? 2 : 1;
-        this.view.audio.win(tier);
+      if (immediateCents > 0) {
+        this.view.countUp(immediateCents);
+        this.bar.setLastWin(immediateCents / 100);
+        if (!outcome.freeSpins) {
+          this.view.playCeremony(immediateCents, outcome.betCents, outcome.wildStrike);
+        }
+        if (immediateCents > outcome.betCents) {
+          const mult = immediateCents / outcome.betCents;
+          const tier = mult >= 50 ? 5 : mult >= 30 ? 4 : mult >= 10 ? 3 : mult >= 2 ? 2 : 1;
+          this.view.audio.win(tier);
+        }
       }
     }
 
@@ -551,6 +561,12 @@ export class SlotController extends Component {
       this.view.clearWins();
       this.view.showFeatureUnlocked('FREE SPINS', SCATTER_FS_MODE, sc);
       this.view.setBanner(`FREE SPINS ×${outcome.result.freeSpins}`);
+      this.view.setBonusAtmosphere(SCATTER_FS_MODE);
+
+      // PLAY the free spins. Previously the feature was only announced and the game
+      // sat idle, looking frozen — now the reels spin through every awarded step.
+      await this.playBonusRounds(outcome.freeSpins, SCATTER_FS_MODE);
+      this.finishBonus(outcome.winCents, 'fs');
     }
 
     this.session = recordSpin(this.session, outcome.betCents, outcome.winCents);
@@ -587,6 +603,63 @@ export class SlotController extends Component {
     }, VIEW_CONFIG.spin.settleMs[this.turboKey()] / 1000);
   }
 
+  /**
+   * Play out a bonus's free-spin rounds (the reels spinning through each step,
+   * sticky pulses, per-step wins + HUD). Shared by buy-bonus AND scatter-triggered
+   * free spins so the latter actually animates instead of looking frozen.
+   */
+  private async playBonusRounds(bonus: BonusResult, mode: BonusMode): Promise<void> {
+    const lineBetCents = this.model.bet / SETTINGS.activeLines;
+    const totalSpins = bonus.steps.length;
+    const tk = this.turboKey();
+    const deadPauseMs = VIEW_CONFIG.bonus.deadPauseMs[tk];
+    const winPauseMs = VIEW_CONFIG.bonus.winPauseMs[tk];
+    const { bigStepMultiple } = VIEW_CONFIG.bonus;
+    let runningPayout = 0;
+    let prevLocked: number[] = [];
+    this.view.setBonusHud(0, totalSpins, 0);
+    for (let i = 0; i < bonus.steps.length; i++) {
+      const step = bonus.steps[i];
+      this.view.clearWins();
+
+      await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul, prevLocked);
+      prevLocked = step.lockedReels;
+
+      this.view.pulseSticky(step.sticky, mode);
+      if (step.sticky.length > 0) this.view.audio.stickyLock();
+      runningPayout += step.payout;
+      const runCents = Math.round(runningPayout * lineBetCents);
+      this.view.setBonusHud(i, totalSpins, runCents);
+      if (runCents > 0) this.bar.setLastWin(runCents / 100);
+
+      if (step.payout > 0) {
+        this.view.showWins(evaluateSpin(step.grid));
+        const stepCents = Math.round(step.payout * lineBetCents);
+        const stepMult = this.model.bet > 0 ? stepCents / this.model.bet : 0;
+        const big = stepMult >= bigStepMultiple;
+        this.view.audio.win(big ? 3 : 1);
+        if (big) this.view.setBanner(`FREE SPIN ×${Math.round(stepMult)}`);
+        await this.wait(big ? winPauseMs + 280 : winPauseMs);
+      } else {
+        await this.wait(deadPauseMs);
+      }
+    }
+    this.view.setBonusHud(null, 0, 0);
+  }
+
+  /** Wind a bonus down: end SFX, wipe out, drop the atmosphere, tally the total. */
+  private finishBonus(winCents: number, wipeTone: 'bonus' | 'fs'): void {
+    this.view.audio.bonusEnd();
+    this.view.wipe(wipeTone, -1, 1);
+    this.view.setBonusAtmosphere('idle');
+    this.view.countUp(winCents);
+    const ldw = winCents <= this.model.bet;
+    const tierBet = Math.min(this.model.bet, Math.max(1, Math.round(winCents / 9)));
+    this.view.playCeremony(winCents, ldw ? this.model.bet : tierBet, 1);
+    this.bar.setLastWin(winCents / 100);
+    this.view.setBanner(ldw ? 'FREE SPINS COMPLETE' : 'FREE SPINS WIN');
+  }
+
   private async onBuy(mode: BonusMode): Promise<void> {
     if (this.state !== 'idle' || this.autoplay.active) return;
     if (this.model.balance < this.model.bonusCost(mode)) {
@@ -616,57 +689,9 @@ export class SlotController extends Component {
     this.view.setBalance(outcome.balanceCents);
     this.bar.setBalance(outcome.balanceCents / 100);
 
-    const lineBetCents = this.model.bet / SETTINGS.activeLines;
+    await this.playBonusRounds(outcome.bonus, mode);
+    this.finishBonus(outcome.winCents, 'bonus');
 
-    let runningPayout = 0;
-    const totalSpins = outcome.bonus.steps.length;
-    this.view.setBonusHud(0, totalSpins, 0);
-
-    const tk = this.turboKey();
-    const deadPauseMs = VIEW_CONFIG.bonus.deadPauseMs[tk];
-    const winPauseMs = VIEW_CONFIG.bonus.winPauseMs[tk];
-    const { bigStepMultiple } = VIEW_CONFIG.bonus;
-    let prevLocked: number[] = [];
-    for (let i = 0; i < outcome.bonus.steps.length; i++) {
-      const step = outcome.bonus.steps[i];
-      this.view.clearWins();
-
-      await this.view.playSpin(step.grid, VIEW_CONFIG.bonus.speedMul, prevLocked);
-      prevLocked = step.lockedReels;
-
-      this.view.pulseSticky(step.sticky, mode);
-      if (step.sticky.length > 0) this.view.audio.stickyLock();
-      runningPayout += step.payout;
-      const runCents = Math.round(runningPayout * lineBetCents);
-      this.view.setBonusHud(i, totalSpins, runCents);
-
-      if (runCents > 0) this.bar.setLastWin(runCents / 100);
-
-      if (step.payout > 0) {
-        this.view.showWins(evaluateSpin(step.grid));
-        const stepCents = Math.round(step.payout * lineBetCents);
-        const stepMult = this.model.bet > 0 ? stepCents / this.model.bet : 0;
-        const big = stepMult >= bigStepMultiple;
-        this.view.audio.win(big ? 3 : 1);
-        if (big) this.view.setBanner(`FREE SPIN ×${Math.round(stepMult)}`);
-        await this.wait(big ? winPauseMs + 280 : winPauseMs);
-      } else {
-        await this.wait(deadPauseMs);
-      }
-    }
-
-    this.view.audio.bonusEnd();
-    this.view.setBonusHud(null, 0, 0);
-    this.view.wipe('bonus', -1, 1);
-    this.view.setBonusAtmosphere('idle');
-    this.view.countUp(outcome.winCents);
-
-    const fsLdw = outcome.winCents <= this.model.bet;
-
-    const fsTierBet = Math.min(this.model.bet, Math.max(1, Math.round(outcome.winCents / 9)));
-    this.view.playCeremony(outcome.winCents, fsLdw ? this.model.bet : fsTierBet, 1);
-    this.bar.setLastWin(outcome.winCents / 100);
-    this.view.setBanner(fsLdw ? 'FREE SPINS COMPLETE' : 'FREE SPINS WIN');
     this.scheduleOnce(() => {
       this.state = 'idle';
       this.bar.setSpinning(false);
