@@ -2680,126 +2680,78 @@
 
   
 
+  // Win "+amount" fly-up. Rendered as a canvas2D -> texture SPRITE, NOT a live PIXI.Text:
+  // PixiJS v8's Text baked a corrupted ~600x horizontal-scale transform on its FIRST render here,
+  // smearing the popup into a full-width magenta line that flew to the screen top on every win
+  // (owner-reported; recreation / fonts.ready rebuild / off-screen warm-up all FAILED to clear it,
+  // verified across real spins in Playwright). A pre-rasterised Sprite avoids the Text-transform
+  // path entirely while keeping the win-amount feedback.
+  function amountTex(str){
+    const R = 2, fs = 22;
+    const m = document.createElement('canvas').getContext('2d');
+    m.font = (fs * R) + 'px "Luckiest Guy", sans-serif';
+    const pad = Math.ceil(8 * R);
+    const c = document.createElement('canvas');
+    c.width = Math.max(2, Math.ceil(m.measureText(str).width) + pad * 2);
+    c.height = Math.ceil(fs * R * 1.85);
+    const x = c.getContext('2d');
+    x.font = (fs * R) + 'px "Luckiest Guy", sans-serif';
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.lineJoin = 'round';
+    x.lineWidth = 3 * R;
+    x.strokeStyle = '#06060c';
+    x.strokeText(str, c.width / 2, c.height / 2);
+    x.fillStyle = '#ff8ad0';
+    x.fillText(str, c.width / 2, c.height / 2);
+    return new PIXI.Texture({ source: new PIXI.CanvasSource({ resource: c, resolution: R }) });
+  }
   const _flyUpPool = [];
   for(let i = 0; i < 8; i++){
-    const t = new PIXI.Text({ text:'+'+fmtMoney(0), resolution:2, style:{   
-      fontFamily:'Luckiest Guy', fontSize:22, fill:0xff8ad0,   
-
-      
-      
-      stroke:{ color:0x06060c, width:3, join:'round' },
-    }});
-    t.anchor.set(0.5);
-    t.label = 'flyUp·winAmount(pool)';   
-    t.visible = false;
-    t.renderable = false;          
-    t.position.set(-9999, -9999);  
-    t.alpha = 0;                   
-    t._busy = false;
-    t._t0 = 0;
-    t._startY = 0;
-    t._cx = 0;
-    stage.addChild(t);
-    _flyUpPool.push(t);
-  }
-  // PixiJS v8 GOTCHA: a Text created BEFORE its web font ("Luckiest Guy") finishes loading
-  // bakes a corrupted local transform — matrix.a desyncs from scale.x into a ~600x horizontal
-  // scale, so the flying "+amount" smeared into a full-width magenta line shooting to the top
-  // on every win (owner-reported "magenta line moving to top", separate from the win-line).
-  // Re-measuring the text does NOT heal it; only a Text built after the font is ready is clean,
-  // so rebuild any idle pool item once fonts have loaded.
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(() => {
-      for (let i = 0; i < _flyUpPool.length; i++) {
-        const old = _flyUpPool[i];
-        if (old._busy) continue;
-        const t = new PIXI.Text({ text:'+'+fmtMoney(0), resolution:2, style:{
-          fontFamily:'Luckiest Guy', fontSize:22, fill:0xff8ad0,
-          stroke:{ color:0x06060c, width:3, join:'round' },
-        }});
-        t.anchor.set(0.5);
-        t.label = 'flyUp·winAmount(pool)';
-        t.visible = false;
-        t.renderable = false;
-        t.position.set(-9999, -9999);
-        t.alpha = 0;
-        t._busy = false;
-        t._t0 = 0;
-        t._startY = 0;
-        t._cx = 0;
-        stage.addChild(t);
-        _flyUpPool[i] = t;
-        try { stage.removeChild(old); old.destroy(); } catch(e){}
-      }
-    }).catch(() => {});
+    const s = new PIXI.Sprite();
+    s.anchor.set(0.5);
+    s.label = 'flyUp\u00b7winAmount(pool)';
+    s.visible = false;
+    s.renderable = false;
+    s.position.set(-9999, -9999);
+    s.alpha = 0;
+    s._busy = false;
+    s._t0 = 0;
+    s._startY = 0;
+    s._flyCx = 0;
+    s._ownTex = null;
+    stage.addChild(s);
+    _flyUpPool.push(s);
   }
   function spawnFlyUpAmount(cx, cy, amountX6){
-    // DISABLED — the owner's "magenta line that flies to the top on every win". This pooled
-    // PixiJS v8 "+amount" Text baked a corrupted ~600x horizontal-scale transform on its FIRST
-    // render (matrix.a desynced from scale.x) and smeared into a full-width magenta line. No
-    // recreation, re-measure, fonts.ready rebuild, or off-screen warm-up reliably cleared it
-    // (verified across real spins in Playwright: width stayed ~40,000px). The win amount is
-    // already presented by the HUD win meter and the big-win celebration, so this redundant
-    // popup is removed outright. Re-add later as a Sprite/RenderTexture if the juice is wanted —
-    // a Sprite avoids the Text-transform bug entirely.
-    return;
     if(isReduced() || amountX6 <= 0) return;
-    const _slot = _flyUpPool.findIndex(x => !x._busy);
-    if(_slot < 0) return;
-    // Bulletproof the PixiJS v8 pre-font-load transform corruption (the owner's "magenta line
-    // flies to the top" bug): rebuild this slot as a FRESH Text on every spawn. By win-time the
-    // "Luckiest Guy" font is always loaded, so the new Text is clean (matrix.a == scale.x); a
-    // pooled Text that may carry the baked ~600x horizontal-scale smear can never reach screen.
-    const _old = _flyUpPool[_slot];
-    const t = new PIXI.Text({ text:'+'+fmtMoney(amountX6), resolution:2, style:{
-      fontFamily:'Luckiest Guy', fontSize:22, fill:0xff8ad0,
-      stroke:{ color:0x06060c, width:3, join:'round' },
-    }});
-    t.anchor.set(0.5);
-    t.label = 'flyUp·winAmount(pool)';
-    stage.addChild(t);
-    _flyUpPool[_slot] = t;
-    try { stage.removeChild(_old); _old.destroy(); } catch(e){}
-    t._busy = true;
-    // Off-screen WARM-UP. PixiJS v8's first render/measure of a Text (after a .text change) bakes a
-    // corrupted ~600x horizontal-scale transform for one+ frames — the "+amount" smears into a
-    // full-width magenta line that flies to the top on EVERY win (owner-reported). It self-resolves
-    // after the text re-measures, so we render it OFF-SCREEN until the corruption clears, THEN start
-    // the visible flight. _t0 is the flight start (capped ~600ms ahead); tickFlyUps pulls it forward
-    // the instant the rendered width is sane again.
-    t._t0 = performance.now() + 600;
-    t._cx = cx;
-    t._startY = cy;
-    t.text = '+' + fmtMoney(amountX6);
-    t.visible = true;
-    t.renderable = true;
-    t.alpha = 1;
-    t.position.set(-9999, -9999);
-    t.scale.set(0.6);
+    const s = _flyUpPool.find(x => !x._busy);
+    if(!s) return;
+    if(s._ownTex){ try { s._ownTex.destroy(true); } catch(e){} }
+    const tex = amountTex('+' + fmtMoney(amountX6));
+    s._ownTex = tex;
+    s.texture = tex;
+    s._busy = true;
+    s._t0 = performance.now();
+    s._flyCx = cx;
+    s._startY = cy;
+    s.visible = true;
+    s.renderable = true;
+    s.alpha = 0;
+    s.position.set(cx, cy);
+    s.scale.set(0.6);
   }
-  
   function tickFlyUps(now){
     const dur = 1200;
     for(let i = 0; i < _flyUpPool.length; i++){
-      const t = _flyUpPool[i];
-      if(!t._busy) continue;
-      const el = now - t._t0;
-      if(el < 0){
-        // WARM-UP: render off-screen (invisible) until the PixiJS v8 first-render text-transform
-        // corruption clears, then begin the visible flight. Rendered width ~600x while corrupt,
-        // ~60-90px once resolved — pull the flight start forward the moment it's sane.
-        t.position.set(-9999, -9999); t.renderable = true; t.alpha = 1; t.scale.set(0.6);
-        let cw = 9999; try { const b = t.getBounds(); cw = b.maxX - b.minX; } catch(e){}
-        if(cw < 300) t._t0 = now;
-        continue;
-      }
+      const s = _flyUpPool[i];
+      if(!s._busy) continue;
+      const el = now - s._t0;
       if(el >= dur){
-        t._busy = false; t.visible = false; t.renderable = false; t.alpha = 0; t.position.set(-9999,-9999);
+        s._busy = false; s.visible = false; s.renderable = false; s.alpha = 0; s.position.set(-9999, -9999);
         continue;
       }
       const p = el / dur;
-
-      
       let scale, alpha;
       if(el < 180){
         const ip = el / 180;
@@ -2812,14 +2764,13 @@
         scale = 1.0 - (el - 1000) / 200 * 0.1;
         alpha = 1 - (el - 1000) / 200;
       }
-      
       const float = (1 - Math.pow(1 - p, 3)) * (CELL * 1.4);
-      t.position.set(t._cx, t._startY - float);
-      t.scale.set(scale);
-      t.alpha = alpha;
+      s.position.set(s._flyCx, s._startY - float);
+      s.scale.set(scale);
+      s.alpha = alpha;
     }
   }
-  
+
   let _bonusState = {
     active: false,
     mode: 'bonus_standard',
