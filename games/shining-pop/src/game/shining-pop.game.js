@@ -5083,9 +5083,8 @@
     } catch(e){}
 
     
-    setTimeout(() => {
-      try { if(typeof showLinesPreview === 'function') showLinesPreview(); } catch(e){}  
-    }, 700);
+    // (auto paylines-preview on intro-dismiss removed: it drew confusing full-width
+    //  magenta lines over the just-revealed board -- paylines stay in the info panel.)
   });
 
   function layoutIntroOverlay(){
