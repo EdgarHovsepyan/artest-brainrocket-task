@@ -37,15 +37,8 @@ export const VIEW_CONFIG = {
     bgCoverOverscan: 1.06,
 
     windowFeatherPx: 24,
-    /** ANTI-CROP (owner, 2026-06-21): each per-reel GRAPHICS_RECT mask is the cell
-     *  width, so a winning symbol's pop (up to ~1.6x) was clipped on its LEFT/RIGHT
-     *  by its own reel mask. Widen the mask HORIZONTALLY by this margin each side so
-     *  the pop shows un-cropped. Safe: the strip is only `cell` px wide so nothing
-     *  new shows during a spin; the extra width is empty (background/inter-reel gap),
-     *  and a popped symbol bleeding over a neighbour is normal slot behaviour. Kept
-     *  horizontal-only — widening vertically would reveal the off-window buffer cells.
-     *  (Lifting winners into an overlay was the alternative but it collapses them to
-     *  the centre reel — see win.liftWinSymbols — so the mask-widen is the safe path.) */
+    /** Per-reel mask widen (each side) so a winning symbol's pop isn't clipped L/R.
+     *  Horizontal-only; widening vertically would reveal off-window buffer cells. */
     winPopMaskMargin: 34,
 
     portraitWidthFill: 0.99,
@@ -81,11 +74,7 @@ export const VIEW_CONFIG = {
   },
 
   spin: {
-    // SPIN FEEL (owner, 2026-06-21): a touch longer base spin so the cruise reads
-    // as a continuous looping tape (440 -> 480), paired with a snappier launch +
-    // firmer decel below and a bigger off-screen buffer (layout.spinBuffer) so the
-    // reel never looks steppy. The "candy damping" land (land.landSq + playLand)
-    // finishes the motion with a satisfying jelly bounce that still holds still.
+    // Longer base spin so the cruise reads as a continuous looping tape.
     minSpinMs: 480,
 
     reelStopStaggerMs: 88,
@@ -94,9 +83,7 @@ export const VIEW_CONFIG = {
 
     stopMinGapMs: { off: 0, turbo: 34, max: 22 },
 
-    // SPIN FEEL: snappier launch (0.15 -> 0.12) + firmer, more committed decel
-    // (0.34 -> 0.30) so the reel reads pro/confident, not spongy. The remaining
-    // ~58% cruise is the steady "looping" band; the land-jelly carries the impact.
+    // Snappier launch + firmer decel so the reel reads confident, not spongy.
     accelFraction: 0.12,
     decelFraction: 0.3,
 
@@ -139,14 +126,8 @@ export const VIEW_CONFIG = {
     },
 
     bounce: {
-      // CRISP-STOP (owner, 2026-06-21): overtravelFrac 0.07 -> 0. The strip used
-      // to decel to y = -overshoot (a ~6.7px dip BELOW rest) then ride back up to
-      // 0 — a visible post-land settle/"dump". With 0, `bounceEnabled` is false in
-      // reel-view.spinTo, so the strip runs ONE monotonic reelEase tween straight
-      // to y=0 (velocity -> 0 at the target): a clean DEAD stop, no overshoot, no
-      // ride-back. This matches the Pixi sister-game stop ("reelEase already
-      // monotonic, no overshoot"). The rest of the knobs are inert at 0; re-bump
-      // overtravelFrac only to restore the strip over-travel feel.
+      // overtravelFrac 0 => bounceEnabled false in reel-view.spinTo: one monotonic
+      // reelEase tween to y=0, a clean dead stop. Other knobs are inert at 0.
       overtravelFrac: 0,
       bounceMs: 190,
       easing: 'quadOut',
@@ -154,13 +135,9 @@ export const VIEW_CONFIG = {
       speed: 1,
       elasticity: 1.0,
 
-      // Whole-reel scale "recoil" pop fired on each reel stop (ReelView.recoil,
-      // via slot-view playSpin). recoil() early-returns when amp <= 1.
-      // CRISP-STOP (owner, 2026-06-21): landRecoilScale 1.03 -> 1.0 kills the
-      // every-spin whole-reel bounce after each stop (the reel now just holds).
-      // wildRecoilScale is KEPT (a wild-LAND celebration beat that pairs with
-      // flashWilds, a special event — not the resting stop); set it to 1.0 too if
-      // the owner wants wild lands dead-crisp as well.
+      // Whole-reel scale "recoil" pop on reel stop (ReelView.recoil); early-returns
+      // when amp <= 1. landRecoilScale 1.0 = resting stop just holds; wildRecoilScale
+      // kept as a wild-LAND celebration beat (paired with flashWilds).
       wildRecoilScale: 1.045,
       landRecoilScale: 1.0,
     },
@@ -170,26 +147,16 @@ export const VIEW_CONFIG = {
     symbolPulseScale: 1.3,
     symbolPulseMs: 240,
 
-    // FULL-SIZE WIN CELEBRATION (owner — reported the Wild/Scatter still "not
-    // celebrating like the others"). They fill the whole cell, so the original
-    // 0.35 flat temper made them read static. Now that the per-reel mask is widened
-    // (layout.winPopMaskMargin) the pop has horizontal room, so we boost toward
-    // PARITY: JELLY runs at FULL strength (1.0 = the same wobble/dance as every
-    // other winning symbol — the key "like the others" cue), the POP is a stronger
-    // 0.55 (still slightly tempered for their cell-filling size), and the rotate is
-    // a touch larger but still gentler than the standard 13deg so they never tip out.
+    // Cell-filling symbols (Wild/Scatter): pop tempered for their size but jelly at
+    // full strength for parity; rotate gentler than the standard so they never tip out.
     fullSizePopTemper: 0.55,
     fullSizeJellyTemper: 1.0,
     fullSizeWinRotate: { deg: 9, ms: 380 },
 
     winAnticipation: { enabled: true, dip: 0.9, ms: 80 },
 
-    // L->R per-reel delay on the win-symbol pop. Was 0.085 -> reel 5 popped a full
-    // 0.34s after reel 1, so the LAST reels' symbols visibly lagged and read as
-    // "static / not celebrating" while the left ones were already popped (owner
-    // report). Tightened to 0.04 (0.16s total sweep) so every winning symbol pops
-    // almost together — a subtle wave, not a laggy one. At rest they all celebrate
-    // equally (verified); this only fixes the early-frame lag.
+    // L->R per-reel delay on the win-symbol pop: small so reels pop almost together
+    // (a subtle wave, not a laggy one).
     highlightWaveStagger: 0.04,
 
     symbolProfiles: {
@@ -209,13 +176,10 @@ export const VIEW_CONFIG = {
 
     winSustainScale: 1.16,
 
-    // Disabled: lifting winning symbols into the winLift overlay (a Mask node)
-    // collapsed them onto the centre reel at runtime regardless of the position
-    // math (manual cellCenter conversion AND keepWorldTransform both measured the
-    // symbols landing at the board centre, real cells empty -- the owner-reported
-    // "symbols hide from their correct place"). With the lift off, winning symbols
-    // pop IN PLACE at their real cells; displacement is structurally impossible.
-    liftWinSymbols: false,
+    // Lift winning symbols into the winLift overlay so the pop renders on top and
+    // isn't cropped by the per-reel/container masks. SymbolView.liftForWin places
+    // each deterministically on its own cell; clear()/resetHome restore strip home.
+    liftWinSymbols: true,
 
     winTilt: { enabled: true, deg: 13, ms: 540 },
 
@@ -235,11 +199,10 @@ export const VIEW_CONFIG = {
 
     beams: {
       enabled: true,
-      // slimmer win line (was 30) — thin + elegant per owner request
+      // slim, elegant win line
       heightPx: 15,
-      // 10 paylines x 4 segments = 40 worst case; 16 starved later lines mid-draw
-      // (a beam pool shared across all wins via a running counter), dropping their
-      // last segment.
+      // 10 paylines x 4 segments = 40 worst case; pool shared across wins via a
+      // running counter, so later lines may drop their last segment when starved.
       maxSegments: 40,
       fadeInMs: 150,
       holdOpacity: 235,
@@ -251,9 +214,8 @@ export const VIEW_CONFIG = {
     burst: { enabled: false, intensity: 1.2, scale: 1.1 },
 
     symbolFx: {
-      // Reverted to false: enabling this per-winning-symbol shader overlay
-      // correlated with "symbols hiding / crushed" reports on real GPU (it was
-      // shipped disabled). Re-enable only after a real-device visual check.
+      // Disabled: this per-symbol shader overlay correlated with "symbols hiding"
+      // on real GPU. Re-enable only after a real-device visual check.
       enabled: false,
       intensity: 1.45,
       rimWidth: 0.035,
@@ -400,20 +362,14 @@ export const VIEW_CONFIG = {
 
   world: {
     parallax: {
-      // BG PARALLAX = BIG-WINS ONLY (owner, 2026-06-21). The bg used to lean on
-      // EVERY spin (spinLeanPx, driven by pxLeanTarget=1 at spin start) — owner
-      // wants the background still during normal play and the depth motion
-      // reserved for big-win moments. spinLeanPx 8 -> 0 kills the per-spin lean;
-      // the per-win pulse (pxPulse=1 in showWins) was also removed. The ONLY
-      // remaining bg motion is the big-win/feature "whoosh" (bgDepthPush ->
-      // winBurstPulse), fired on ceremony detonation + buy-bonus/free-spins entry.
+      // BG parallax = big-wins only. spinLeanPx 0 keeps the background still during
+      // normal play; depth motion is reserved for big-win/feature moments.
       spinLeanPx: 0,
       winPulsePx: 6,
       leanLerp: 5,
       pulseDecay: 2.0,
-      // one-shot bg depth "whoosh" amplitude (× winPulsePx) fired on big-win
-      // detonation + feature entry; decays via pulseDecay. This is now the sole
-      // bg-parallax driver.
+      // one-shot bg depth "whoosh" (× winPulsePx) on big-win detonation + feature
+      // entry; decays via pulseDecay. Now the sole bg-parallax driver.
       winBurstPulse: 4.5,
     },
   },
@@ -422,20 +378,9 @@ export const VIEW_CONFIG = {
     armAt: 0.965,
     symDurMs: { off: 250, turbo: 165, max: 130 },
     symStagMs: { off: 42, turbo: 22, max: 7 },
-    // CRISP-STOP (owner, 2026-06-21) — mirrors the Pixi sister-game fix exactly.
-    // landDip was the per-symbol column "dump": each cell dropped cell*dip px AFTER
-    // the reel had already reached rest, reading as a post-stop bob. Zeroed -> the
-    // reel lands FLAT, no positional bob. landSq is kept but TRIMMED to a small,
-    // FIRM single land-squash (impact "thunk", not a bouncy dump): off .055->.032,
-    // turbo .042->.024, max .034->.018. (playLand's return easing was also changed
-    // backOut->quadOut so even this small squash settles firm, with no scale
-    // overshoot.) Prior values preserved in this comment for a designer restore.
-    // CANDY DAMPING (owner, 2026-06-21): landDip STAYS 0 (no positional "dump" —
-    // that read as a post-stop bob and was rejected). The land feel is now a
-    // SCALE jelly in playLand: squash (1+sq, 1-sq) -> rebound stretch -> damped
-    // settle to 1, all quadOut. landSq is the squash depth — bumped back up from
-    // the dead-crisp 0.032 so the land has a satisfying candy "boing" that still
-    // resolves in one motion and holds still after (no lingering wobble).
+    // landDip 0 = reel lands flat (no positional post-stop bob). The land feel is a
+    // SCALE jelly in playLand (squash -> rebound -> damped settle, all quadOut);
+    // landSq is the squash depth, tuned for a candy "boing" that holds still after.
     landDip: { off: 0, turbo: 0, max: 0 },
     landSq: { off: 0.055, turbo: 0.042, max: 0.03 },
   },
@@ -480,12 +425,9 @@ export const VIEW_CONFIG = {
     idleProfiles: {
       base: { amp: 1.0, freq: 1.9 },
     } as Record<string, { amp: number; freq: number }>,
-    /** Idle-breathe scale amplitude per symbol weight (sine on the `art` child).
-     *  CRISP-STOP (owner, 2026-06-21): cut to a WHISPER so symbols settle and STAY
-     *  after a reel lands instead of visibly bob-breathing forever — mirrors the
-     *  Pixi sister-game "kill the idle breathing bob" (0.030 -> 0.008). A faint
-     *  whisper is kept (not 0) so the board reads alive, not frozen-dead. Wild uses
-     *  0 (its land/win FX carry it). high = ids 0..4 (wild+H1..H4), low = the rest. */
+    /** Idle-breathe scale amplitude per symbol weight (sine on the `art` child): a
+     *  whisper so symbols settle but the board still reads alive. Wild uses 0 (its
+     *  FX carry it). high = ids 0..4 (wild+H1..H4), low = the rest. */
     idleBreatheAmp: { high: 0.008, low: 0.005 },
   },
 

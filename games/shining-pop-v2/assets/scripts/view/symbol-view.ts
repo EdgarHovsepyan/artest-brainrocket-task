@@ -76,11 +76,7 @@ export class SymbolView extends Component {
   private idleAmp = 0;
   private idleOn = false;
 
-  // True while this cell is playing its win pop. A reel's land bounce for rows 1/2
-  // is scheduleOnce'd (staggered cascade) and can fire AFTER showWins has already
-  // started the win pop; playLand's Tween.stopAllByTarget + setScale(1,1,1) would
-  // then KILL the pop and leave the symbol static (owner: "some win symbols static
-  // in the win"). This guard makes a late land a no-op once a win pop owns the cell.
+  // True while this cell plays its win pop, so a late staggered playLand can't stop it and snap the symbol static.
   private winActive = false;
 
   private artBaseScale = 1;
@@ -150,8 +146,7 @@ export class SymbolView extends Component {
     if (this.sprite) this.sprite.spriteFrame = frame;
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
 
-    // Idle-breathe amplitude is data-driven + cut to a whisper for the crisp stop
-    // (see VIEW_CONFIG.symbols.idleBreatheAmp). Wild stays 0 (its own FX carry it).
+    // Idle-breathe amplitude (VIEW_CONFIG.symbols.idleBreatheAmp); Wild stays 0 since its own FX carry it.
     const ba = VIEW_CONFIG.symbols.idleBreatheAmp;
     this.idleAmp = id === SYMBOLS.WILD ? 0 : id <= 4 ? ba.high : ba.low;
 
@@ -198,8 +193,7 @@ export class SymbolView extends Component {
 
   private ensureHalo(): void {
     if (this.halo || !SymbolView.fxHaloMat) return;
-    // Tighter halo (was 1.75) so the win glow stays near the symbol; the winLift
-    // mask now also clips whatever remains at the board edge.
+    // Tight halo so the win glow stays near the symbol; the winLift mask clips any remainder at the board edge.
     const s = this.size * 1.35;
     const n = new Node('winHalo');
     n.layer = this.node.layer;
@@ -298,26 +292,18 @@ export class SymbolView extends Component {
     this.happyFace.active = false;
   }
 
-  private liftForWin(overlay: Node, _worldCenter: Vec3): void {
-    // Capture home ONLY when the cell is in its real reel — never from the overlay
-    // itself. The old `if (homeParent) return` could (a) record homeParent = winLift
-    // when a cell was already lifted, corrupting its way back, and (b) skip the
-    // reposition on a re-lift, stranding the symbol at the centre reel (localX=0)
-    // while its true cell rendered empty — the "symbols crammed in the middle +
-    // empty reels" bug.
+  private liftForWin(overlay: Node, localCenter: Vec3): void {
+    // Capture home ONLY from the real reel (not the overlay) so clear()/resetHome can restore it onto its strip.
     if (!this.homeParent && this.node.parent !== overlay) {
       this.homeParent = this.node.parent;
       this.homeSibling = this.node.getSiblingIndex();
       this.homePos = this.node.position.clone();
     }
-    // Reparent KEEPING the world transform so the symbol stays EXACTLY at its
-    // own cell. The previous manual slot-view -> overlay-local conversion
-    // (worldCenter.x - op.x) collapsed every winning symbol onto the CENTRE reel
-    // at runtime (measured: lifted cells landed at the board centre, real cells
-    // empty). Letting Cocos preserve the world position is correct and needs no
-    // cellCenter math; the overlay only lifts the symbol above the reel mask for
-    // an unclipped pop.
-    if (this.node.parent !== overlay) this.node.setParent(overlay, true);
+    // Deterministic placement: localCenter and the overlay share SlotView-local space, so overlay-local pos =
+    // localCenter - overlay.position. Lifting raises the symbol above the masks so the win pop renders uncropped.
+    if (this.node.parent !== overlay) this.node.setParent(overlay, false);
+    const op = overlay.position;
+    this.node.setPosition(localCenter.x - op.x, localCenter.y - op.y, 0);
   }
 
   playWin(
@@ -340,14 +326,9 @@ export class SymbolView extends Component {
     const half = symbolPulseMs / 2 / 1000;
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
-    // The Wild (and scatter art) are full-size — they already fill the cell, so
-    // the standard win-pop overshoot (~1.5x) shoves them past the reel/board
-    // border ("wild moving out to the outside"). Temper the overshoot + bounce
-    // jelly for full-size symbols so the win pop stays inside the board.
+    // Full-size symbols (Wild/Scatter) already fill the cell: temper the POP so the overshoot stays inside the
+    // board, but keep the JELLY strong so they still celebrate. Non-full-size symbols are unaffected (temper = 1).
     const fs = FULL_SIZE_IDS.has(this._currentId);
-    // Full-size symbols (Wild/Scatter): keep the POP conservative so the overshoot
-    // doesn't shove them past the board edge, but let the JELLY run strong so they
-    // still visibly celebrate. Non-full-size symbols are unaffected (temper = 1).
     const fsPop = fs ? VIEW_CONFIG.win.fullSizePopTemper : 1;
     const fsJelly = fs ? VIEW_CONFIG.win.fullSizeJellyTemper : 1;
     const pop = (1 + (symbolPulseScale - 1 + 0.12) * heat * fsPop) * zoom;
@@ -387,16 +368,12 @@ export class SymbolView extends Component {
     const tlt = VIEW_CONFIG.win.winTilt;
     if (tlt?.enabled && bnc.enabled) {
       const td = tlt.ms / 1000;
-      // Full-size Wild/Scatter get a SMALLER win rotate — a big symbol rocking the
-      // full 13deg reads as tipping over, so they use fullSizeWinRotate.deg for a
-      // gentle in-plane sway that still gives them distinct, alive win motion.
+      // Full-size Wild/Scatter use a smaller rotate (fullSizeWinRotate.deg) so a big symbol doesn't read as tipping.
       const tiltDeg = fs ? VIEW_CONFIG.win.fullSizeWinRotate.deg : tlt.deg;
       this.node.eulerAngles = new Vec3(0, 0, 0);
       tween(this.node)
         .delay(popStart + half * 2)
-        // Z-axis (in-plane) rock — a Y-axis tilt turned the symbol edge-on /
-        // foreshortened it; the in-plane sway keeps it full-face while it
-        // celebrates.
+        // Z-axis (in-plane) rock — keeps the symbol full-face; a Y-axis tilt foreshortened it edge-on.
         .to(td, { eulerAngles: new Vec3(0, 0, tiltDeg) }, { easing: 'sineInOut' })
         .to(td, { eulerAngles: new Vec3(0, 0, -tiltDeg) }, { easing: 'sineInOut' })
         .union()
@@ -441,9 +418,8 @@ export class SymbolView extends Component {
         .repeatForever()
         .start();
     }
-    // Sparkles fire on EVERY winning symbol (cheap 4-corner twinkle) so no win cell
-    // is ever particle-less; the heavier shader + confetti stars + bubbles stay on
-    // focused (rich) wins to avoid stacking into a wash on dense full-reel wins.
+    // Cheap 4-corner sparkles fire on EVERY win cell; the heavier shader/stars/bubbles stay on rich wins only
+    // to avoid a wash on dense full-reel wins.
     this.playSparkles(popStart);
     if (rich) {
       if (winMat && VIEW_CONFIG.win.symbolFx.enabled) this.playWinShader(popStart, winMat);
@@ -489,9 +465,7 @@ export class SymbolView extends Component {
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.type = Sprite.Type.SIMPLE;
 
-      // Stable warm candy-white tint (was a random R,G per cell, which gave
-      // winning symbols inconsistent blue-ish sheens) — lets the shader's own
-      // iridescence read clean and on-brand.
+      // Stable warm candy-white tint so the shader's own iridescence reads clean (per-cell random gave blue sheens).
       sp.color = new Color(255, 246, 252, 255);
       this.winOverlay = n;
       this.winOverlaySp = sp;
@@ -524,8 +498,7 @@ export class SymbolView extends Component {
         n.addComponent(UITransform).setContentSize(12, 12);
         n.setPosition(x, y, 0);
         const g = n.addComponent(Graphics);
-        // 4-point twinkle star (cuter than a plain dot) — smaller for a delicate
-        // candy sparkle, not a chunky dot (owner: "particles smaller").
+        // Small 4-point twinkle star for a delicate candy sparkle.
         g.fillColor = new Color(255, 240, 255, 220);
         const R = 5,
           r = 1.3;
@@ -849,8 +822,7 @@ export class SymbolView extends Component {
   }
 
   playLand(cell: number, dipFrac: number, sqFrac: number, durMs: number): void {
-    // A win pop already owns this cell — a staggered land that fires now would stop
-    // the pop and snap the symbol back to scale 1 (the "static winning symbol" bug).
+    // Skip if a win pop owns the cell — a late staggered land would stop it and snap the symbol back to scale 1.
     if (this.winActive) return;
     Tween.stopAllByTarget(this.node);
 
@@ -859,11 +831,8 @@ export class SymbolView extends Component {
     const d = Math.max(0.05, durMs / 1000);
     this.node.setPosition(home);
     this.node.setScale(1, 1, 1);
-    // CANDY DAMPING (owner, 2026-06-21): a satisfying jelly land — SQUASH on impact
-    // (wide+short) -> REBOUND stretch (tall+narrow, ~70% amplitude) -> DAMPED settle
-    // to 1. All quadOut, each phase smaller than the last, so it reads as ONE soft
-    // candy "boing" that resolves in a single motion and HOLDS still after — never
-    // the old multi-oscillation wobble. Scale-only (dipFrac is 0 => no position dump).
+    // Candy jelly land: SQUASH on impact -> REBOUND stretch (~70%) -> DAMPED settle, each phase smaller, so it
+    // reads as one soft "boing" that holds still after. Scale-only when dipFrac is 0 (no position dump).
     const dip = dipFrac > 0 ? new Vec3(home.x, home.y - cell * dipFrac, home.z) : home;
     const squash = new Vec3(1 + sqFrac, 1 - sqFrac, 1);
     const rebound = new Vec3(1 - sqFrac * 0.5, 1 + sqFrac * 0.7, 1);
@@ -927,12 +896,9 @@ export class SymbolView extends Component {
   }
 
   /**
-   * Hard-reset this cell back to its strip home and clear ANY stale win-lift
-   * state. Called at the start of every spin so a win-lift that wasn't cleanly
-   * restored can never leave a symbol parented to winLift or at a stale localX
-   * (which renders it in the WRONG column, even off-board, and persists). This
-   * is authoritative; clear() only undoes a lift while homeParent is still set,
-   * which is not guaranteed once a new spin interrupts a live win.
+   * Hard-reset this cell to its strip home and clear any stale win-lift state. Called at the start of every spin
+   * so a lift that wasn't cleanly restored can't leave the symbol in the wrong column. Authoritative, unlike
+   * clear() which only undoes a lift while homeParent is still set.
    */
   resetHome(strip: Node, localPos: Vec3): void {
     this.winActive = false; // new spin — release the win-pop claim so lands work again
