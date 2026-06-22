@@ -184,7 +184,13 @@ export const VIEW_CONFIG = {
 
     winAnticipation: { enabled: true, dip: 0.9, ms: 80 },
 
-    highlightWaveStagger: 0.085,
+    // L->R per-reel delay on the win-symbol pop. Was 0.085 -> reel 5 popped a full
+    // 0.34s after reel 1, so the LAST reels' symbols visibly lagged and read as
+    // "static / not celebrating" while the left ones were already popped (owner
+    // report). Tightened to 0.04 (0.16s total sweep) so every winning symbol pops
+    // almost together — a subtle wave, not a laggy one. At rest they all celebrate
+    // equally (verified); this only fixes the early-frame lag.
+    highlightWaveStagger: 0.04,
 
     symbolProfiles: {
       0: { heat: 1.35 },
