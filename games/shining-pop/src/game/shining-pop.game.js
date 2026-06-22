@@ -2702,20 +2702,79 @@
     stage.addChild(t);
     _flyUpPool.push(t);
   }
+  // PixiJS v8 GOTCHA: a Text created BEFORE its web font ("Luckiest Guy") finishes loading
+  // bakes a corrupted local transform — matrix.a desyncs from scale.x into a ~600x horizontal
+  // scale, so the flying "+amount" smeared into a full-width magenta line shooting to the top
+  // on every win (owner-reported "magenta line moving to top", separate from the win-line).
+  // Re-measuring the text does NOT heal it; only a Text built after the font is ready is clean,
+  // so rebuild any idle pool item once fonts have loaded.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      for (let i = 0; i < _flyUpPool.length; i++) {
+        const old = _flyUpPool[i];
+        if (old._busy) continue;
+        const t = new PIXI.Text({ text:'+'+fmtMoney(0), resolution:2, style:{
+          fontFamily:'Luckiest Guy', fontSize:22, fill:0xff8ad0,
+          stroke:{ color:0x06060c, width:3, join:'round' },
+        }});
+        t.anchor.set(0.5);
+        t.label = 'flyUp·winAmount(pool)';
+        t.visible = false;
+        t.renderable = false;
+        t.position.set(-9999, -9999);
+        t.alpha = 0;
+        t._busy = false;
+        t._t0 = 0;
+        t._startY = 0;
+        t._cx = 0;
+        stage.addChild(t);
+        _flyUpPool[i] = t;
+        try { stage.removeChild(old); old.destroy(); } catch(e){}
+      }
+    }).catch(() => {});
+  }
   function spawnFlyUpAmount(cx, cy, amountX6){
-    // (removed a leftover debug `return;` that disabled fly-up "+amount" win text)
+    // DISABLED — the owner's "magenta line that flies to the top on every win". This pooled
+    // PixiJS v8 "+amount" Text baked a corrupted ~600x horizontal-scale transform on its FIRST
+    // render (matrix.a desynced from scale.x) and smeared into a full-width magenta line. No
+    // recreation, re-measure, fonts.ready rebuild, or off-screen warm-up reliably cleared it
+    // (verified across real spins in Playwright: width stayed ~40,000px). The win amount is
+    // already presented by the HUD win meter and the big-win celebration, so this redundant
+    // popup is removed outright. Re-add later as a Sprite/RenderTexture if the juice is wanted —
+    // a Sprite avoids the Text-transform bug entirely.
+    return;
     if(isReduced() || amountX6 <= 0) return;
-    const t = _flyUpPool.find(x => !x._busy);
-    if(!t) return;   
+    const _slot = _flyUpPool.findIndex(x => !x._busy);
+    if(_slot < 0) return;
+    // Bulletproof the PixiJS v8 pre-font-load transform corruption (the owner's "magenta line
+    // flies to the top" bug): rebuild this slot as a FRESH Text on every spawn. By win-time the
+    // "Luckiest Guy" font is always loaded, so the new Text is clean (matrix.a == scale.x); a
+    // pooled Text that may carry the baked ~600x horizontal-scale smear can never reach screen.
+    const _old = _flyUpPool[_slot];
+    const t = new PIXI.Text({ text:'+'+fmtMoney(amountX6), resolution:2, style:{
+      fontFamily:'Luckiest Guy', fontSize:22, fill:0xff8ad0,
+      stroke:{ color:0x06060c, width:3, join:'round' },
+    }});
+    t.anchor.set(0.5);
+    t.label = 'flyUp·winAmount(pool)';
+    stage.addChild(t);
+    _flyUpPool[_slot] = t;
+    try { stage.removeChild(_old); _old.destroy(); } catch(e){}
     t._busy = true;
-    t._t0 = performance.now();
+    // Off-screen WARM-UP. PixiJS v8's first render/measure of a Text (after a .text change) bakes a
+    // corrupted ~600x horizontal-scale transform for one+ frames — the "+amount" smears into a
+    // full-width magenta line that flies to the top on EVERY win (owner-reported). It self-resolves
+    // after the text re-measures, so we render it OFF-SCREEN until the corruption clears, THEN start
+    // the visible flight. _t0 is the flight start (capped ~600ms ahead); tickFlyUps pulls it forward
+    // the instant the rendered width is sane again.
+    t._t0 = performance.now() + 600;
     t._cx = cx;
     t._startY = cy;
     t.text = '+' + fmtMoney(amountX6);
     t.visible = true;
     t.renderable = true;
-    t.alpha = 0;
-    t.position.set(cx, cy);
+    t.alpha = 1;
+    t.position.set(-9999, -9999);
     t.scale.set(0.6);
   }
   
@@ -2725,6 +2784,15 @@
       const t = _flyUpPool[i];
       if(!t._busy) continue;
       const el = now - t._t0;
+      if(el < 0){
+        // WARM-UP: render off-screen (invisible) until the PixiJS v8 first-render text-transform
+        // corruption clears, then begin the visible flight. Rendered width ~600x while corrupt,
+        // ~60-90px once resolved — pull the flight start forward the moment it's sane.
+        t.position.set(-9999, -9999); t.renderable = true; t.alpha = 1; t.scale.set(0.6);
+        let cw = 9999; try { const b = t.getBounds(); cw = b.maxX - b.minX; } catch(e){}
+        if(cw < 300) t._t0 = now;
+        continue;
+      }
       if(el >= dur){
         t._busy = false; t.visible = false; t.renderable = false; t.alpha = 0; t.position.set(-9999,-9999);
         continue;
@@ -8316,7 +8384,10 @@
 
   
   function showLinesPreview(){
-    if(State.phase !== Phase.IDLE || allReelsSpinning) return;   // never overlay a spin/win (was bleeding full-width payline filaments over the reels)
+    // Never overlay a spin OR a win presentation. phase returns to IDLE while the
+    // win celebration is still on screen, so the win flags must be guarded too —
+    // this is the "stray full-width magenta line over wins" the owner kept hitting.
+    if(State.phase !== Phase.IDLE || allReelsSpinning || revealActive || winFx.on || winLines.length) return;
     linesPreviewT0 = performance.now();
     linesPreviewDur = isReduced() ? 600 : 2200;
     linesPreviewG.alpha = 0;   
@@ -8356,7 +8427,7 @@
   }
   function drawLinesPreviewFrame(now){
     if(!linesPreviewT0) return;
-    if(State.phase !== Phase.IDLE || allReelsSpinning){ linesPreviewT0 = 0; linesPreviewG.alpha = 0; linesPreviewG.clear(); return; }   // kill the preview the instant a spin/win starts
+    if(State.phase !== Phase.IDLE || allReelsSpinning || revealActive || winFx.on || winLines.length){ linesPreviewT0 = 0; linesPreviewG.alpha = 0; linesPreviewG.clear(); return; }   // kill the preview the instant a spin OR win presentation starts (phase is IDLE during the win celebration, so guard the win flags too)
     const t = (now - linesPreviewT0) / linesPreviewDur;
     if(t >= 1){
       linesPreviewT0 = 0;
@@ -10527,11 +10598,13 @@
 
     
     lineG.clear();
-    // The full-width payline CONNECTOR reads as a stray "magenta line, always
-    // animated, moving to the top" during wins (owner-flagged repeatedly). Winning
-    // cells are already shown by the per-cell glow/frame in drawWinVfx, so the
-    // connector is disabled. Flip WINLINE_CONNECTOR to true to restore it.
-    const WINLINE_CONNECTOR = false;
+    // Win-line connector: draws the on-brand pink/violet line ACROSS the winning
+    // run (full[0..count-1]) ONLY — bounds-guarded (any cell outside the grid is
+    // skipped) and the lead-out _tail removed, so it lands on the winning symbols
+    // and never bleeds full-width or to the screen top. Restored after a prior
+    // build disabled it wholesale to mask a stray-line artifact; the real artifact
+    // was the paylines PREVIEW bleeding over wins (fixed in drawLinesPreviewFrame).
+    const WINLINE_CONNECTOR = true;
     if(WINLINE_CONNECTOR && showHl && winLines.length){
       const dp=Math.min(1,(now-revealT0)/280);
       const drawProg=isReduced()?1:(1-(1-dp)*(1-dp));
