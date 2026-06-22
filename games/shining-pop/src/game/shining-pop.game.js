@@ -1898,7 +1898,7 @@
   }
 
   function layoutStickySprites(){
-    const sz = CELL * 0.92;
+    const sz = CELL * 1.0;   // match the sticky-update size (was reading "little")
     for(let r = 0; r < REELS; r++){
       for(let row = 0; row < ROWS; row++){
         const sp = stickySprites[r][row];
@@ -7806,7 +7806,7 @@
     // the reels stopped -- and the win-hero tracks the live symbol position, so
     // the winning symbols drifted during the celebration too (owner-flagged
     // "damping after stop / symbols changing position").
-    return 7.0 * tau * Math.exp(-7.5*tau) * Math.sin(tau*6.28319);
+    return 4.2 * tau * Math.exp(-5.2*tau) * Math.sin(tau*6.28319);
   }
   let allReelsSpinning = false;
 
@@ -7922,11 +7922,12 @@
     const tm = State.turboMode;
     const symDur  = tm===2 ? 130 : tm===1 ? 165 : 250;
     const symStag = tm===2 ?  18 : tm===1 ?  26 :  40;
-    // Clean, crisp stop: NO column "dump" -- the reel decelerates smoothly via
-    // reelEase (monotonic, no overshoot) and lands flat with no post-stop bob.
-    // Keep only a small single land-squash for a firm impact, not a bouncy dump.
-    const landDip = 0;
-    const landSq  = tm===2 ? 0.018 : tm===1 ? 0.024 : 0.032;
+    // Firm land-settle: a small positional dip + squash that compresses then
+    // springs back and fully settles within one symDur (~250ms) -- restores the
+    // "damping" impact the prior crisp-stop had gutted to a dead ~1% snap. The
+    // fast decay + the landAt watchdog return symbols to rest, so no win drift.
+    const landDip = tm===2 ? 0.09 : tm===1 ? 0.12 : 0.16;
+    const landSq  = tm===2 ? 0.035 : tm===1 ? 0.045 : 0.060;
     const reduced = isReduced();
 
     
@@ -9657,7 +9658,7 @@
                 stuckSp.texture = SYM_TEX[SYM.CROWN];
                 const cc = cellCenter(r, row);
                 stuckSp.position.set(cc.x, cc.y);
-                const sz = CELL * 0.92;
+                const sz = CELL * 1.0;   // fill the cell — sticky crowns were reading "little" next to live (breathing/popping) symbols
                 stuckSp.scale.set(sz / Math.max(stuckSp.texture.width, stuckSp.texture.height));
                 stuckSp.visible = true;
                 
@@ -10526,7 +10527,12 @@
 
     
     lineG.clear();
-    if(showHl && winLines.length){
+    // The full-width payline CONNECTOR reads as a stray "magenta line, always
+    // animated, moving to the top" during wins (owner-flagged repeatedly). Winning
+    // cells are already shown by the per-cell glow/frame in drawWinVfx, so the
+    // connector is disabled. Flip WINLINE_CONNECTOR to true to restore it.
+    const WINLINE_CONNECTOR = false;
+    if(WINLINE_CONNECTOR && showHl && winLines.length){
       const dp=Math.min(1,(now-revealT0)/280);
       const drawProg=isReduced()?1:(1-(1-dp)*(1-dp));
 
