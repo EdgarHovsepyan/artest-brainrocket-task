@@ -56,26 +56,23 @@ export function glassInto(g, w, h, rx, opts = {}) {
   // optional draw-origin offset (default top-left). lets centred surfaces
   // (e.g. the game's modal cards drawn around their own origin) reuse this recipe.
   const X = opts.x || 0, Y = opts.y || 0;
-  // outer candy bloom (soft halo so the edge reads "lit")
-  if (ew && opts.glow !== false) g.roundRect(X - 1.5, Y - 1.5, w + 3, h + 3, rx + 1.5).stroke({ width: ew + 3, color: THEME.edgeBloom, alpha: 0.085 });
-  // body
+  // SLEEKER MINIMAL PREMIUM: flat refined gradient body — no neon bloom halo.
   g.roundRect(X, Y, w, h, rx).fill(fg(base, horiz ? 'h' : 'v'));
-  // top gloss band (gel shine)
+  // one soft top sheen for the glass read (no glint dash, no stacked gel band)
   if (opts.gloss !== false) {
-    g.roundRect(X + 2.5, Y + 2, w - 5, h * 0.46, Math.max(0, rx - 2)).fill({ color: THEME.gloss, alpha: 0.13 });
-    // soft centered specular glint near the top (reads as gloss, not a dash)
-    const gw = Math.min(w * 0.42, w - 16);
-    if (gw > 8) g.roundRect(X + (w - gw) / 2, Y + 3, gw, Math.max(1.5, h * 0.055), 3).fill({ color: THEME.gloss, alpha: 0.26 });
+    g.roundRect(X + 1.5, Y + 1.5, w - 3, h * 0.5, Math.max(0, rx - 1.5)).fill({ color: THEME.gloss, alpha: 0.05 });
   }
-  // bottom inner shade — grounds the surface
-  g.roundRect(X + 3, Y + h * 0.60, w - 6, h * 0.38, Math.max(0, rx - 3)).fill({ color: THEME.shadow, alpha: 0.20 });
-  // inner cool glass rim (glass thickness)
-  g.roundRect(X + 1.6, Y + 1.6, w - 3.2, h - 3.2, Math.max(0, rx - 1.6)).stroke({ width: 1.1, color: THEME.cyan, alpha: 0.16 });
-  // 2-tone neon edge: deep under-layer + bright candy edge
+  // faint bottom grounding (subtle, keeps the surface seated)
+  g.roundRect(X + 2, Y + h * 0.70, w - 4, h * 0.28, Math.max(0, rx - 2)).fill({ color: THEME.shadow, alpha: 0.12 });
+  // ONE clean refined edge — fintech-crisp. Floored to >=2.2px so it stays >=1
+  // device-pixel after the bar's ~0.56x downscale at resolution 1 (no aliasing /
+  // "crushed" edge); antialiasing then renders it as a clean hairline.
   if (ew) {
-    g.roundRect(X + ew / 2, Y + ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew + 1.2, color: THEME.edgeDeep, alpha: 0.8 });
-    g.roundRect(X + ew / 2, Y + ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: edge, alpha: 1 });
+    const eww = Math.max(2.2, ew);
+    g.roundRect(X + eww / 2, Y + eww / 2, w - eww, h - eww, Math.max(0, rx - eww / 2)).stroke({ width: eww, color: edge, alpha: 0.82 });
   }
+  // top inner light line (>=1.6px so it survives the downscale instead of vanishing)
+  g.moveTo(X + rx, Y + 1.2).lineTo(X + w - rx, Y + 1.2).stroke({ width: 1.6, color: THEME.gloss, alpha: 0.12 });
   return g;
 }
 
@@ -87,26 +84,18 @@ export function glassCircle(r, opts = {}) {
   const edge = opts.edge != null ? opts.edge : THEME.edge;
   const rim = opts.rim != null ? opts.rim : THEME.rim;
   const g = new PIXI.Graphics();
-  // seat shadow → lifts the gem off the bar
-  g.circle(0, r * 0.08, r * 0.98).fill({ color: THEME.shadow, alpha: 0.32 });
-  // candy bloom
-  g.circle(0, 0, r + 1.5).stroke({ width: 5, color: THEME.edgeBloom, alpha: 0.10 });
-  // sphere base — radial, brightest toward the top
-  g.circle(0, 0, r).fill(fgRad(base, 0.5, 0.26, 0.80));
-  // grounded bottom inner shadow → seats the face
-  g.arc(0, 0, r * 0.98, 0.32, Math.PI - 0.32).stroke({ width: r * 0.13, color: THEME.shadow, alpha: 0.33, cap: 'round' });
-  // bottom rim light → candy bounce
-  g.arc(0, 0, r - r * 0.05, 0.55, Math.PI - 0.55).stroke({ width: r * 0.06, color: rim, alpha: 0.5, cap: 'round' });
-  // crisp 2-tone edge (deep under-layer + bright neon)
-  g.circle(0, 0, r - r * 0.018).stroke({ width: Math.max(2, r * 0.078), color: THEME.edgeDeep, alpha: 0.88 });
-  g.circle(0, 0, r - r * 0.03).stroke({ width: Math.max(1.4, r * 0.05), color: edge, alpha: 1 });
-  // top bevel highlight crescent
-  g.arc(0, 0, r - r * 0.085, Math.PI + 0.62, 2 * Math.PI - 0.62).stroke({ width: r * 0.05, color: THEME.rim, alpha: 0.5, cap: 'round' });
-  // top gloss — soft pool + sharp glint
-  g.ellipse(0, -r * 0.40, r * 0.60, r * 0.34).fill({ color: THEME.gloss, alpha: 0.16 });
-  g.ellipse(-r * 0.12, -r * 0.52, r * 0.30, r * 0.12).fill({ color: THEME.gloss, alpha: 0.42 });
-  // inner cool sheen
-  g.circle(0, 0, r - r * 0.13).stroke({ width: 1, color: THEME.cyan, alpha: 0.14 });
+  // SLEEKER MINIMAL PREMIUM — soft contact shadow, gentle sphere, one clean edge,
+  // a single subtle sheen. No neon bloom, no 2-tone edge, no stacked bevels.
+  g.circle(0, r * 0.05, r * 0.99).fill({ color: THEME.shadow, alpha: 0.22 });
+  g.circle(0, 0, r).fill(fgRad(base, 0.5, 0.34, 0.88));
+  // subtle bottom grounding
+  g.arc(0, 0, r * 0.96, 0.5, Math.PI - 0.5).stroke({ width: r * 0.10, color: THEME.shadow, alpha: 0.16, cap: 'round' });
+  // ONE clean refined edge — floored to >=2.4px so the small buttons (r~30) stay
+  // crisp (not aliased / "crushed") after the bar's ~0.56x downscale at resolution 1.
+  g.circle(0, 0, r - r * 0.02).stroke({ width: Math.max(2.4, r * 0.052), color: edge, alpha: 0.8 });
+  // a single soft top sheen + highlight arc (arc floored >=1.8px so it survives)
+  g.ellipse(0, -r * 0.40, r * 0.50, r * 0.22).fill({ color: THEME.gloss, alpha: 0.10 });
+  g.arc(0, 0, r - r * 0.07, Math.PI + 0.72, 2 * Math.PI - 0.72).stroke({ width: Math.max(1.8, r * 0.04), color: THEME.gloss, alpha: 0.22, cap: 'round' });
   return g;
 }
 
@@ -187,16 +176,13 @@ function spinArrowPath(g, r, w, headK, col) {
 // bright candy-cream body, plus sparkle shines. Gamified hero glyph for the
 // spin button.
 export function iconSpinCandy(s, opts = {}) {
+  // SLEEKER MINIMAL: clean twin circular-arrows (clear "spin"), crisp monoline,
+  // no sparkles / no heavy candy outline (those read busy & as an "S").
   const g = new PIXI.Graphics();
   const main = opts.main != null ? opts.main : 0xfff4fb;
-  const outline = opts.outline != null ? opts.outline : 0x9a2370;
-  const r = s * 0.80;
-  const w = Math.max(2.5, s * 0.21);
-  spinArrowPath(g, r, w + Math.max(2.2, s * 0.12), 0.46, outline);  // candy outline
-  spinArrowPath(g, r, w, 0.40, main);                                // bright body
-  // sparkle shines — placed in the left & right ring gaps (clear of the arcs)
-  sparkleStar(g, s * 1.18, -s * 0.30, s * 0.30, 0xffffff, 0.98);
-  sparkleStar(g, -s * 1.18, s * 0.30, s * 0.18, 0xffe9fa, 0.9);
+  const r = s * 0.84;
+  const w = Math.max(2.5, s * 0.155);
+  spinArrowPath(g, r, w, 0.42, main);
   return g;
 }
 
@@ -284,21 +270,21 @@ export function iconClose(s, col = THEME.icon) {
 // COINS — a clean glossy candy-chip stack (the bet/coins button). Three stacked
 // discs, each with a deep rim, a brighter top face, and a small shine on top.
 export function iconCoins(s) {
+  // SLEEKER MINIMAL: a clean casino-chip stack — bright candy faces (high contrast
+  // on the dark gem), crisp thin edges, a center ring per chip, one clean shine.
   const g = new PIXI.Graphics();
-  const rx = s * 0.96, ry = s * 0.40, gap = s * 0.50;
+  const rx = s * 0.92, ry = s * 0.38;
   const chip = (yc, side, face) => {
-    // side wall
     g.ellipse(0, yc + ry * 0.46, rx, ry).fill(side);
-    g.rect(-rx, yc - ry * 0.1, rx * 2, ry * 0.56).fill(side);
-    // top face
+    g.rect(-rx, yc - ry * 0.06, rx * 2, ry * 0.52).fill(side);
     g.ellipse(0, yc, rx, ry).fill(face);
-    g.ellipse(0, yc, rx, ry).stroke({ width: Math.max(1, s * 0.07), color: THEME.edgeDeep, alpha: 0.55 });
+    g.ellipse(0, yc, rx, ry).stroke({ width: Math.max(1, s * 0.05), color: 0x5a2a86, alpha: 0.55 });
+    g.ellipse(0, yc, rx * 0.5, ry * 0.5).stroke({ width: Math.max(1, s * 0.04), color: 0x5a2a86, alpha: 0.32 });
   };
-  chip(s * 0.46, 0x7a39b0, 0x9a55cf);
-  chip(s * 0.04, 0x9446c0, 0xb96fe0);
-  chip(-s * 0.40, 0xb85fd6, 0xe7b3ff);
-  // shine on the top chip
-  g.ellipse(-s * 0.26, -s * 0.46, rx * 0.34, ry * 0.34).fill({ color: 0xffffff, alpha: 0.6 });
+  chip(s * 0.42, 0x6a37a0, 0xcf9fe8);
+  chip(s * 0.02, 0x7a42b2, 0xe6c2f6);
+  chip(-s * 0.40, 0x9a5fd0, 0xfdf2ff);
+  g.ellipse(-s * 0.28, -s * 0.50, rx * 0.30, ry * 0.30).fill({ color: 0xffffff, alpha: 0.7 });
   return g;
 }
 
@@ -320,9 +306,8 @@ export function spinButton(R, opts = {}) {
   const base = new PIXI.Graphics();
   // seat shadow
   base.circle(0, R * 0.10, R * 1.02).fill({ color: THEME.shadow, alpha: 0.5 });
-  // candy bloom
-  base.circle(0, 0, R + 2).stroke({ width: 7, color: THEME.edgeBloom, alpha: 0.16 });
-  // outer neon candy ring (radial gem)
+  // outer candy ring (radial gem) — sleeker minimal: no neon bloom halo
+
   base.circle(0, 0, R).fill(fgRad(THEME.btnSpin, 0.5, 0.30, 0.80));
   base.circle(0, 0, R - 1).stroke({ width: R * 0.05, color: THEME.rim, alpha: 0.6 });
   // 2-tone outer edge
@@ -334,7 +319,6 @@ export function spinButton(R, opts = {}) {
   base.circle(0, 0, inner).fill(fgRad(THEME.btnSpinCore, 0.42, 0.30, 0.64));
   base.circle(0, 0, inner).stroke({ width: R * 0.03, color: THEME.rim, alpha: 0.4 });
   base.arc(0, 0, inner * 0.96, Math.PI + 0.4, 2 * Math.PI - 0.4).stroke({ width: R * 0.06, color: THEME.shadow, alpha: 0.5, cap: 'round' });
-  base.ellipse(0, -R * 0.30, R * 0.44, R * 0.18).fill({ color: THEME.gloss, alpha: 0.16 });
   g.addChild(base);
 
   // arrow glyph (gamified candy circular-arrows)
