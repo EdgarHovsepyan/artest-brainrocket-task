@@ -831,14 +831,18 @@ export class SymbolView extends Component {
     const d = Math.max(0.05, durMs / 1000);
     this.node.setPosition(home);
     this.node.setScale(1, 1, 1);
-    // Candy jelly land: SQUASH on impact -> REBOUND stretch (~70%) -> DAMPED settle, each phase smaller, so it
-    // reads as one soft "boing" that holds still after. Scale-only when dipFrac is 0 (no position dump).
+    // Candy jelly land (A11): SQUASH on impact -> elastic REBOUND stretch (backOut
+    // overshoot) -> DAMPED settle — one soft "boing" that holds still after. The
+    // amplitude scales with the symbol's tier ("heat") so high-value symbols recoil
+    // deeper. Scale-only when dipFrac is 0 (the owner's crisp, position-flat stop).
+    const heat = VIEW_CONFIG.win.symbolProfiles[this._currentId]?.heat ?? 1;
+    const sq = sqFrac * (0.8 + 0.4 * heat);
     const dip = dipFrac > 0 ? new Vec3(home.x, home.y - cell * dipFrac, home.z) : home;
-    const squash = new Vec3(1 + sqFrac, 1 - sqFrac, 1);
-    const rebound = new Vec3(1 - sqFrac * 0.5, 1 + sqFrac * 0.7, 1);
+    const squash = new Vec3(1 + sq, 1 - sq, 1);
+    const rebound = new Vec3(1 - sq * 0.5, 1 + sq * 0.7, 1);
     tween(this.node)
       .to(d * 0.26, { position: dip, scale: squash }, { easing: 'quadOut' })
-      .to(d * 0.34, { position: home, scale: rebound }, { easing: 'quadOut' })
+      .to(d * 0.34, { position: home, scale: rebound }, { easing: 'backOut' })
       .to(d * 0.4, { scale: new Vec3(1, 1, 1) }, { easing: 'quadOut' })
       .start();
   }
