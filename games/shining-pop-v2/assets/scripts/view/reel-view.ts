@@ -86,14 +86,17 @@ export class ReelView extends Component {
     this.startY = spinBuffer * this.pitch;
 
     const ut = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    // ANTI-CROP: the clip rect is WIDER and TALLER than the window (by
-    // winPopMaskMargin each side) so a winning symbol's pop is not clipped by its
-    // own reel mask on ANY edge — the prior height==windowH clipped pops top/bottom
-    // (the cropping the owner reported). Trade-off: during a spin a ~maskMargin
-    // sliver of the incoming/outgoing symbol shows above/below; reduce the vertical
-    // term if that reads poorly on device.
+    // ANTI-CROP, HORIZONTAL-ONLY (owner's documented design — see view-config
+    // layout.winPopMaskMargin): widen the per-reel clip rect HORIZONTALLY so a
+    // winning symbol's pop has left/right room and isn't clipped by its own
+    // cell-width reel mask. The HEIGHT stays == windowH on purpose: a previous edit
+    // widened it vertically too, which revealed the off-window buffer symbols above
+    // and below the window (the owner-reported "symbols showing outside the reel
+    // container"). The OUTER board edges (reel 0 left, reel 4 right, top, bottom) are
+    // contained by the reels-container mask in SlotView.buildReels, so a pop on an
+    // edge reel can never bleed past the board.
     const maskMargin = VIEW_CONFIG.layout.winPopMaskMargin;
-    ut.setContentSize(cell + maskMargin * 2, windowH + maskMargin * 2);
+    ut.setContentSize(cell + maskMargin * 2, windowH);
     const mask = this.node.addComponent(Mask);
     mask.type = Mask.Type.GRAPHICS_RECT;
 

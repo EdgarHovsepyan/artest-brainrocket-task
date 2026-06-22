@@ -1907,6 +1907,17 @@ export class SlotView extends Component {
     const { cell, reelCenterY } = VIEW_CONFIG.layout;
     const reelsRoot = this.mkNode('reels', this.gw, this.gh, this.node);
     reelsRoot.setPosition(0, reelCenterY, 0);
+    // CONTAIN-TO-CONTAINER (bug #1, owner: "symbols showing outside the reel
+    // container in the win case — only show in the reels container"): clip every reel
+    // to the playfield window (reelsRoot is sized exactly gw×gh). Each per-reel mask
+    // is deliberately wider than its cell to give win pops left/right room, which let
+    // pops on the EDGE reels (reel 0 / reel 4) bleed PAST the board. This single
+    // container mask is the hard boundary, so a winning symbol only ever shows inside
+    // the reels container. Interior pop overlap between neighbouring reels is
+    // untouched (it stays within gw×gh); particles/glow/winLift are siblings of
+    // reelsRoot, so they are not clipped.
+    const reelsMask = reelsRoot.addComponent(Mask);
+    reelsMask.type = Mask.Type.GRAPHICS_RECT;
     for (let r = 0; r < GRID.reels; r++) {
       const reelNode = new Node(`reel_${r}`);
       reelsRoot.addChild(reelNode);
