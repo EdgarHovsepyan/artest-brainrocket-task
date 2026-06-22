@@ -934,6 +934,9 @@
       
       try { app.renderer.resize(sz.w, sz.h, safeRes); }
       catch(e){ try { app.renderer.resolution = safeRes; app.renderer.resize(sz.w, sz.h); } catch(_){} }
+      // keep the stage grade-filter target at the live render resolution (else it
+      // collapses the scene back to its old res → soft/aliased edges).
+      try { gradeFilter.resolution = safeRes; } catch(e){}
       
       try { typeof layout === 'function' && layout(); } catch(e){}
     });
@@ -1583,6 +1586,13 @@
   gradeFilter.alpha = 1.0;              
   stage.filterArea = app.screen;        
   stage.filters = [gradeFilter];
+  // The stage colour-grade filter renders the WHOLE scene through a RenderTexture, whose
+  // target defaults to resolution 1 with NO MSAA — that silently collapsed the 2x
+  // supersampling back to 1x AND dropped antialiasing, leaving every edge (the betting-
+  // panel borders included) soft + jagged regardless of app resolution. Pin the filter
+  // target to the renderer resolution + force MSAA so the whole graded scene stays crisp.
+  gradeFilter.antialias = 'on';
+  try { gradeFilter.resolution = app.renderer.resolution; } catch (e) {}
 
 
   
