@@ -30,6 +30,11 @@ static board + `window.__dbg` forced states (a real Pixi spin crashes swiftshade
 
 ### Shipped — Pixi (`shining-pop`, the Stake submission)
 
+- **CANDY SYMBOLS replace the generic fruit — the #1 cohesion cap is fixed.** Ported
+  the cohesive candy art from the Cocos build into all 9 Pixi symbol slots rank-for-rank
+  (gems for the highs, wrapped candies for the lows, rainbow lollipop for the scatter).
+  Texture-only swap — same filenames, no code change, ids/math/paytable untouched. Wild
+  stays the Spine crown.
 - **Cool-dominant palette cohesion** — deeper cool-purple bg, candy-magenta spin
   accent, 5-colour cool-candy particle spectrum, frost-layer z-order fixed.
 - Fly-up "+amount" win text re-enabled (was killed by a leftover debug `return;`).
