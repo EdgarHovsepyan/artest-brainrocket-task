@@ -1142,9 +1142,9 @@
     x.fillRect(cx-R, cy-R, 2*R, R*1.2);
 
     const under = x.createRadialGradient(cx, cy + R*0.44, R*0.05, cx, cy + R*0.28, R*0.98);
-    under.addColorStop(0,   'rgba(233,191,90,0.36)');
-    under.addColorStop(0.5, 'rgba(233,191,90,0.13)');
-    under.addColorStop(1,   'rgba(233,191,90,0.00)');
+    under.addColorStop(0,   'rgba(215,105,205,0.36)'); // cool-dominant: candy-magenta under-glow (was warm gold 233,191,90)
+    under.addColorStop(0.5, 'rgba(215,105,205,0.13)');
+    under.addColorStop(1,   'rgba(215,105,205,0.00)');
     x.fillStyle = under;
     x.fillRect(cx-R, cy-R, 2*R, 2*R);
 
@@ -1619,7 +1619,7 @@
   const ambientMotes = [];
 
   
-  bg.tint = 0xb8b8c8;
+  bg.tint = 0x8b7a9f; // cool-dominant: deeper cool-purple bg so warm fruit symbols pop + neon edges read (was 0xb8b8c8 grey)
   const vignette = spr('vignette');                stage.addChild(vignette);
   
   vignette.alpha = 1.0;
@@ -1849,6 +1849,7 @@
   const frostMask = new PIXI.Graphics();
   frostBg.mask = frostMask;
   reelArea.addChildAt(frostBg, 0);
+  frostBg.zIndex = -10; // reelArea.sortableChildren=true makes index-0 lose to zIndexed win layers (60/62); pin frost BEHIND so its blur never covers a big win
   reelArea.addChild(frostMask);
 
   
@@ -8084,7 +8085,7 @@
   
 
   let _fireClock = 0;
-  const DUST_COLS = [0xff8ad0, 0xff5ab0, 0xffd9ec];  
+  const DUST_COLS = [0xff5ab0, 0xc8a0ff, 0x7ef0c0, 0x96d7ff, 0xfff0fa]; // cool-candy spectrum (pink/lavender/mint/cyan/white) — was pink-only, read monochrome
   function spawnFire(x,y){
     
     particles.push({ kind:'fire', x, y, vx:(vrnd()-0.5)*0.5,
