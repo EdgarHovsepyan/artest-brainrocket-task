@@ -1,69 +1,69 @@
 {
   "sampleRate": 44100,
-  "generated": "elevenlabs",
+  "generated": "elevenlabs-master",
   "clips": [
     {
       "id": "anticipation",
       "file": "anticipation.mp3",
-      "ms": 2600,
+      "ms": 2560,
       "loop": false,
-      "kb": 36.1,
-      "peak": 0.759
+      "kb": 51.1,
+      "peak": 0.767
     },
     {
       "id": "bonus_end",
       "file": "bonus_end.mp3",
       "ms": 2000,
       "loop": false,
-      "kb": 27.9,
-      "peak": 0.759
+      "kb": 40.4,
+      "peak": 0.841
     },
     {
       "id": "bonus_intro",
       "file": "bonus_intro.mp3",
-      "ms": 1500,
+      "ms": 1600,
       "loop": false,
-      "kb": 21.1,
-      "peak": 0.759
+      "kb": 32.4,
+      "peak": 0.596
     },
     {
       "id": "bonus_loop",
       "file": "bonus_loop.mp3",
-      "ms": 24000,
+      "ms": 24007,
       "loop": true,
-      "kb": 375.1,
-      "peak": 0.687
+      "kb": 470.2,
+      "peak": 0.543
     },
     {
       "id": "buy_confirm",
       "file": "buy_confirm.mp3",
       "ms": 1200,
       "loop": false,
-      "kb": 16.8,
-      "peak": 0.759
+      "kb": 24.4,
+      "peak": 0.851
     },
     {
       "id": "buy_open",
       "file": "buy_open.mp3",
       "ms": 800,
       "loop": false,
-      "kb": 11.4,
-      "peak": 0.759
+      "kb": 16.9,
+      "peak": 0.841
     },
     {
       "id": "buy_select",
       "file": "buy_select.mp3",
-      "ms": 400,
+      "ms": 431,
       "loop": false,
-      "kb": 5.2,
-      "peak": 0.738
+      "kb": 9.4,
+      "peak": 0.804
     },
     {
       "id": "coin_cascade",
       "file": "coin_cascade.mp3",
-      "ms": 1992,
+      "ms": 2000,
       "loop": true,
-      "kb": 24.8,
+      "kb": 40.4,
       "peak": 0.759
     },
     {
@@ -71,232 +71,232 @@
       "file": "impact_braam.mp3",
       "ms": 1000,
       "loop": false,
-      "kb": 14.3,
-      "peak": 0.759
+      "kb": 20.7,
+      "peak": 0.841
     },
     {
       "id": "main_base_loop",
       "file": "main_base_loop.mp3",
-      "ms": 26000,
+      "ms": 25992,
       "loop": true,
-      "kb": 407,
-      "peak": 0.639
+      "kb": 508.6,
+      "peak": 0.638
     },
     {
       "id": "main_bigwin",
       "file": "main_bigwin.mp3",
       "ms": 5000,
       "loop": false,
-      "kb": 68.9,
-      "peak": 0.759
+      "kb": 99,
+      "peak": 0.55
     },
     {
       "id": "main_intro",
       "file": "main_intro.mp3",
       "ms": 4000,
       "loop": false,
-      "kb": 55.4,
-      "peak": 0.759
+      "kb": 79.3,
+      "peak": 0.603
     },
     {
       "id": "main_tension",
       "file": "main_tension.mp3",
       "ms": 4000,
       "loop": false,
-      "kb": 55.4,
-      "peak": 0.759
+      "kb": 79.3,
+      "peak": 0.668
     },
     {
       "id": "mult_reveal",
       "file": "mult_reveal.mp3",
-      "ms": 800,
+      "ms": 880,
       "loop": false,
-      "kb": 11.4,
-      "peak": 0.759
+      "kb": 18.3,
+      "peak": 0.513
     },
     {
       "id": "near_miss",
       "file": "near_miss.mp3",
-      "ms": 800,
+      "ms": 880,
       "loop": false,
-      "kb": 11.4,
-      "peak": 0.759
+      "kb": 18.3,
+      "peak": 0.841
     },
     {
       "id": "reel_loop",
       "file": "reel_loop.mp3",
-      "ms": 1992,
+      "ms": 1600,
       "loop": true,
-      "kb": 33.1,
-      "peak": 0.759
+      "kb": 32.4,
+      "peak": 0.813
     },
     {
       "id": "reel_stop",
       "file": "reel_stop.mp3",
-      "ms": 340,
+      "ms": 60,
       "loop": false,
-      "kb": 4.6,
-      "peak": 0.693
+      "kb": 2.4,
+      "peak": 0.851
     },
     {
       "id": "retrigger",
       "file": "retrigger.mp3",
-      "ms": 1000,
+      "ms": 1080,
       "loop": false,
-      "kb": 14.3,
-      "peak": 0.759
+      "kb": 22.1,
+      "peak": 0.804
     },
     {
       "id": "scatter_tick",
       "file": "scatter_tick.mp3",
       "ms": 600,
       "loop": false,
-      "kb": 8.6,
-      "peak": 0.759
+      "kb": 12.7,
+      "peak": 0.394
     },
     {
       "id": "scatter_trigger",
       "file": "scatter_trigger.mp3",
       "ms": 2000,
       "loop": false,
-      "kb": 27.9,
-      "peak": 0.759
+      "kb": 40.4,
+      "peak": 0.832
     },
     {
       "id": "shake_thud",
       "file": "shake_thud.mp3",
-      "ms": 400,
+      "ms": 322,
       "loop": false,
-      "kb": 5.2,
-      "peak": 0.727
+      "kb": 7.5,
+      "peak": 0.813
     },
     {
       "id": "spin_start",
       "file": "spin_start.mp3",
       "ms": 600,
       "loop": false,
-      "kb": 8.6,
-      "peak": 0.759
+      "kb": 12.7,
+      "peak": 0.631
     },
     {
       "id": "sticky_lock",
       "file": "sticky_lock.mp3",
-      "ms": 900,
+      "ms": 880,
       "loop": false,
-      "kb": 12.9,
-      "peak": 0.759
+      "kb": 18.3,
+      "peak": 0.776
     },
     {
       "id": "tally_pip",
       "file": "tally_pip.mp3",
-      "ms": 90,
+      "ms": 98,
       "loop": false,
-      "kb": 1,
-      "peak": 0.676
+      "kb": 3.3,
+      "peak": 0.841
     },
     {
       "id": "transition_in",
       "file": "transition_in.mp3",
-      "ms": 1500,
+      "ms": 1480,
       "loop": false,
-      "kb": 21.1,
-      "peak": 0.759
+      "kb": 30,
+      "peak": 0.785
     },
     {
       "id": "turbo_stop",
       "file": "turbo_stop.mp3",
-      "ms": 300,
+      "ms": 90,
       "loop": false,
-      "kb": 4,
-      "peak": 0.684
+      "kb": 2.9,
+      "peak": 0.832
     },
     {
       "id": "ui_bet",
       "file": "ui_bet.mp3",
-      "ms": 100,
+      "ms": 105,
       "loop": false,
-      "kb": 1.5,
-      "peak": 0.689
+      "kb": 3.3,
+      "peak": 0.813
     },
     {
       "id": "ui_click",
       "file": "ui_click.mp3",
-      "ms": 120,
+      "ms": 275,
       "loop": false,
-      "kb": 1.8,
-      "peak": 0.6
+      "kb": 6.6,
+      "peak": 0.891
     },
     {
       "id": "ui_modal_close",
       "file": "ui_modal_close.mp3",
-      "ms": 550,
+      "ms": 600,
       "loop": false,
-      "kb": 8.2,
-      "peak": 0.759
+      "kb": 12.7,
+      "peak": 0.851
     },
     {
       "id": "ui_modal_open",
       "file": "ui_modal_open.mp3",
-      "ms": 700,
+      "ms": 680,
       "loop": false,
-      "kb": 10,
-      "peak": 0.759
+      "kb": 14.6,
+      "peak": 0.881
     },
     {
       "id": "wild_expand",
       "file": "wild_expand.mp3",
       "ms": 1200,
       "loop": false,
-      "kb": 16.8,
-      "peak": 0.759
+      "kb": 24.4,
+      "peak": 0.343
     },
     {
       "id": "wild_land",
       "file": "wild_land.mp3",
-      "ms": 900,
+      "ms": 880,
       "loop": false,
-      "kb": 12.9,
-      "peak": 0.759
+      "kb": 18.3,
+      "peak": 0.851
     },
     {
       "id": "win_big",
       "file": "win_big.mp3",
-      "ms": 1700,
+      "ms": 1680,
       "loop": false,
-      "kb": 23.9,
-      "peak": 0.759
+      "kb": 33.8,
+      "peak": 0.589
     },
     {
       "id": "win_epic",
       "file": "win_epic.mp3",
-      "ms": 2600,
+      "ms": 2680,
       "loop": false,
-      "kb": 36.1,
-      "peak": 0.759
+      "kb": 53.5,
+      "peak": 0.575
     },
     {
       "id": "win_mega",
       "file": "win_mega.mp3",
-      "ms": 2100,
+      "ms": 2080,
       "loop": false,
-      "kb": 29.3,
-      "peak": 0.759
+      "kb": 41.8,
+      "peak": 0.376
     },
     {
       "id": "win_nice",
       "file": "win_nice.mp3",
       "ms": 1200,
       "loop": false,
-      "kb": 16.8,
-      "peak": 0.759
+      "kb": 24.4,
+      "peak": 0.785
     },
     {
       "id": "win_small",
       "file": "win_small.mp3",
-      "ms": 800,
+      "ms": 880,
       "loop": false,
-      "kb": 11.4,
-      "peak": 0.759
+      "kb": 18.3,
+      "peak": 0.661
     }
   ]
 }
