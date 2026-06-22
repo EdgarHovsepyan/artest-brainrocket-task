@@ -8316,6 +8316,7 @@
 
   
   function showLinesPreview(){
+    if(State.phase !== Phase.IDLE || allReelsSpinning) return;   // never overlay a spin/win (was bleeding full-width payline filaments over the reels)
     linesPreviewT0 = performance.now();
     linesPreviewDur = isReduced() ? 600 : 2200;
     linesPreviewG.alpha = 0;   
@@ -8355,6 +8356,7 @@
   }
   function drawLinesPreviewFrame(now){
     if(!linesPreviewT0) return;
+    if(State.phase !== Phase.IDLE || allReelsSpinning){ linesPreviewT0 = 0; linesPreviewG.alpha = 0; linesPreviewG.clear(); return; }   // kill the preview the instant a spin/win starts
     const t = (now - linesPreviewT0) / linesPreviewDur;
     if(t >= 1){
       linesPreviewT0 = 0;
