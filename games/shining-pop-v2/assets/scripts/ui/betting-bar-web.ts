@@ -108,6 +108,7 @@ export class BettingBarWeb extends Component {
   private volPanelOp!: UIOpacity;
   private volFill!: Graphics;
   private volKnob!: Node;
+  private volScrim: Node | null = null;
   private volume = 0.5;
   private lastNonZero = 0.5;
   private spinArrow!: Node;
@@ -1002,6 +1003,36 @@ export class BettingBarWeb extends Component {
     mute.on(Node.EventType.TOUCH_END, () =>
       this.applyVolume(this.volume > 0.001 ? 0 : this.lastNonZero, true),
     );
+
+    // SLIDER FIX (owner: "sound slider not working"): a wide track hit-area over the
+    // bar so tapping/dragging anywhere on the track sets the volume by finger
+    // position, not just the tiny knob.
+    const vtrack = new Node('vtrack');
+    vp.addChild(vtrack);
+    const vtui = vtrack.addComponent(UITransform);
+    vtui.setAnchorPoint(0, 0.5);
+    vtui.setContentSize(154 + 28, 40);
+    vtrack.setPosition(60 - 14, -66, 0);
+    const setVolFromTouch = (e: EventTouch): void => {
+      const p = e.getUILocation();
+      const local = vtui.convertToNodeSpaceAR(new Vec3(p.x, p.y, 0));
+      this.applyVolume((local.x - 14) / 154, true);
+    };
+    vtrack.on(Node.EventType.TOUCH_START, setVolFromTouch);
+    vtrack.on(Node.EventType.TOUCH_MOVE, setVolFromTouch);
+
+    // OUTSIDE-CLICK (owner: "outside click not working"): a full-screen scrim behind
+    // the panel that closes it when the player taps anywhere outside.
+    this.volScrim = new Node('volScrim');
+    this.node.addChild(this.volScrim);
+    this.volScrim.setSiblingIndex(0);
+    this.volScrim.addComponent(UITransform).setContentSize(8000, 6000);
+    this.volScrim.setPosition(W / 2, this.Y(H / 2), 0);
+    this.volScrim.on(Node.EventType.TOUCH_END, () => {
+      if (this.volPanel.active) this.toggleVolPanel();
+    });
+    this.volScrim.active = false;
+
     this.redrawVolume();
   }
 
@@ -1013,6 +1044,7 @@ export class BettingBarWeb extends Component {
     Tween.stopAllByTarget(op);
     if (opening) {
       vp.active = true;
+      if (this.volScrim) this.volScrim.active = true;
       vp.setScale(0.84, 0.84, 1);
       op.opacity = 0;
       tween(vp)
@@ -1020,6 +1052,7 @@ export class BettingBarWeb extends Component {
         .start();
       tween(op).to(0.16, { opacity: 255 }).start();
     } else {
+      if (this.volScrim) this.volScrim.active = false;
       tween(vp)
         .to(0.14, { scale: new Vec3(0.9, 0.9, 1) }, { easing: 'quadIn' })
         .start();

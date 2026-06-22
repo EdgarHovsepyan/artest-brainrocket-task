@@ -98,6 +98,7 @@ export class BettingBarMobile extends Component {
   private soundMuted!: Node;
   private demoGroup!: Node;
   private soundPanel!: Node;
+  private soundScrim: Node | null = null;
   private soundFill!: Graphics;
   private soundHandle!: Node;
   private volume = 0.5;
@@ -534,8 +535,38 @@ export class BettingBarMobile extends Component {
     muteHit.setPosition(new Vec3(372, Y(437), 0));
     muteHit.on(Node.EventType.TOUCH_END, () => this.events.emit('sound'));
 
+    // SLIDER FIX (owner: "sound slider not working"): a wide track hit-area so
+    // tapping/dragging anywhere on the track sets the volume by finger position —
+    // the bare handle was a tiny, hard-to-grab target.
+    const track = new Node('volTrack');
+    this.soundPanel.addChild(track);
+    const tui = track.addComponent(UITransform);
+    tui.setAnchorPoint(0, 0.5);
+    tui.setContentSize(VOL.w + 28, 44);
+    track.setPosition(new Vec3(VOL.x0 - 14, this.Y(VOL.y), 0));
+    const setFromTouch = (e: EventTouch): void => {
+      const p = e.getUILocation();
+      const local = tui.convertToNodeSpaceAR(new Vec3(p.x, p.y, 0));
+      this.setVolume((local.x - 14) / VOL.w);
+    };
+    track.on(Node.EventType.TOUCH_START, setFromTouch);
+    track.on(Node.EventType.TOUCH_MOVE, setFromTouch);
+
     this.setVolume(this.volume, false);
     this.soundPanel.active = false;
+
+    // OUTSIDE-CLICK (owner: "outside click not working"): a full-screen scrim behind
+    // the panel that closes it on tap. It sits below the bar controls, so tapping a
+    // control still works; tapping the game area outside closes the panel.
+    this.soundScrim = new Node('soundScrim');
+    this.node.addChild(this.soundScrim);
+    this.soundScrim.setSiblingIndex(0);
+    this.soundScrim.addComponent(UITransform).setContentSize(6000, 4000);
+    this.soundScrim.setPosition(new Vec3(W / 2, -H / 2, 0));
+    this.soundScrim.on(Node.EventType.TOUCH_END, () => {
+      if (this.panelOpen) this.toggleSoundPanel();
+    });
+    this.soundScrim.active = false;
   }
 
   private ping(cx: number, cy: number): void {
@@ -579,6 +610,7 @@ export class BettingBarMobile extends Component {
   private toggleSoundPanel(): void {
     this.panelOpen = !this.panelOpen;
     this.soundPanel.active = this.panelOpen;
+    if (this.soundScrim) this.soundScrim.active = this.panelOpen;
   }
 
   private mkLabel(
