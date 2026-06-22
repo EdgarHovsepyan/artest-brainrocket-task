@@ -3590,7 +3590,7 @@
       .fill({ color:0x000000, alpha: selected ? 0.55 : 0.35 })
       
       .roundRect(-w/2, -h/2, w, h, r)
-      .fill({ color: selected ? 0x1d1212 : 0x100a13, alpha: 0.97 })
+      .fill({ color: selected ? 0x3a2566 : 0x241544, alpha: 0.97 })
       
       .roundRect(-w/2+1, -h/2+1, w-2, h*0.5, r-1)
       .fill({ color: tc._tier.accent, alpha: selected ? 0.22 : 0.10 })
