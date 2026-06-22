@@ -86,15 +86,9 @@ export class ReelView extends Component {
     this.startY = spinBuffer * this.pitch;
 
     const ut = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    // ANTI-CROP, HORIZONTAL-ONLY (owner's documented design — see view-config
-    // layout.winPopMaskMargin): widen the per-reel clip rect HORIZONTALLY so a
-    // winning symbol's pop has left/right room and isn't clipped by its own
-    // cell-width reel mask. The HEIGHT stays == windowH on purpose: a previous edit
-    // widened it vertically too, which revealed the off-window buffer symbols above
-    // and below the window (the owner-reported "symbols showing outside the reel
-    // container"). The OUTER board edges (reel 0 left, reel 4 right, top, bottom) are
-    // contained by the reels-container mask in SlotView.buildReels, so a pop on an
-    // edge reel can never bleed past the board.
+    // Anti-crop, HORIZONTAL-ONLY (winPopMaskMargin): widen the clip rect so a win pop has left/right room.
+    // Height stays == windowH on purpose — widening it vertically reveals the off-window buffer symbols. Outer
+    // board edges are contained by the reels-container mask in SlotView.buildReels.
     const maskMargin = VIEW_CONFIG.layout.winPopMaskMargin;
     ut.setContentSize(cell + maskMargin * 2, windowH);
     const mask = this.node.addComponent(Mask);
@@ -131,12 +125,8 @@ export class ReelView extends Component {
     const rows = GRID.rows;
     const len = this.stripCells.length;
 
-    // Hard-reset every cell to its strip home BEFORE spinning. A win-lift that
-    // wasn't cleanly restored could leave a symbol parented to winLift or at a
-    // stale localX -> it then renders in the WRONG column (measured: a winning
-    // symbol stuck one pitch left, overlapping the next reel, persisting across
-    // spins). Resetting here makes every spin start from a clean, correctly
-    // placed grid.
+    // Hard-reset every cell to its strip home BEFORE spinning, so a win-lift that wasn't cleanly restored can't
+    // leave a symbol in the wrong column. Every spin then starts from a clean, correctly placed grid.
     this.stripCells.forEach((c, k) =>
       c.resetHome(strip, new Vec3(0, this.pitch - k * this.pitch, 0)),
     );
@@ -269,11 +259,8 @@ export class ReelView extends Component {
     lift: Node | null = null,
     centers?: (Vec3 | null)[],
   ): void {
-    // `centers` is pre-computed by the caller (parallel to `rows`) with concrete
-    // Vec3 values. Passing a `(row)=>cellCenter(i,row)` closure here mis-resolved
-    // the reel index `i` for some cells once it crossed this function boundary
-    // (winning symbols collapsed onto the centre reel, leaving empty cells), so
-    // we take baked values instead of a deferred closure.
+    // `centers` is baked by the caller (parallel to `rows`) as concrete Vec3 values; a deferred
+    // `(row)=>cellCenter(i,row)` closure mis-resolved the reel index `i` across this boundary.
     rows.forEach((row, j) =>
       this.cells[row]?.playWin(delay + j * 0.04, rich, winMat, lift, centers?.[j] ?? null),
     );

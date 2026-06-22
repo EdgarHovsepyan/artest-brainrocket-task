@@ -123,8 +123,7 @@ export class ParticleLayer extends Component {
   fireEmbers(centers: Vec3[]): void {
     const cfg = VIEW_CONFIG.win.fireEmbers;
     const life = cfg.lifeMs / 1000;
-    // Use the shared 7-colour CANDY palette (was a local 4-colour 'warm' subset
-    // that read as a separate vfx system) so every emitter matches the candy theme.
+    // Use the shared CANDY palette so every emitter matches the candy theme.
     const warm = CANDY;
 
     const ringCount = this.gov.count(8, 5);

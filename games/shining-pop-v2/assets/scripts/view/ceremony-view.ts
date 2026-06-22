@@ -23,7 +23,6 @@ import { formatMoney } from '../logic/money';
 
 const { ccclass } = _decorator;
 
-const RIM = new Color().fromHEX(PAL.accent);
 const CRYSTAL = new Color().fromHEX(PAL.valueText);
 const WARM = new Color(255, 130, 200, 255);
 const TITLE = new Color().fromHEX(PAL.title);
@@ -90,10 +89,8 @@ export class CeremonyView extends Component {
     this.dim = dimNode.addComponent(UIOpacity);
     this.dim.opacity = 0;
 
-    // Win-callout banner + Spine model rendered 2x smaller (was oversized / low
-    // quality on every win). Wrap it in a half-scale container centred on the
-    // reels — the reveal/dismiss tweens + the setScale(1,1,1) reset all run on
-    // `ov` INSIDE the wrapper, so they still play but render at half size.
+    // Half-scale wrapper centred on the reels so the banner/Spine render at half size; the reveal/dismiss tweens
+    // run on `ov` inside the wrapper, so they still play.
     const ovWrap = this.mk('ceremonyScale', 10, 10, this.node);
     ovWrap.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     ovWrap.setScale(0.5, 0.5, 1);
@@ -376,10 +373,8 @@ export class CeremonyView extends Component {
     ov.active = true;
     ov.setScale(0, 0, 1);
 
-    // ── ACT 1 · ANTICIPATION ──────────────────────────────────────────────
-    // The screen darkens toward the mode colour and candy lights stream INWARD
-    // to the centre — a held breath before the reveal. The banner stays hidden
-    // (scale 0) so the reveal lands as an impact, not a fade-in.
+    // ACT 1 · ANTICIPATION: screen darkens and candy lights stream inward; the banner stays hidden (scale 0)
+    // so the reveal lands as an impact, not a fade-in.
     Tween.stopAllByTarget(this.dim);
     this.dim.opacity = 0;
     tween(this.dim).to(0.42, { opacity: 178 }, { easing: 'quadOut' }).start();
@@ -441,19 +436,6 @@ export class CeremonyView extends Component {
         .to(0.42, { position: new Vec3(0, 0, 0) }, { easing: 'quadIn' })
         .start();
     }
-  }
-
-  private igniteModeGlow(col: Color): void {
-    if (!this.panelLightG || !this.panelLightOp) return;
-    this.panelLightG.clear();
-    this.drawSoftGlow(this.panelLightG, col.r, col.g, col.b, 150, 320);
-    Tween.stopAllByTarget(this.panelLightOp);
-    this.panelLightOp.opacity = 0;
-    tween(this.panelLightOp)
-      .to(0.16, { opacity: 230 }, { easing: 'quadOut' })
-      .to(0.5, { opacity: 165 }, { easing: 'sineInOut' })
-      .to(0.5, { opacity: 205 }, { easing: 'sineInOut' })
-      .start();
   }
 
   private fireLightBurst(col: Color): void {

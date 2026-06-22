@@ -66,9 +66,7 @@ const PLATE_EDGE = new Color(184, 111, 218, 255);
 const SHADOW = new Color(5, 2, 12, 170);
 const MUTED = new Color(201, 206, 216, 255);
 
-// Win-line colours = the on-brand pink/violet ring (was a rainbow with
-// gold/cyan/green/orange/lime — off-brand on the single most-watched element).
-// Mirrors PAL.lineColors so the win line reads as one brand system.
+// On-brand pink/violet win-line ring (mirrors PAL.lineColors) so it reads as one system.
 const LINE_HUES = [
   '#ff007f',
   '#c566ff',
@@ -660,8 +658,7 @@ export class SlotView extends Component {
       46,
       () => {
         layer.destroy();
-        // Reality-check modal isn't a popClose panel, so restore the betting bar
-        // via the overlay-sync path or it stays hidden and the game is stuck.
+        // Not a popClose panel, so sync overlays manually or the betting bar stays hidden.
         this.scheduleOverlaySync();
         onStop();
       },
@@ -681,9 +678,7 @@ export class SlotView extends Component {
       card,
     );
     cont.setActive(true);
-    // BUGFIX: setActive(true) recolours the label to INK (near-black 20,10,32),
-    // which on the ACID hot-pink primary fill read as wrong/low-contrast. CONTINUE
-    // is the primary CTA — force WHITE so it stays crisp on the pink highlight.
+    // setActive recolours the label to INK; force WHITE for contrast on the pink CTA fill.
     cont.label.color = Color.WHITE;
   }
 
@@ -871,10 +866,8 @@ export class SlotView extends Component {
 
     this.buildReels();
 
-    // Lifted winning cells live here: un-clipped by the per-reel masks (so a
-    // popped symbol is never cropped) BUT bounded to the board so the pop + glow
-    // halo never bleed out past the frame. The pad keeps the symbol pop itself
-    // unclipped; only the soft outer glow is contained at the board edge.
+    // Lifted winning cells: un-clipped by per-reel masks (so pops aren't cropped) but
+    // bounded to the board (+pad) so the glow halo can't bleed past the frame.
     this.winLift = this.mkNode('winLift', this.gw + 60, this.gh + 60, this.node);
     this.winLift.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     const winLiftMask = this.winLift.addComponent(Mask);
@@ -1343,11 +1336,9 @@ export class SlotView extends Component {
         const idx = b;
         const n = this.winBeams[b++];
 
-        // Span each beam from symbol to symbol, overlapping ONLY at interior joints
-        // (never past the line's first/last symbol). The old len*1.22 about the
-        // midpoint overshot every endpoint by 11%; on a steep terminal segment that
-        // tail juts visibly into empty space past the last reel. Clamp the outer
-        // ends to the symbol centres; keep interior overlap so joints still merge.
+        // Span each beam symbol-to-symbol, overlapping only at interior joints. Clamp
+        // outer ends to the symbol centres so the terminal segment can't jut past the
+        // last reel; keep interior overlap so joints still merge.
         const ux = dx / len;
         const uy = dy / len;
         const pad = cfg.heightPx * 0.9;
@@ -1612,9 +1603,7 @@ export class SlotView extends Component {
       const sp = photo.addComponent(Sprite);
       sp.sizeMode = Sprite.SizeMode.CUSTOM;
       sp.spriteFrame = this.brandFrames.bg;
-      // Cool/desaturate the busy candyscape (parity with the Pixi game's
-      // bg.tint = 0xb8b8c8) so the warm foreground symbols stop fighting it and
-      // the board reads with more depth.
+      // Cool-tint the candyscape (Pixi parity: bg.tint=0xb8b8c8) so warm symbols pop.
       sp.color = new Color(184, 184, 200);
       photo.getComponent(UITransform)!.setContentSize(w, w / ratio);
       const op = photo.addComponent(UIOpacity);
@@ -1827,95 +1816,13 @@ export class SlotView extends Component {
     void gap;
   }
 
-  private buildCosmicShimmer(): void {
-    const { reelCenterY } = VIEW_CONFIG.layout;
-    const root = this.mkNode('cosmicShimmer', this.gw, this.gh, this.node);
-    root.setPosition(0, reelCenterY, 0);
-    const halfW = this.gw / 2 - 6;
-    const halfH = this.gh / 2 - 6;
-    const rng = createRng(20260615).next;
-    const star = (g: Graphics, x: number, y: number, r: number, c: Color): void => {
-      g.fillColor = c;
-      g.moveTo(x, y - r);
-      g.lineTo(x + r, y);
-      g.lineTo(x, y + r);
-      g.lineTo(x - r, y);
-      g.close();
-      g.fill();
-    };
-
-    const neb = this.mkNode('cosmicNebula', this.gw, this.gh, root);
-    const ng = neb.addComponent(Graphics);
-    (
-      [
-        [-halfW * 0.45, halfH * 0.3, 360, 260, 120, 170, 255, 13],
-        [halfW * 0.5, -halfH * 0.35, 320, 230, 190, 130, 220, 12],
-        [halfW * 0.1, halfH * 0.55, 300, 200, 120, 210, 255, 10],
-      ] as number[][]
-    ).forEach(([cx, cy, w, h, cr, cg, cb, ca]) => {
-      ng.fillColor = new Color(cr, cg, cb, ca);
-      ng.moveTo(cx, cy - h);
-      ng.lineTo(cx + w, cy);
-      ng.lineTo(cx, cy + h);
-      ng.lineTo(cx - w, cy);
-      ng.close();
-      ng.fill();
-    });
-    if (!this.reducedFx) {
-      tween(neb)
-        .to(7.5, { position: new Vec3(14, -8, 0) }, { easing: 'sineInOut' })
-        .to(7.5, { position: new Vec3(-12, 6, 0) }, { easing: 'sineInOut' })
-        .union()
-        .repeatForever()
-        .start();
-    }
-
-    const layerCfg: [number, number, number, number][] = [
-      [10, 26, 150, 2.3],
-      [9, 20, 120, 3.1],
-      [8, 30, 170, 1.7],
-    ];
-    layerCfg.forEach(([n, dim, bright, period], li) => {
-      const layer = this.mkNode(`cosmicStars${li}`, this.gw, this.gh, root);
-      const sg = layer.addComponent(Graphics);
-      for (let i = 0; i < n; i++) {
-        const x = (rng() - 0.5) * 2 * halfW;
-        const y = (rng() - 0.5) * 2 * halfH;
-        const r = 2.2 + rng() * 2.6;
-        const pink = rng() > 0.78;
-        const c = pink ? new Color(255, 158, 208, 255) : new Color(232, 240, 255, 255);
-        star(sg, x, y, r, c);
-
-        if (r > 4) star(sg, x, y, r * 1.9, new Color(c.r, c.g, c.b, 36));
-      }
-      const op = layer.addComponent(UIOpacity);
-      if (this.reducedFx) {
-        op.opacity = Math.round((dim + bright) / 2);
-      } else {
-        op.opacity = bright;
-        tween(op)
-          .to(period, { opacity: dim }, { easing: 'sineInOut' })
-          .to(period, { opacity: bright }, { easing: 'sineInOut' })
-          .union()
-          .repeatForever()
-          .start();
-      }
-    });
-  }
-
   private buildReels(): void {
     const { cell, reelCenterY } = VIEW_CONFIG.layout;
     const reelsRoot = this.mkNode('reels', this.gw, this.gh, this.node);
     reelsRoot.setPosition(0, reelCenterY, 0);
-    // CONTAIN-TO-CONTAINER (bug #1, owner: "symbols showing outside the reel
-    // container in the win case — only show in the reels container"): clip every reel
-    // to the playfield window (reelsRoot is sized exactly gw×gh). Each per-reel mask
-    // is deliberately wider than its cell to give win pops left/right room, which let
-    // pops on the EDGE reels (reel 0 / reel 4) bleed PAST the board. This single
-    // container mask is the hard boundary, so a winning symbol only ever shows inside
-    // the reels container. Interior pop overlap between neighbouring reels is
-    // untouched (it stays within gw×gh); particles/glow/winLift are siblings of
-    // reelsRoot, so they are not clipped.
+    // Hard playfield clip (reelsRoot is exactly gw×gh): per-reel masks are wider than
+    // their cell for win-pop room, which let edge-reel pops bleed past the board. This
+    // container mask is the boundary. Particles/glow/winLift are siblings, so uncliped.
     const reelsMask = reelsRoot.addComponent(Mask);
     reelsMask.type = Mask.Type.GRAPHICS_RECT;
     for (let r = 0; r < GRID.reels; r++) {
@@ -2363,10 +2270,8 @@ export class SlotView extends Component {
 
   closeBuyMenu(): void {
     this.buyMenuOpen = false;
-    // Restore the bar + FAB FIRST (synchronous), so even if the modal close below
-    // ever throws, the UI can never be stranded hidden — this is the root of the
-    // "betting panel stays hidden after exiting buy bonus" report. Also re-synced
-    // next frame to cover any tail state.
+    // Restore bar + FAB synchronously first, so the UI can't be stranded hidden if the
+    // modal close below throws; re-synced next frame to cover any tail state.
     this.setBuyFabVisible(true);
     this.onOverlay?.(this.anyOverlayOpen());
     this.scheduleOverlaySync();
@@ -2417,7 +2322,7 @@ export class SlotView extends Component {
         104,
         46,
         () => {
-          // Restore the betting bar via the overlay-sync path (see quick-bet).
+          // Sync overlays to restore the betting bar (see quick-bet).
           panel.active = false;
           this.scheduleOverlaySync();
           this.autoplayStartCb?.(n);
@@ -2610,7 +2515,7 @@ export class SlotView extends Component {
       });
       let y = top - 28;
       for (const row of paytableRows()) {
-        // the actual symbol art, so each payout is unmistakably tied to its candy
+        // Render the real symbol art so each payout is tied to its candy.
         const icon = this.mkNode('payIcon', 26, 26, panel);
         icon.setPosition(-w / 2 + info.leftMargin + 12, y + 5, 0);
         const isp = icon.addComponent(Sprite);
@@ -2904,9 +2809,8 @@ export class SlotView extends Component {
         104,
         46,
         () => {
-          // Close via the overlay-sync path so onOverlay(false) fires and the
-          // betting bar is restored — a bare panel.active=false strands the bar
-          // hidden and the player can't continue.
+          // Sync overlays so onOverlay(false) fires and restores the betting bar;
+          // a bare panel.active=false strands it hidden.
           panel.active = false;
           this.scheduleOverlaySync();
           this.betSelectCb?.(cents);
@@ -3289,10 +3193,8 @@ export class SlotView extends Component {
     const { minSpinMs, reelStopStaggerMs } = VIEW_CONFIG.spin;
     const { minEarlyWilds, minEarlyScatters, extraSeconds } = VIEW_CONFIG.anticipation;
 
-    // Tension on the last reels when the early reels (0-2) already tease a feature:
-    // enough wilds for a WILD STRIKE, or enough scatters for the free-spins trigger
-    // (scatters pay from anywhere, so a 3rd is live). Koster — vary anticipation by
-    // trigger type; the bonus tease is the highest-tension moment in the game.
+    // Tension on the last reels when reels 0-2 already tease a feature: enough wilds
+    // for a WILD STRIKE, or enough scatters for the free-spins trigger.
     let earlyWilds = 0;
     let earlyScatters = 0;
     for (let r = 0; r < 3; r++) {
@@ -3387,9 +3289,8 @@ export class SlotView extends Component {
     const lift = VIEW_CONFIG.win.liftWinSymbols ? this.winLift : null;
     this.reels.forEach((reel, i) => {
       const rows = byReel[i] ?? [];
-      // bake the centres NOW with this reel's `i`, then hand concrete values to
-      // highlight (a deferred `(row)=>cellCenter(i,row)` closure resolved the
-      // wrong reel for some cells -> symbols stacked on the centre reel).
+      // Bake centres now with this reel's `i`; a deferred closure resolved the wrong
+      // reel for some cells (symbols stacked on the centre reel).
       const centers = rows.map((row) => this.cellCenter(i, row));
       reel.highlight(rows, i * waveStagger, rich, winMat, lift, centers);
     });
@@ -3400,9 +3301,8 @@ export class SlotView extends Component {
         const progress = winningReels.length > 1 ? order / (winningReels.length - 1) : 0;
         this.scheduleOnce(() => this.audio.countTick(progress), reelIdx * waveStagger);
       });
-      // BG PARALLAX = BIG-WINS ONLY (owner, 2026-06-21): the per-win bg pulse was
-      // removed so regular wins no longer nudge the background. Big wins still get
-      // the depth "whoosh" via bgDepthPush() (ceremony detonation / feature entry).
+      // BG parallax is big-wins-only: regular wins don't nudge the bg; big wins get
+      // the depth whoosh via bgDepthPush() (ceremony detonation / feature entry).
     }
 
     const anyWinFx =
@@ -3532,9 +3432,8 @@ export class SlotView extends Component {
         chain = chain.to(0.085, { position: longest[i] }, { easing: 'sineInOut' });
       }
       chain.call(() => tween(sop).to(0.2, { opacity: 0 }, { easing: 'quadIn' }).start()).start();
-      // Hard backstop: the spark MUST go dark after it finishes travelling, even
-      // if the fade callback is pre-empted. It was sticking lit at the line end —
-      // the "detached" bright mark past the last reel that the owner circled.
+      // Backstop: force the spark dark after it travels, in case the fade callback is
+      // pre-empted (else it sticks lit past the last reel).
       this.unschedule(this.hideCandySpark);
       this.scheduleOnce(this.hideCandySpark, (longest.length - 1) * 0.085 + 0.45);
     }
@@ -3896,8 +3795,7 @@ export class SlotView extends Component {
   private tickWin = (dt: number): void => {
     this.winCountElapsed += dt;
     const p = Math.min(1, this.winCountElapsed / this.winCountDur);
-    // Ease-out-expo: the win number rushes up then decelerates into the total
-    // (was a flat linear odometer — the most-seen win moment now has life).
+    // Ease-out-expo: the win number rushes up then decelerates into the total.
     const e = p >= 1 ? 1 : 1 - Math.pow(2, -10 * p);
     const v = Math.round(this.winCountTo * e);
     this.setWin(v);
@@ -3911,9 +3809,8 @@ export class SlotView extends Component {
     }
   };
 
-  /** One-shot background depth "whoosh" — fired on big-win detonation + feature
-   *  entry (buy-bonus / free-spins). Spikes the parallax pulse; it eases back on
-   *  its own via pulseDecay, so the bg stays calm the rest of the time. */
+  /** One-shot bg depth whoosh (big-win detonation / feature entry): spikes the parallax
+   *  pulse, which eases back on its own via pulseDecay. */
   private bgDepthPush(): void {
     if (this.reducedFx || !this.parallaxLayers.length) return;
     this.pxPulse = Math.max(this.pxPulse, VIEW_CONFIG.world.parallax.winBurstPulse);

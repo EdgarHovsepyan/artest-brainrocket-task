@@ -80,8 +80,7 @@ export class SlotController extends Component {
   private muted = false;
 
   onLoad(): void {
-    // 60fps locked — 120 doubled GPU/thermal load on high-refresh panels for no
-    // perceptible gain on a 60Hz-feel slot (SOP §1 thermal gate).
+    // Lock 60fps — avoids GPU/thermal cost of high-refresh panels for no perceptible gain.
     game.frameRate = 60;
     this.model = new SlotModel({ balanceCents: this.startBalanceCents, betCents: this.betCents });
     this.session = newSession(this.nowMs());
@@ -481,10 +480,7 @@ export class SlotController extends Component {
       if (this.canStop) this.view.quickStopReels();
       return;
     }
-    // AUTOPLAY FIX: block a MANUAL press while autoplay is running, but let
-    // autoplay's OWN spins through (startAuto + the continuation loop call this
-    // with fromAuto=true). Without the exception they hit `autoplay.active` and
-    // autoplay never spins at all.
+    // Block manual presses during autoplay, but let autoplay's own spins (fromAuto) through.
     if (this.state !== 'idle' || (this.autoplay.active && !fromAuto)) return;
     if (!this.model.canSpin()) {
       this.view.showError(
