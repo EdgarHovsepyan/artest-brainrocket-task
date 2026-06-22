@@ -60,7 +60,7 @@ export class AudioManager {
   private musicId: 'main_base_loop' | 'bonus_loop' | null = null;
   private rushOsc: OscillatorNode[] = [];
   private rushGain: GainNode | null = null;
-  private rushPip: number | null = null;
+  private rushSrc: AudioBufferSourceNode | null = null;
   private lastBetAt = 0;
   private lastWinAt = 0;
 
@@ -213,54 +213,52 @@ export class AudioManager {
     const t = this.ctx.currentTime;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(1, t + 0.15);
+    g.gain.linearRampToValueAtTime(1, t + 0.12);
     g.connect(this.buses.gameplay!);
+    this.rushGain = g;
+
+    // Damped spin: a soft looped reel hum, not a buzzy drone.
+    const buf = this.buffers['reel_loop'];
+    if (buf) {
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const sg = this.ctx.createGain();
+      sg.gain.value = 0.5;
+      src.connect(sg);
+      sg.connect(g);
+      src.start(t);
+      this.rushSrc = src;
+      return;
+    }
+
+    // Fallback until reel_loop decodes: one soft low-passed hum.
     const lp = this.ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 1300;
-    lp.Q.value = 0.8;
+    lp.frequency.value = 650; // muffled / damped
+    lp.Q.value = 0.5;
     lp.connect(g);
-    const mk = (freq: number) => {
-      const o = this.ctx!.createOscillator();
-      o.type = 'triangle';
-      o.frequency.value = freq;
-      const og = this.ctx!.createGain();
-      og.gain.value = 0.032;
-      o.connect(og);
-      og.connect(lp);
-      o.start(t);
-      return o;
-    };
-    // Gentle 0.7Hz shimmer instead of a buzzy 3.5Hz beat on the spin drone.
-    this.rushOsc = [mk(220), mk(220.7)];
-    this.rushGain = g;
-    const pips = [523.25, 659.25, 783.99, 659.25];
-    let step = 0;
-    this.rushPip = setInterval(() => {
-      if (!this.ctx || this.muted) return;
-      const pt = this.ctx.currentTime;
-      const o = this.ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = pips[step++ % pips.length];
-      const pg = this.ctx.createGain();
-      pg.gain.setValueAtTime(0, pt);
-      pg.gain.linearRampToValueAtTime(0.034, pt + 0.012);
-      pg.gain.exponentialRampToValueAtTime(0.0001, pt + 0.18);
-      o.connect(pg);
-      pg.connect(this.buses.gameplay!);
-      o.start(pt);
-      o.stop(pt + 0.2);
-    }, 320) as unknown as number;
+    const o = this.ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = 170;
+    const og = this.ctx.createGain();
+    og.gain.value = 0.05;
+    o.connect(og);
+    og.connect(lp);
+    o.start(t);
+    this.rushOsc = [o];
   }
 
   stopRush(): void {
     if (!this.rushGain || !this.ctx) return;
-    if (this.rushPip != null) {
-      clearInterval(this.rushPip);
-      this.rushPip = null;
-    }
     const t = this.ctx.currentTime;
-    this.rushGain.gain.setTargetAtTime(0, t, 0.07);
+    this.rushGain.gain.setTargetAtTime(0, t, 0.08);
+    if (this.rushSrc) {
+      try {
+        this.rushSrc.stop(t + 0.25);
+      } catch {}
+      this.rushSrc = null;
+    }
     this.rushOsc.forEach((o) => {
       try {
         o.stop(t + 0.3);
@@ -306,8 +304,11 @@ export class AudioManager {
   }
 
   impact(): void {
-    this.duckMusic(-10, 560);
+    // Big-win: a warm swelling bed under a deep boom; music ducked deeper + longer.
+    this.duckMusic(-11, 660);
+    this.playSample('main_bigwin', 'win', 0.5); // damped swell layer, under the boom
     if (this.playSample('impact_braam', 'win', 0.9)) return;
+    // Procedural fallback (samples not decoded yet): a soft deep boom.
     this.voice(72, 0.6, 'sawtooth', 0.34);
     this.voice(110, 0.5, 'triangle', 0.22);
   }
