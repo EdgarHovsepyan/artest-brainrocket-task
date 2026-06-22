@@ -224,7 +224,7 @@ export const VIEW_CONFIG = {
 
     showLines: false,
 
-    fireEmbers: { perCell: 22, riseSpeed: 180, lifeMs: 820, spreadPx: 58 },
+    fireEmbers: { perCell: 22, riseSpeed: 180, lifeMs: 820, spreadPx: 96 },
 
     fireFlames: { enabled: false },
 

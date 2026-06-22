@@ -123,12 +123,9 @@ export class ParticleLayer extends Component {
   fireEmbers(centers: Vec3[]): void {
     const cfg = VIEW_CONFIG.win.fireEmbers;
     const life = cfg.lifeMs / 1000;
-    const warm = [
-      new Color(255, 130, 190, 255),
-      new Color(255, 205, 90, 255),
-      new Color(140, 240, 200, 255),
-      new Color(255, 250, 250, 255),
-    ];
+    // Use the shared 7-colour CANDY palette (was a local 4-colour 'warm' subset
+    // that read as a separate vfx system) so every emitter matches the candy theme.
+    const warm = CANDY;
 
     const ringCount = this.gov.count(8, 5);
     const cellCount = this.gov.count(cfg.perCell, 3);
@@ -139,8 +136,8 @@ export class ParticleLayer extends Component {
         this.spawnPhys(
           c.x,
           c.y,
-          warm[i % 3]!,
-          0.4 + Math.random() * 0.25,
+          warm[i % warm.length]!,
+          0.2 + Math.random() * 0.15,
           Math.cos(ang) * v,
           Math.sin(ang) * v,
           -40,
@@ -155,7 +152,7 @@ export class ParticleLayer extends Component {
           c.x + (Math.random() - 0.5) * cfg.spreadPx,
           c.y + (Math.random() - 0.5) * 24,
           warm[i % warm.length]!,
-          hot ? 0.2 + Math.random() * 0.2 : 0.45 + Math.random() * 0.7,
+          hot ? 0.12 + Math.random() * 0.12 : 0.45 + Math.random() * 0.55,
           (Math.random() - 0.5) * 90,
           cfg.riseSpeed * (hot ? 1.6 + Math.random() : 0.7 + Math.random() * 0.7),
           -130,
