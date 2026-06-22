@@ -3399,11 +3399,14 @@ export class SlotView extends Component {
     if (!g) return;
     this.candyLinePts = [];
     let longest: Vec3[] = [];
-    for (const { lineIndex, count } of lines) {
+    for (const { lineIndex } of lines) {
       const rows = PAYLINES[lineIndex];
       if (!rows) continue;
       const pts: Vec3[] = [];
-      for (let reel = 0; reel < count; reel++) pts.push(this.cellCenter(reel, rows[reel]));
+      // Draw the FULL payline across all reels (owner: show the whole combination
+      // line, not just up to the last winning symbol). The winning symbols are still
+      // the ones lifted/popped; this just shows the complete line path.
+      for (let reel = 0; reel < rows.length; reel++) pts.push(this.cellCenter(reel, rows[reel]));
       if (pts.length < 2) continue;
       this.candyLinePts.push(pts);
       if (pts.length > longest.length) longest = pts;
