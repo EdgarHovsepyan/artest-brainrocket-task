@@ -1,7 +1,7 @@
 
 import * as PIXI from 'pixi.js';
 import {
-  glassCircle, glassPanel, spinButton, iconPlay, iconBolt, iconPlus, iconMinus, iconSound, iconMenu,
+  glassCircle, glassInto, glassPanel, spinButton, iconPlay, iconBolt, iconPlus, iconMinus, iconSound, iconMenu,
 } from './ui-kit.js';
 
 const DPR = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
@@ -41,25 +41,25 @@ function fgRad(stops, cx, cy) {
     colorStops: stops.map((s) => ({ offset: s[0], color: s[1] })), textureSpace: 'local',
   });
 }
-function panel(w, h, rx, fill, ew, horiz, inRx) {
+function panel(w, h, rx, fill, ew, horiz, inRx) {   // inRx kept for call-site compatibility (glassInto derives its own inner rim)
+  // premium candy-glass via the shared toolkit — matches the web bar exactly.
   const g = new PIXI.Graphics();
-  g.roundRect(0, 0, w, h, rx).fill(fg(fill, horiz ? 'h' : 'v'));
-
-  g.roundRect(2.5, 2, w - 5, h * 0.42, Math.max(0, rx - 2)).fill({ color: COL.gloss, alpha: 0.12 });
-  if (inRx !== undefined) g.roundRect(2, 2, w - 4, h - 4, inRx).stroke({ width: 1.1, color: COL.cyan, alpha: 0.15 });
-  if (ew) g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: COL.edge });
+  glassInto(g, w, h, rx, { fill, horiz, edge: COL.edge, edgeWidth: ew || 0 });
   return g;
 }
 function T(t, sz, col, w, ax, mid, ls) {
   const o = new PIXI.Text({ text: t, style: { fontFamily: FONT, fontSize: Math.round(sz * FS), fontWeight: String(w || 700), fill: col, letterSpacing: ls || 0 } });
   o.resolution = Math.max(2, DPR); o.anchor.set(ax || 0, mid ? 0.5 : 0); return o;
 }
+// Unified press-physics (polish KB #59): 0.94 squash in (<100ms) + elastic
+// settle out — matches the web bar exactly.
 function hit(c, h, fn) {
   c.eventMode = 'static'; c.cursor = 'pointer'; c.hitArea = h; let d = false;
-  c.on('pointerdown', () => { d = true; c.scale.set(0.95); });
-  const u = () => { if (!d) return; d = false; c.scale.set(1); };
-  c.on('pointerup', () => { u(); fn && fn(); });
-  c.on('pointerupoutside', u);
+  const press = () => { d = true; const g = (typeof window !== 'undefined') && window.gsap; if (g) g.to(c.scale, { x: 0.94, y: 0.94, duration: 0.06, ease: 'power3.out', overwrite: true }); else c.scale.set(0.94); };
+  const rel = () => { if (!d) return; d = false; const g = (typeof window !== 'undefined') && window.gsap; if (g) g.to(c.scale, { x: 1, y: 1, duration: 0.5, ease: 'elastic.out(1, 0.55)', overwrite: true }); else c.scale.set(1); };
+  c.on('pointerdown', press);
+  c.on('pointerup', () => { rel(); fn && fn(); });
+  c.on('pointerupoutside', rel);
   return c;
 }
 
@@ -110,14 +110,14 @@ export class BettingBarMobile extends PIXI.Container {
     const demo = new PIXI.Container(); demo.position.set(210, 272); demo.addChild(panel(120, 24, 12, G.panel, 1.1, false));
     const dt = T('DEMO MODE', 11, COL.cur, 700, 0.5, true, 2.5); dt.position.set(60, 12); demo.addChild(dt); demo.visible = false; this.addChild(demo); E.demoBadge = demo;
 
-    const spin = this._spin(270, 392, 70); hit(spin, new PIXI.Circle(0, 0, 70), () => { if (!spin._stop.visible) spin.spin(); this._emit('spin'); }); this.addChild(spin); E.spinButton = spin;
+    const spin = this._spin(270, 392, 70); hit(spin, new PIXI.Circle(0, 0, 78), () => { if (!spin._stop.visible) spin.spin(); this._emit('spin'); }); this.addChild(spin); E.spinButton = spin;
     if (spin._setIdle) spin._setIdle(true);   // "ready" glow until the first spin
 
     
     const au = new PIXI.Container(); au.position.set(104, 506); au.addChild(glassCircle(30));
     const at = iconPlay(13, ACCENT); au.addChild(at);
     const aCount = T('', 17, COL.value, 700, 0.5, true); aCount.visible = false; au.addChild(aCount);
-    hit(au, new PIXI.Circle(0, 0, 30), () => this._emit('autoplay')); this.addChild(au); E.autoplayButton = au; au._glyph = at; au._count = aCount;
+    hit(au, new PIXI.Circle(0, 0, 38), () => this._emit('autoplay')); this.addChild(au); E.autoplayButton = au; au._glyph = at; au._count = aCount;
 
     
     const st = new PIXI.Container(); st.position.set(170, 479); st.addChild(glassPanel(200, 54, 27, { edgeWidth: 1.8 }));
@@ -137,7 +137,7 @@ export class BettingBarMobile extends PIXI.Container {
     const tbtn = new PIXI.Container(); tbtn.position.set(436, 506); tbtn.addChild(glassCircle(30));
     const tbB = iconBolt(14, ACCENT); tbtn.addChild(tbB);
     const tPip = new PIXI.Graphics(); tPip.visible = false; tbtn.addChild(tPip);
-    hit(tbtn, new PIXI.Circle(0, 0, 30), () => this._emit('turbo')); this.addChild(tbtn); E.turboButton = tbtn; tbtn._glyph = tbB; tbtn._pip = tPip;
+    hit(tbtn, new PIXI.Circle(0, 0, 38), () => this._emit('turbo')); this.addChild(tbtn); E.turboButton = tbtn; tbtn._glyph = tbB; tbtn._pip = tPip;
 
     
     const bb = new PIXI.Container(); bb.position.set(14, 560); bb.addChild(panel(512, 44, 22, G.panel, 1.8, false, 20));

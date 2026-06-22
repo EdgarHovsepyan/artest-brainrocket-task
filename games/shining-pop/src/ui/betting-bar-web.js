@@ -1,7 +1,7 @@
 
 import * as PIXI from 'pixi.js';
 import {
-  glassCircle, spinButton, iconPlay, iconBolt, iconSound, iconMenu, iconClose, iconCoins,
+  glassCircle, glassInto, spinButton, iconPlay, iconBolt, iconSound, iconMenu, iconClose, iconCoins,
 } from './ui-kit.js';
 
 const DPR = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 3);
@@ -37,12 +37,11 @@ function fg(stops, dir) {
   });
 }
 function panel(w, h, rx, fill, ew, horiz) {
+  // premium candy-glass via the shared toolkit (single source of truth so web +
+  // mobile read identically): seat bloom, gel gloss + glint, bottom shade,
+  // cool inner rim, 2-tone neon edge.
   const g = new PIXI.Graphics();
-  g.roundRect(0, 0, w, h, rx).fill(fg(fill, horiz ? 'h' : 'v'));
-  
-  g.roundRect(2.5, 2, w - 5, h * 0.42, Math.max(0, rx - 2)).fill({ color: COL.gloss, alpha: 0.12 });
-  g.roundRect(2, 2, w - 4, h - 4, Math.max(0, rx - 2)).stroke({ width: 1.1, color: COL.cyan, alpha: 0.15 });
-  if (ew) g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: COL.edge });
+  glassInto(g, w, h, rx, { fill, horiz, edge: COL.edge, edgeWidth: ew || 0 });
   return g;
 }
 function T(t, sz, col, w, ax, mid, ls) {
@@ -51,11 +50,14 @@ function T(t, sz, col, w, ax, mid, ls) {
   
   o.resolution = Math.max(3, DPR); o.anchor.set(ax || 0, mid ? 0.5 : 0); return o;
 }
+// Unified press-physics (polish KB #59): 0.94 squash in (<100ms) + elastic
+// settle out — juicy, consistent ack across every hero control.
 function hit(c, h, fn) {
   c.eventMode = 'static'; c.cursor = 'pointer'; c.hitArea = h; let d = false;
-  c.on('pointerdown', () => { d = true; c.scale.set(0.95); });
-  const u = () => { if (!d) return; d = false; c.scale.set(1); };
-  c.on('pointerup', () => { u(); fn && fn(); }); c.on('pointerupoutside', u); return c;
+  const press = () => { d = true; const g = (typeof window !== 'undefined') && window.gsap; if (g) g.to(c.scale, { x: 0.94, y: 0.94, duration: 0.06, ease: 'power3.out', overwrite: true }); else c.scale.set(0.94); };
+  const rel = () => { if (!d) return; d = false; const g = (typeof window !== 'undefined') && window.gsap; if (g) g.to(c.scale, { x: 1, y: 1, duration: 0.5, ease: 'elastic.out(1, 0.55)', overwrite: true }); else c.scale.set(1); };
+  c.on('pointerdown', press);
+  c.on('pointerup', () => { rel(); fn && fn(); }); c.on('pointerupoutside', rel); return c;
 }
 
 export class BettingBarWeb extends PIXI.Container {
@@ -129,9 +131,17 @@ export class BettingBarWeb extends PIXI.Container {
 
     
     
-    const pill = new PIXI.Graphics()
-      .roundRect(-62, 8, 124, 60, 30).fill(fg(G.active, 'v'))
-      .roundRect(-62, 8, 124, 60, 30).stroke({ width: 2, color: COL.pillStroke });
+    // glossy candy "active bet" chip — bloom, gel body, top gloss + glint,
+    // bottom shade, 2-tone candy edge.
+    const PX = -62, PY = 8, PW = 124, PH = 60, PR = 30;
+    const pill = new PIXI.Graphics();
+    pill.roundRect(PX - 2, PY - 2, PW + 4, PH + 4, PR + 2).stroke({ width: 5, color: 0xff8fd8, alpha: 0.20 });
+    pill.roundRect(PX, PY, PW, PH, PR).fill(fg(G.active, 'v'));
+    pill.roundRect(PX + 3, PY + 2.5, PW - 6, PH * 0.46, PR - 3).fill({ color: 0xffffff, alpha: 0.26 });
+    pill.roundRect(PX + PW * 0.22, PY + 4, PW * 0.40, 3, 2).fill({ color: 0xffffff, alpha: 0.5 });
+    pill.roundRect(PX + 4, PY + PH * 0.62, PW - 8, PH * 0.34, PR - 4).fill({ color: 0x8a1466, alpha: 0.22 });
+    pill.roundRect(PX + 1, PY + 1, PW - 2, PH - 2, PR - 1).stroke({ width: 2.6, color: 0xbf2496, alpha: 0.9 });
+    pill.roundRect(PX + 1, PY + 1, PW - 2, PH - 2, PR - 1).stroke({ width: 1.6, color: COL.pillStroke });
     track.addChild(pill);
     sel.eventMode = 'static'; sel.cursor = 'grab'; sel.hitArea = new PIXI.Rectangle(0, 0, SW, 76);
     const car = { track, pill, CELLW, PCX, levels: [], cells: [], active: 0, drag: false, lastX: 0, vx: 0, moved: 0, emitted: -1, fmt: (v) => String(v) };
@@ -146,7 +156,7 @@ export class BettingBarWeb extends PIXI.Container {
     const trackXFor = (i) => clampTrack(PCX - (i * CELLW + CELLW / 2));
     const pillXFor = (i) => i * CELLW + CELLW / 2; 
     const nearest = () => Math.max(0, Math.min(car.levels.length - 1, Math.round((PCX - track.x - CELLW / 2) / CELLW)));
-    const restyle = () => car.cells.forEach((c, i) => { const cen = i === car.active; c.style.fill = cen ? COL.dark : COL.value; c.scale.set(cen ? 1 : 0.78); c.alpha = cen ? 1 : 0.6; });
+    const restyle = () => car.cells.forEach((c, i) => { const cen = i === car.active; c.style.fill = cen ? COL.dark : COL.value; c.scale.set(cen ? 1 : 0.8); c.alpha = cen ? 1 : 0.72; });
     car._restyle = restyle;
     car._snapTo = (i, animate) => {
       car.active = Math.max(0, Math.min(car.levels.length - 1, i)); car.emitted = car.active;
@@ -173,22 +183,22 @@ export class BettingBarWeb extends PIXI.Container {
 
     
     const coins = this._circleBtn(1980, 186, 38, (c) => { c.addChild(iconCoins(17)); });
-    hit(coins, new PIXI.Circle(0, 0, 38), () => this._emit('betmenu')); this.addChild(coins); E.coins = coins;   
+    hit(coins, new PIXI.Circle(0, 0, 46), () => this._emit('betmenu')); this.addChild(coins); E.coins = coins;   // +8px fat-finger pad (#80)
     const gamble = this._circleBtn(2090, 186, 38, null);
     const gx2 = T('×2', 25, COL.value, 700, 0.5, true); gx2.position.set(0, 0); gamble.addChild(gx2);
-    hit(gamble, new PIXI.Circle(0, 0, 38), () => this._emit('bet:double'));
+    hit(gamble, new PIXI.Circle(0, 0, 46), () => this._emit('bet:double'));
     this.addChild(gamble); E.gamble = gamble;
     const turbo = this._circleBtn(2200, 150, 30, (c) => {
       const gl = iconBolt(15, ACCENT); c.addChild(gl); c._glyph = gl;
       const pip = new PIXI.Graphics(); pip.visible = false; c.addChild(pip); c._pip = pip;
     });
-    hit(turbo, new PIXI.Circle(0, 0, 30), () => this._emit('turbo')); this.addChild(turbo); E.turbo = turbo;
+    hit(turbo, new PIXI.Circle(0, 0, 35), () => this._emit('turbo')); this.addChild(turbo); E.turbo = turbo;   // padded but clear of stacked auto btn
     const auto = this._circleBtn(2200, 222, 30, (c) => {
       const ar = iconPlay(14, ACCENT); c.addChild(ar); c._glyph = ar;
       const cnt = T('', 22, COL.value, 700, 0.5, true); cnt.visible = false; c.addChild(cnt); c._count = cnt;
     });
-    hit(auto, new PIXI.Circle(0, 0, 30), () => this._emit('autoplay')); this.addChild(auto); E.autoplay = auto;
-    const spin = this._spin(2330, 186, 70); hit(spin, new PIXI.Circle(0, 0, 70), () => { if (!spin._stop.visible) spin.spin(); this._emit('spin'); }); this.addChild(spin); E.spin = spin;
+    hit(auto, new PIXI.Circle(0, 0, 35), () => this._emit('autoplay')); this.addChild(auto); E.autoplay = auto;
+    const spin = this._spin(2330, 186, 70); hit(spin, new PIXI.Circle(0, 0, 78), () => { if (!spin._stop.visible) spin.spin(); this._emit('spin'); }); this.addChild(spin); E.spin = spin;
     if (spin._setIdle) spin._setIdle(true);
 
 

@@ -2,28 +2,29 @@
 //
 // Everything here is procedural PIXI.Graphics (no external assets) so it stays
 // inside the single-file casino-RGS build and renders crisp at any scale. The
-// goal is an "expert" neon candy-glass look: layered depth (radial sphere base,
-// inner shadow, top gloss, bottom rim light, crisp neon edge) plus a clean,
-// correct, well-formed icon set — instead of the flat single-gradient buttons
-// and crude hand-drawn glyphs the bars used before.
+// goal is a PREMIUM neon candy-glass look: gem-like layered depth (seat shadow,
+// radial sphere base, grounded inner shadow, neon bevel + 2-tone edge, top
+// specular gloss, candy bloom) plus a clean, crisp, well-formed icon set.
 import * as PIXI from 'pixi.js';
 
 export const THEME = {
   // candy neon palette (shared with the betting bars)
-  edge: 0xff7ad0,
-  edgeDeep: 0xbf2496,
-  rim: 0xffd9f4,
-  cyan: 0xbfe8ff,
+  edge: 0xff77cf,       // candy-magenta neon edge
+  edgeDeep: 0xb42490,   // deep magenta — under-layer of the 2-tone bevel / icon shade
+  edgeBloom: 0xff8fd8,  // soft outer bloom around lit candy edges
+  rim: 0xffd9f4,        // bright candy rim highlight (top bevel + bottom bounce)
+  cyan: 0xcdebff,       // cool glass sheen
   gloss: 0xffffff,
-  icon: 0xfdf2ff,
-  iconDim: 0xe9d6f5,
-  shadow: 0x140a2c,
-  // gradients
-  btnBase: [[0, '#6a47a6'], [0.42, '#3a2468'], [1, '#160d33']],
-  btnSpin: [[0, '#ffe8fb'], [0.34, '#ff7ad0'], [0.66, '#9a4fcf'], [1, '#3e2076']],
-  btnSpinCore: [[0, '#3a2666'], [0.6, '#1a1138'], [1, '#0b0723']],
+  icon: 0xfff2fb,       // bright candy-white icon body
+  iconDim: 0xe6c9ef,
+  iconShade: 0x6f2a5c,  // icon outline / shade for definition
+  shadow: 0x0b0522,     // seat / inner shadow
+  // gradients (top → bottom)
+  btnBase: [[0, '#9168cf'], [0.42, '#4a2e82'], [1, '#1b1040']], // glossy grape sphere, bright top
+  btnSpin: [[0, '#ffe8fb'], [0.30, '#ff7ad0'], [0.64, '#9a4fcf'], [1, '#3a1d71']],
+  btnSpinCore: [[0, '#48326f'], [0.55, '#1d1340'], [1, '#0a0622']],
   activeGlyph: [[0, '#ffe6f7'], [0.45, '#ff66bd'], [1, '#c42a99']],
-  panel: [[0, '#46297a'], [0.5, '#2e1c58'], [1, '#19103e']],
+  panel: [[0, '#553597'], [0.5, '#301d5e'], [1, '#160d37']],     // grape glass body
 };
 
 export function fg(stops, dir) {
@@ -43,46 +44,73 @@ export function fgRad(stops, cx, cy, outerR) {
 
 // ---- chrome -------------------------------------------------------------
 
-// A glossy, 3-D circular button face. Light reads from the top: radial sphere
-// base, a grounded bottom inner-shadow, a neon bottom rim-light bounce, a soft
-// top gloss, and a crisp double edge (neon + cyan sheen).
+// Paint a premium glass pill/panel INTO an existing Graphics at the origin.
+// The single source of truth for every rectangular surface (both bars route
+// their local panels through here so web + mobile read identically).
+//   opts: { fill: stops[], horiz, edge, edgeWidth, glow, gloss }
+export function glassInto(g, w, h, rx, opts = {}) {
+  const base = opts.fill || THEME.panel;
+  const horiz = !!opts.horiz;
+  const edge = opts.edge != null ? opts.edge : THEME.edge;
+  const ew = opts.edgeWidth || 0;
+  // outer candy bloom (soft halo so the edge reads "lit")
+  if (ew && opts.glow !== false) g.roundRect(-1.5, -1.5, w + 3, h + 3, rx + 1.5).stroke({ width: ew + 3, color: THEME.edgeBloom, alpha: 0.085 });
+  // body
+  g.roundRect(0, 0, w, h, rx).fill(fg(base, horiz ? 'h' : 'v'));
+  // top gloss band (gel shine)
+  if (opts.gloss !== false) {
+    g.roundRect(2.5, 2, w - 5, h * 0.46, Math.max(0, rx - 2)).fill({ color: THEME.gloss, alpha: 0.13 });
+    // soft centered specular glint near the top (reads as gloss, not a dash)
+    const gw = Math.min(w * 0.42, w - 16);
+    if (gw > 8) g.roundRect((w - gw) / 2, 3, gw, Math.max(1.5, h * 0.055), 3).fill({ color: THEME.gloss, alpha: 0.26 });
+  }
+  // bottom inner shade — grounds the surface
+  g.roundRect(3, h * 0.60, w - 6, h * 0.38, Math.max(0, rx - 3)).fill({ color: THEME.shadow, alpha: 0.20 });
+  // inner cool glass rim (glass thickness)
+  g.roundRect(1.6, 1.6, w - 3.2, h - 3.2, Math.max(0, rx - 1.6)).stroke({ width: 1.1, color: THEME.cyan, alpha: 0.16 });
+  // 2-tone neon edge: deep under-layer + bright candy edge
+  if (ew) {
+    g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew + 1.2, color: THEME.edgeDeep, alpha: 0.8 });
+    g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: edge, alpha: 1 });
+  }
+  return g;
+}
+
+// A glossy, 3-D candy-gem circular button face. Light reads from the top:
+// seat shadow, radial sphere base, grounded inner shadow, neon bottom bounce,
+// a bright top bevel crescent, soft+sharp top gloss, a crisp 2-tone neon edge.
 export function glassCircle(r, opts = {}) {
   const base = opts.base || THEME.btnBase;
   const edge = opts.edge != null ? opts.edge : THEME.edge;
   const rim = opts.rim != null ? opts.rim : THEME.rim;
   const g = new PIXI.Graphics();
+  // seat shadow → lifts the gem off the bar
+  g.circle(0, r * 0.08, r * 0.98).fill({ color: THEME.shadow, alpha: 0.32 });
+  // candy bloom
+  g.circle(0, 0, r + 1.5).stroke({ width: 5, color: THEME.edgeBloom, alpha: 0.10 });
   // sphere base — radial, brightest toward the top
-  g.circle(0, 0, r).fill(fgRad(base, 0.5, 0.30, 0.72));
-  // bottom inner shadow → seats the face
-  g.arc(0, 0, r * 0.97, 0.34, Math.PI - 0.34).stroke({ width: r * 0.12, color: THEME.shadow, alpha: 0.45, cap: 'round' });
-  // bottom rim light → neon bounce
-  g.arc(0, 0, r - r * 0.05, 0.5, Math.PI - 0.5).stroke({ width: r * 0.05, color: rim, alpha: 0.45, cap: 'round' });
-  // top gloss highlight (two stacked ellipses, soft → bright)
-  g.ellipse(0, -r * 0.40, r * 0.64, r * 0.38).fill({ color: THEME.gloss, alpha: 0.14 });
-  g.ellipse(0, -r * 0.52, r * 0.38, r * 0.16).fill({ color: THEME.gloss, alpha: 0.30 });
-  // crisp neon edge + inner cyan sheen
-  g.circle(0, 0, r - r * 0.028).stroke({ width: Math.max(1.4, r * 0.052), color: edge, alpha: 0.96 });
-  g.circle(0, 0, r - r * 0.11).stroke({ width: 1, color: THEME.cyan, alpha: 0.16 });
+  g.circle(0, 0, r).fill(fgRad(base, 0.5, 0.26, 0.80));
+  // grounded bottom inner shadow → seats the face
+  g.arc(0, 0, r * 0.98, 0.32, Math.PI - 0.32).stroke({ width: r * 0.13, color: THEME.shadow, alpha: 0.33, cap: 'round' });
+  // bottom rim light → candy bounce
+  g.arc(0, 0, r - r * 0.05, 0.55, Math.PI - 0.55).stroke({ width: r * 0.06, color: rim, alpha: 0.5, cap: 'round' });
+  // crisp 2-tone edge (deep under-layer + bright neon)
+  g.circle(0, 0, r - r * 0.018).stroke({ width: Math.max(2, r * 0.078), color: THEME.edgeDeep, alpha: 0.88 });
+  g.circle(0, 0, r - r * 0.03).stroke({ width: Math.max(1.4, r * 0.05), color: edge, alpha: 1 });
+  // top bevel highlight crescent
+  g.arc(0, 0, r - r * 0.085, Math.PI + 0.62, 2 * Math.PI - 0.62).stroke({ width: r * 0.05, color: THEME.rim, alpha: 0.5, cap: 'round' });
+  // top gloss — soft pool + sharp glint
+  g.ellipse(0, -r * 0.40, r * 0.60, r * 0.34).fill({ color: THEME.gloss, alpha: 0.16 });
+  g.ellipse(-r * 0.12, -r * 0.52, r * 0.30, r * 0.12).fill({ color: THEME.gloss, alpha: 0.42 });
+  // inner cool sheen
+  g.circle(0, 0, r - r * 0.13).stroke({ width: 1, color: THEME.cyan, alpha: 0.14 });
   return g;
 }
 
-// A glossy rounded panel/pill with the same language as glassCircle.
+// A glossy rounded panel/pill in the same language as glassCircle.
 export function glassPanel(w, h, rx, opts = {}) {
-  const base = opts.base || THEME.panel;
   const g = new PIXI.Graphics();
-  g.roundRect(0, 0, w, h, rx).fill(fg(base, opts.horiz ? 'h' : 'v'));
-  // top gloss band
-  g.roundRect(2.5, 2, w - 5, h * 0.44, Math.max(0, rx - 2)).fill({ color: THEME.gloss, alpha: 0.12 });
-  // bottom inner shadow band
-  g.roundRect(3, h * 0.62, w - 6, h * 0.36, Math.max(0, rx - 3)).fill({ color: THEME.shadow, alpha: 0.18 });
-  // inner cyan hairline
-  g.roundRect(2, 2, w - 4, h - 4, Math.max(0, rx - 2)).stroke({ width: 1.1, color: THEME.cyan, alpha: 0.15 });
-  // neon edge
-  if (opts.edgeWidth) {
-    const ew = opts.edgeWidth;
-    g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: opts.edge != null ? opts.edge : THEME.edge });
-  }
-  return g;
+  return glassInto(g, w, h, rx, { fill: opts.base, horiz: opts.horiz, edge: opts.edge, edgeWidth: opts.edgeWidth || 0 });
 }
 
 // ---- icons --------------------------------------------------------------
@@ -97,19 +125,16 @@ export function iconSpin(s, col = THEME.icon) {
   const w = strokeW(s, 0.20);
   const r = s * 0.92;
   const head = s * 0.30;
-  // top arc (sweeps clockwise toward the right) + bottom arc (toward the left)
   g.arc(0, 0, r, -Math.PI * 0.86, Math.PI * 0.30).stroke({ width: w, color: col, cap: 'round' });
   g.arc(0, 0, r, Math.PI * 0.14, Math.PI * 1.30).stroke({ width: w, color: col, cap: 'round' });
-  // arrowhead at top-right end (end angle Math.PI*0.30)
   const a1 = Math.PI * 0.30;
   const p1 = { x: Math.cos(a1) * r, y: Math.sin(a1) * r };
-  const t1 = { x: -Math.sin(a1), y: Math.cos(a1) }; // tangent (cw)
+  const t1 = { x: -Math.sin(a1), y: Math.cos(a1) };
   g.poly([
     p1.x + t1.x * head, p1.y + t1.y * head,
     p1.x - t1.x * head * 0.45 + (p1.x / r) * head, p1.y - t1.y * head * 0.45 + (p1.y / r) * head,
     p1.x - t1.x * head * 0.45 - (p1.x / r) * head, p1.y - t1.y * head * 0.45 - (p1.y / r) * head,
   ]).fill(col);
-  // arrowhead at bottom-left end (end angle Math.PI*1.30)
   const a2 = Math.PI * 1.30;
   const p2 = { x: Math.cos(a2) * r, y: Math.sin(a2) * r };
   const t2 = { x: -Math.sin(a2), y: Math.cos(a2) };
@@ -135,81 +160,80 @@ function sparkleStar(g, cx, cy, rad, col = 0xffffff, alpha = 0.95) {
   ]).fill({ color: col, alpha });
 }
 
-// draws the two spin arrows (arcs + heads) once, in a single colour/width.
-// Two distinct ~144° arms 180° apart with clear gaps top + bottom, so it reads
-// as a chasing twin-arrow "spin" — not a near-complete "refresh ring".
+// Draws ONE chasing-arrow ring pass: a TOP arc + a BOTTOM arc (180° apart) with
+// clear gaps at left & right, each ending in a fat tangent arrowhead so it reads
+// unmistakably as a clockwise "spin" — the classic refresh ring, never letters.
 function spinArrowPath(g, r, w, headK, col) {
   const head = r * headK;
-  const A = -0.42 * Math.PI, B = 0.38 * Math.PI;
+  const A = 0.16 * Math.PI, B = 0.84 * Math.PI;    // bottom arm 28.8°→151.2° (≈122°)
   [0, Math.PI].forEach((off) => {
-    const a1 = B + off;
-    g.arc(0, 0, r, A + off, a1).stroke({ width: w, color: col, cap: 'round' });
+    const a0 = A + off, a1 = B + off;              // a1 = leading (clockwise) tip
+    g.arc(0, 0, r, a0, a1).stroke({ width: w, color: col, cap: 'round' });
     const px = Math.cos(a1) * r, py = Math.sin(a1) * r;
-    const tx = -Math.sin(a1), ty = Math.cos(a1); // tangent (cw, travel dir)
+    const tx = -Math.sin(a1), ty = Math.cos(a1);   // clockwise tangent (travel dir)
+    const nx = Math.cos(a1), ny = Math.sin(a1);    // outward radial
     g.poly([
-      px + tx * head, py + ty * head,
-      px - tx * head * 0.5 + (px / r) * head, py - ty * head * 0.5 + (py / r) * head,
-      px - tx * head * 0.5 - (px / r) * head, py - ty * head * 0.5 - (py / r) * head,
+      px + tx * head * 1.12, py + ty * head * 1.12, // tip leads the travel
+      px + nx * head * 0.82, py + ny * head * 0.82, // outer corner
+      px - nx * head * 0.82, py - ny * head * 0.82, // inner corner
     ]).fill(col);
   });
 }
 
 // SPIN (candy) — glossy candy circular-arrows: deep-magenta candy outline, a
-// bright candy-cream body, a top gloss sheen and sparkle shines. Gamified hero
-// glyph for the spin button (replaces the flat utilitarian refresh ring).
+// bright candy-cream body, plus sparkle shines. Gamified hero glyph for the
+// spin button.
 export function iconSpinCandy(s, opts = {}) {
   const g = new PIXI.Graphics();
-  const main = opts.main != null ? opts.main : 0xfff2fb;
+  const main = opts.main != null ? opts.main : 0xfff4fb;
   const outline = opts.outline != null ? opts.outline : 0x9a2370;
-  const r = s * 0.86;
-  const w = Math.max(2.5, s * 0.23);
-  // candy outline (dark magenta, thicker) → bright candy-cream body
-  spinArrowPath(g, r, w + Math.max(2, s * 0.13), 0.42, outline);
-  spinArrowPath(g, r, w, 0.30, main);
-  // sparkle shines — placed clear of the ring (top-right + bottom-left)
-  sparkleStar(g, s * 0.92, -s * 0.86, s * 0.34, 0xffffff, 0.98);
-  sparkleStar(g, -s * 1.02, s * 0.66, s * 0.22, 0xffe9fa, 0.9);
+  const r = s * 0.80;
+  const w = Math.max(2.5, s * 0.21);
+  spinArrowPath(g, r, w + Math.max(2.2, s * 0.12), 0.46, outline);  // candy outline
+  spinArrowPath(g, r, w, 0.40, main);                                // bright body
+  // sparkle shines — placed in the left & right ring gaps (clear of the arcs)
+  sparkleStar(g, s * 1.18, -s * 0.30, s * 0.30, 0xffffff, 0.98);
+  sparkleStar(g, -s * 1.18, s * 0.30, s * 0.18, 0xffe9fa, 0.9);
   return g;
 }
 
 // PLAY ▶ (autoplay / start) — rounded equilateral triangle.
 export function iconPlay(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
-  const w = s * 1.04, h = s * 1.14;
-  g.poly([-w * 0.42, -h * 0.5, w * 0.58, 0, -w * 0.42, h * 0.5]).fill(col);
-  // thin round join only to soften corners — NOT a fat same-colour outline (which
-  // bloated the silhouette unevenly).
+  const w = s * 1.04, h = s * 1.16;
+  g.poly([-w * 0.40, -h * 0.5, w * 0.60, 0, -w * 0.40, h * 0.5]).fill(col);
   if (typeof col === 'number')
-    g.stroke({ width: Math.max(1, Math.round(s * 0.07)), color: col, alpha: 1, join: 'round', cap: 'round' });
+    g.stroke({ width: Math.max(1, Math.round(s * 0.08)), color: col, alpha: 1, join: 'round', cap: 'round' });
   return g;
 }
 
 // TURBO — a clean lightning bolt, point-symmetric through the origin.
 export function iconBolt(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
-  const x = s * 0.74, y = s * 1.06;
-  g.poly([
-    x * 0.18, -y, // top tip
-    -x * 0.45, y * 0.1, // upper-left
-    x * 0.02, y * 0.1, // inner notch
-    -x * 0.18, y, // bottom tip (mirror of top)
-    x * 0.45, -y * 0.1, // lower-right (mirror)
-    -x * 0.02, -y * 0.1, // inner notch (mirror)
-  ]).fill(col);
-  if (typeof col === 'number') g.stroke({ width: Math.max(1, Math.round(s * 0.06)), color: col, join: 'round' });
+  const x = s * 0.76, y = s * 1.08;
+  const pts = [
+    x * 0.20, -y,
+    -x * 0.48, y * 0.10,
+    x * 0.04, y * 0.10,
+    -x * 0.20, y,
+    x * 0.48, -y * 0.10,
+    -x * 0.04, -y * 0.10,
+  ];
+  g.poly(pts).fill(col);
+  if (typeof col === 'number') g.stroke({ width: Math.max(1, Math.round(s * 0.07)), color: col, join: 'round', cap: 'round' });
   return g;
 }
 
 // PLUS / MINUS — bold, rounded bars.
 export function iconPlus(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
-  const w = strokeW(s, 0.30);
+  const w = strokeW(s, 0.32);
   g.moveTo(-s, 0).lineTo(s, 0).moveTo(0, -s).lineTo(0, s).stroke({ width: w, color: col, cap: 'round' });
   return g;
 }
 export function iconMinus(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
-  const w = strokeW(s, 0.30);
+  const w = strokeW(s, 0.32);
   g.moveTo(-s, 0).lineTo(s, 0).stroke({ width: w, color: col, cap: 'round' });
   return g;
 }
@@ -217,22 +241,20 @@ export function iconMinus(s, col = THEME.icon) {
 // SOUND — speaker cone + two waves; `off` swaps the waves for a slash.
 export function iconSound(s, col = THEME.icon, off = false) {
   const g = new PIXI.Graphics();
-  const w = Math.max(2, Math.round(s * 0.13));
-  // clean speaker: back box + trapezoid cone on one vertical seam, symmetric about y=0
+  const w = Math.max(2, Math.round(s * 0.14));
   g.poly([
     -s * 0.92, -s * 0.3,
     -s * 0.52, -s * 0.3,
-    -s * 0.02, -s * 0.7,
-    -s * 0.02, s * 0.7,
+    -s * 0.02, -s * 0.72,
+    -s * 0.02, s * 0.72,
     -s * 0.52, s * 0.3,
     -s * 0.92, s * 0.3,
   ]).fill(col);
   if (off) {
-    g.moveTo(s * 0.22, -s * 0.5).lineTo(s * 0.92, s * 0.5)
-      .moveTo(s * 0.92, -s * 0.5).lineTo(s * 0.22, s * 0.5)
+    g.moveTo(s * 0.24, -s * 0.5).lineTo(s * 0.94, s * 0.5)
+      .moveTo(s * 0.94, -s * 0.5).lineTo(s * 0.24, s * 0.5)
       .stroke({ width: w, color: col, cap: 'round' });
   } else {
-    // two CONCENTRIC waves, same centre + same sweep
     g.arc(-s * 0.02, 0, s * 0.5, -0.8, 0.8).stroke({ width: w, color: col, cap: 'round' });
     g.arc(-s * 0.02, 0, s * 0.85, -0.8, 0.8).stroke({ width: w, color: col, cap: 'round' });
   }
@@ -242,7 +264,7 @@ export function iconSound(s, col = THEME.icon, off = false) {
 // MENU — three rounded bars (hamburger).
 export function iconMenu(s, col = THEME.icon) {
   const g = new PIXI.Graphics();
-  const w = Math.max(2, s * 0.22);
+  const w = Math.max(2, s * 0.24);
   [-s * 0.62, 0, s * 0.62].forEach((y) => g.moveTo(-s, y).lineTo(s, y));
   g.stroke({ width: w, color: col, cap: 'round' });
   return g;
@@ -256,54 +278,71 @@ export function iconClose(s, col = THEME.icon) {
   return g;
 }
 
-// COINS — a small stack (used by the bet/coins button).
-export function iconCoins(s, col = THEME.edge) {
+// COINS — a clean glossy candy-chip stack (the bet/coins button). Three stacked
+// discs, each with a deep rim, a brighter top face, and a small shine on top.
+export function iconCoins(s) {
   const g = new PIXI.Graphics();
-  const rx = s * 0.92, ry = s * 0.34;
-  const mk = (yc, fill) => g.ellipse(0, yc, rx, ry).fill(fill).ellipse(0, yc, rx, ry).stroke({ width: Math.max(1, s * 0.06), color: THEME.edgeDeep, alpha: 0.8 });
-  mk(s * 0.50, 0x9a4bd0);
-  mk(s * 0.04, 0xc06fda);
-  g.ellipse(0, -s * 0.42, rx, ry).fill(0xe7b3ff);
-  g.ellipse(0, -s * 0.42, rx, ry).stroke({ width: Math.max(1, s * 0.06), color: THEME.edgeDeep, alpha: 0.7 });
+  const rx = s * 0.96, ry = s * 0.40, gap = s * 0.50;
+  const chip = (yc, side, face) => {
+    // side wall
+    g.ellipse(0, yc + ry * 0.46, rx, ry).fill(side);
+    g.rect(-rx, yc - ry * 0.1, rx * 2, ry * 0.56).fill(side);
+    // top face
+    g.ellipse(0, yc, rx, ry).fill(face);
+    g.ellipse(0, yc, rx, ry).stroke({ width: Math.max(1, s * 0.07), color: THEME.edgeDeep, alpha: 0.55 });
+  };
+  chip(s * 0.46, 0x7a39b0, 0x9a55cf);
+  chip(s * 0.04, 0x9446c0, 0xb96fe0);
+  chip(-s * 0.40, 0xb85fd6, 0xe7b3ff);
+  // shine on the top chip
+  g.ellipse(-s * 0.26, -s * 0.46, rx * 0.34, ry * 0.34).fill({ color: 0xffffff, alpha: 0.6 });
   return g;
 }
 
 // ---- hero spin button ---------------------------------------------------
-// A self-contained glossy spin button with arrow glyph, stop state, and a soft
-// idle breathing pulse on the outer ring. Returns a Container with .spin(),
-// ._arrow, ._stop and ._setIdle(on).
+// A self-contained glossy candy-gem spin button with arrow glyph, stop state,
+// and a soft idle breathing pulse. Returns a Container with .spin(), ._arrow,
+// ._stop, ._glow and ._setIdle(on).
 export function spinButton(R, opts = {}) {
   const g = new PIXI.Container();
   const inner = R * 0.78;
-  // soft idle glow halo (pulses; sits behind the face so it never fights the
-  // press-scale on the button container)
+  // soft idle glow halo (pulses; sits behind the face)
   const glow = new PIXI.Graphics();
-  glow.circle(0, 0, R * 1.22).fill({ color: THEME.edge, alpha: 0.30 });
-  glow.circle(0, 0, R * 1.08).fill({ color: THEME.edge, alpha: 0.22 });
+  glow.circle(0, 0, R * 1.24).fill({ color: THEME.edge, alpha: 0.30 });
+  glow.circle(0, 0, R * 1.09).fill({ color: THEME.edge, alpha: 0.22 });
   glow.alpha = 0;
   g.addChild(glow);
   g._glow = glow;
+
   const base = new PIXI.Graphics();
-  // outer neon ring
-  base.circle(0, 0, R).fill(fgRad(THEME.btnSpin, 0.5, 0.34, 0.72));
-  base.circle(0, 0, R - 1).stroke({ width: R * 0.05, color: THEME.rim, alpha: 0.55 });
-  base.arc(0, 0, R - R * 0.04, 0.5, Math.PI - 0.5).stroke({ width: R * 0.045, color: THEME.gloss, alpha: 0.30, cap: 'round' });
+  // seat shadow
+  base.circle(0, R * 0.10, R * 1.02).fill({ color: THEME.shadow, alpha: 0.5 });
+  // candy bloom
+  base.circle(0, 0, R + 2).stroke({ width: 7, color: THEME.edgeBloom, alpha: 0.16 });
+  // outer neon candy ring (radial gem)
+  base.circle(0, 0, R).fill(fgRad(THEME.btnSpin, 0.5, 0.30, 0.80));
+  base.circle(0, 0, R - 1).stroke({ width: R * 0.05, color: THEME.rim, alpha: 0.6 });
+  // 2-tone outer edge
+  base.circle(0, 0, R - 0.5).stroke({ width: R * 0.045, color: THEME.edgeDeep, alpha: 0.55 });
+  // top bevel + bottom seat on the ring
+  base.arc(0, 0, R - R * 0.04, Math.PI + 0.5, 2 * Math.PI - 0.5).stroke({ width: R * 0.05, color: THEME.gloss, alpha: 0.34, cap: 'round' });
+  base.arc(0, 0, R - R * 0.06, 0.5, Math.PI - 0.5).stroke({ width: R * 0.05, color: THEME.shadow, alpha: 0.35, cap: 'round' });
   // recessed glossy core
-  base.circle(0, 0, inner).fill(fgRad(THEME.btnSpinCore, 0.42, 0.32, 0.62));
+  base.circle(0, 0, inner).fill(fgRad(THEME.btnSpinCore, 0.42, 0.30, 0.64));
   base.circle(0, 0, inner).stroke({ width: R * 0.03, color: THEME.rim, alpha: 0.4 });
   base.arc(0, 0, inner * 0.96, Math.PI + 0.4, 2 * Math.PI - 0.4).stroke({ width: R * 0.06, color: THEME.shadow, alpha: 0.5, cap: 'round' });
-  base.ellipse(0, -R * 0.30, R * 0.42, R * 0.18).fill({ color: THEME.gloss, alpha: 0.16 });
+  base.ellipse(0, -R * 0.30, R * 0.44, R * 0.18).fill({ color: THEME.gloss, alpha: 0.16 });
   g.addChild(base);
 
   // arrow glyph (gamified candy circular-arrows)
   const a = new PIXI.Container();
-  a.addChild(iconSpinCandy(R * 0.40));
+  a.addChild(iconSpinCandy(R * 0.42));
   g.addChild(a);
 
-  // stop glyph (square)
+  // stop glyph (rounded square)
   const stop = new PIXI.Graphics()
-    .roundRect(-R * 0.24, -R * 0.24, R * 0.48, R * 0.48, R * 0.12).fill({ color: THEME.icon, alpha: 0.98 })
-    .roundRect(-R * 0.24, -R * 0.24, R * 0.48, R * 0.48, R * 0.12).stroke({ color: THEME.edgeDeep, width: R * 0.03, alpha: 0.9 });
+    .roundRect(-R * 0.24, -R * 0.24, R * 0.48, R * 0.48, R * 0.13).fill({ color: THEME.icon, alpha: 0.98 })
+    .roundRect(-R * 0.24, -R * 0.24, R * 0.48, R * 0.48, R * 0.13).stroke({ color: THEME.edgeDeep, width: R * 0.03, alpha: 0.9 });
   stop.visible = false;
   g.addChild(stop);
 
@@ -313,19 +352,26 @@ export function spinButton(R, opts = {}) {
     const tk = () => { const t = (performance.now() - s0) / 650; a.rotation = Math.min(t, 1) * Math.PI * 2; if (t < 1) requestAnimationFrame(tk); else { a.rotation = 0; g.__s = false; } };
     requestAnimationFrame(tk);
   };
-  // soft idle breathing on the glow halo (a "ready to spin" pulse). Pulsing the
-  // halo — not the button scale — keeps the press feedback in hit() clean.
   g._idle = null;
   g._setIdle = (on) => {
-    if (on && !g._idle && typeof window !== 'undefined' && window.gsap) {
-      glow.alpha = 0.25; glow.scale.set(0.94);
-      g._idle = window.gsap.timeline({ repeat: -1, yoyo: true })
-        .to(glow, { alpha: 0.7, duration: 1.0, ease: 'sine.inOut' }, 0)
-        .to(glow.scale, { x: 1.06, y: 1.06, duration: 1.0, ease: 'sine.inOut' }, 0);
-    } else if (!on && g._idle) {
-      g._idle.kill(); g._idle = null;
-      if (window.gsap) window.gsap.to(glow, { alpha: 0, duration: 0.25 }); else glow.alpha = 0;
+    // WCAG 2.3.3 — honour prefers-reduced-motion: show a STATIC "ready" glow
+    // instead of the breathing pulse.
+    const reduce = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (g._idle) { g._idle.kill(); g._idle = null; }
+    if (!on) {
+      if (typeof window !== 'undefined' && window.gsap) window.gsap.to(glow, { alpha: 0, duration: 0.25 });
+      else glow.alpha = 0;
+      return;
     }
+    if (reduce || typeof window === 'undefined' || !window.gsap) {
+      glow.alpha = 0.5; glow.scale.set(1);   // static ready-glow, no motion
+      return;
+    }
+    glow.alpha = 0.28; glow.scale.set(0.95);
+    g._idle = window.gsap.timeline({ repeat: -1, yoyo: true })
+      .to(glow, { alpha: 0.62, duration: 1.7, ease: 'sine.inOut' }, 0)
+      .to(glow.scale, { x: 1.05, y: 1.05, duration: 1.7, ease: 'sine.inOut' }, 0);
   };
   return g;
 }
