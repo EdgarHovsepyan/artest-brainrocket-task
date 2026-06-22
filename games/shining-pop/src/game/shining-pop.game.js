@@ -363,7 +363,12 @@
   const _pickRes = (w, h) => {
     const dpr = window.devicePixelRatio || 1;
     const cap = _gpuWeak ? 2 : 3;
-    return Math.max(0.5, Math.min(dpr, cap, 4096 / Math.max(w, h, 1)));
+    // Crispness: supersample non-retina (DPR-1) DESKTOP up to 2x so the UI — betting
+    // bar, icons, text, reels — renders sharp instead of soft/aliased at 1x (owner-
+    // reported "bad quality"). Still clamped by the 4096px backing limit + cap, and
+    // weak/mobile devices stay at native DPR to protect performance.
+    const want = _gpuWeak ? dpr : Math.max(dpr, 2);
+    return Math.max(0.5, Math.min(want, cap, 4096 / Math.max(w, h, 1)));
   };
 
   
