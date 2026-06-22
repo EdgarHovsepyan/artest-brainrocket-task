@@ -3552,7 +3552,16 @@ export class SlotView extends Component {
     }, 1.6);
   }
 
+  /** A6: iridescent rainbow shine-slide on winning symbols — ON only for MEGA/EPIC
+   *  (rare). Drives u_prestige on the shared symbol-win material; 0 keeps the cute
+   *  candy-warm win untouched for every normal win. */
+  setWinPrestige(on: boolean): void {
+    const m = this.effectMaterials['symbol-win'];
+    if (m) m.setProperty('u_prestige', on ? 1 : 0);
+  }
+
   clearWins(): void {
+    this.setWinPrestige(false);
     this.unschedule(this.cycleWinLine);
     this.unschedule(this.tickReveal);
     this.unschedule(this.tickSymbolWin);

@@ -36,6 +36,7 @@ CCEffect %{
         u_sweepSpeed:  { value: 0.55 }
         u_fireAmt:     { value: 1.0 }
         u_shimmer:     { value: 1.0 }
+        u_prestige:    { value: 0.0 }
 }%
 
 CCProgram sprite-vs %{
@@ -85,6 +86,7 @@ CCProgram sprite-fs %{
     float u_sweepSpeed;
     float u_fireAmt;
     float u_shimmer;
+    float u_prestige;
   };
 
   // Cheap value-noise (hash + bilerp) → 3-octave fbm → warm fire ramp.
@@ -161,6 +163,18 @@ CCProgram sprite-fs %{
              + rimCol * rim * 0.95
              + vec3(1.0, 0.99, 0.95) * glint * 1.8;    // bright white twinkles
     float outA = clamp(body + rim * 0.85 + glint * 1.5, 0.0, 1.0) * u_intensity * color.a;
+
+    // IRIDESCENT SHINE-SLIDE (A6) — PRESTIGE ONLY (MEGA/EPIC). A tight rainbow ribbon
+    // slides 45deg across the candy. u_prestige gates it fully OFF (=0) for every
+    // normal win, so the cute candy-warm look is untouched except on the rare top
+    // tiers (alpha-clipped via × a, so it lives on the candy, never the cell box).
+    float diag = (uv0.x - uv0.y) * 0.70711;
+    float ribT = fract(diag * 1.6 - u_time * 0.8);
+    float ribbon = smoothstep(0.0, 0.06, ribT) * (1.0 - smoothstep(0.09, 0.26, ribT));
+    vec3 iris = hue(diag * 0.85 + u_time * 0.12);
+    float shine = ribbon * a * u_prestige;
+    rgb += iris * shine * 1.15;
+    outA = clamp(outA + shine * 0.8, 0.0, 1.0);
 
     vec4 col = vec4(rgb, outA);
     ALPHA_TEST(col);

@@ -535,8 +535,16 @@ export class SlotController extends Component {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
       if (immediateCents > 0) {
-        this.view.countUp(immediateCents);
-        this.bar.setLastWin(immediateCents / 100);
+        // A2 — chain the count-up to the L->R win cascade: start it as the cascade
+        // reaches the last winning reel, so the number follows the symbols igniting
+        // instead of racing ahead of them. (Cascade stagger itself is owner-tuned.)
+        const cascadeReels = outcome.result.lineWins.reduce((m, w) => Math.max(m, w.count), 0);
+        const cascadeS =
+          Math.max(0, cascadeReels - 1) * VIEW_CONFIG.win.highlightWaveStagger + 0.08;
+        this.scheduleOnce(() => {
+          this.view.countUp(immediateCents);
+          this.bar.setLastWin(immediateCents / 100);
+        }, cascadeS);
         if (!outcome.freeSpins) {
           this.view.playCeremony(immediateCents, outcome.betCents, outcome.wildStrike);
         }
@@ -544,6 +552,7 @@ export class SlotController extends Component {
           const mult = immediateCents / outcome.betCents;
           const tier = mult >= 50 ? 5 : mult >= 30 ? 4 : mult >= 10 ? 3 : mult >= 2 ? 2 : 1;
           this.view.audio.win(tier);
+          this.view.setWinPrestige(tier >= 4); // A6: rainbow shine-slide only on MEGA/EPIC
         }
       }
     }
