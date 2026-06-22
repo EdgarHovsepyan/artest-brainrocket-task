@@ -76,6 +76,13 @@ export class SymbolView extends Component {
   private idleAmp = 0;
   private idleOn = false;
 
+  // True while this cell is playing its win pop. A reel's land bounce for rows 1/2
+  // is scheduleOnce'd (staggered cascade) and can fire AFTER showWins has already
+  // started the win pop; playLand's Tween.stopAllByTarget + setScale(1,1,1) would
+  // then KILL the pop and leave the symbol static (owner: "some win symbols static
+  // in the win"). This guard makes a late land a no-op once a win pop owns the cell.
+  private winActive = false;
+
   private artBaseScale = 1;
 
   build(size: number, frames: SpriteFrame[], phase = 0): void {
@@ -320,6 +327,7 @@ export class SymbolView extends Component {
     lift: Node | null = null,
     worldCenter: Vec3 | null = null,
   ): void {
+    this.winActive = true; // claim the cell so a late, scheduled reel-land can't clobber the pop
     this.ensureBurst();
 
     if (lift && worldCenter) this.liftForWin(lift, worldCenter);
@@ -841,6 +849,9 @@ export class SymbolView extends Component {
   }
 
   playLand(cell: number, dipFrac: number, sqFrac: number, durMs: number): void {
+    // A win pop already owns this cell — a staggered land that fires now would stop
+    // the pop and snap the symbol back to scale 1 (the "static winning symbol" bug).
+    if (this.winActive) return;
     Tween.stopAllByTarget(this.node);
 
     if (!this.landRest) this.landRest = this.node.position.clone();
@@ -884,6 +895,7 @@ export class SymbolView extends Component {
   }
 
   clear(): void {
+    this.winActive = false; // win is over — lands may bounce this cell again next spin
     Tween.stopAllByTarget(this.node);
 
     if (this.homeParent) {
@@ -923,6 +935,7 @@ export class SymbolView extends Component {
    * which is not guaranteed once a new spin interrupts a live win.
    */
   resetHome(strip: Node, localPos: Vec3): void {
+    this.winActive = false; // new spin — release the win-pop claim so lands work again
     Tween.stopAllByTarget(this.node);
     if (this.node.parent !== strip) this.node.setParent(strip, false);
     this.node.setPosition(localPos);
