@@ -86,12 +86,14 @@ export class ReelView extends Component {
     this.startY = spinBuffer * this.pitch;
 
     const ut = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
-    // ANTI-CROP: the clip rect is WIDER than the cell (by winPopMaskMargin each
-    // side) so a winning symbol's pop is not side-clipped by its own reel mask.
-    // Height stays windowH (vertical buffer must stay clipped). The strip + cells
-    // below remain `cell` wide, so the spin shows nothing new in the extra width.
+    // ANTI-CROP: the clip rect is WIDER and TALLER than the window (by
+    // winPopMaskMargin each side) so a winning symbol's pop is not clipped by its
+    // own reel mask on ANY edge — the prior height==windowH clipped pops top/bottom
+    // (the cropping the owner reported). Trade-off: during a spin a ~maskMargin
+    // sliver of the incoming/outgoing symbol shows above/below; reduce the vertical
+    // term if that reads poorly on device.
     const maskMargin = VIEW_CONFIG.layout.winPopMaskMargin;
-    ut.setContentSize(cell + maskMargin * 2, windowH);
+    ut.setContentSize(cell + maskMargin * 2, windowH + maskMargin * 2);
     const mask = this.node.addComponent(Mask);
     mask.type = Mask.Type.GRAPHICS_RECT;
 
