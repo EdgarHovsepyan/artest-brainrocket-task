@@ -53,25 +53,28 @@ export function glassInto(g, w, h, rx, opts = {}) {
   const horiz = !!opts.horiz;
   const edge = opts.edge != null ? opts.edge : THEME.edge;
   const ew = opts.edgeWidth || 0;
+  // optional draw-origin offset (default top-left). lets centred surfaces
+  // (e.g. the game's modal cards drawn around their own origin) reuse this recipe.
+  const X = opts.x || 0, Y = opts.y || 0;
   // outer candy bloom (soft halo so the edge reads "lit")
-  if (ew && opts.glow !== false) g.roundRect(-1.5, -1.5, w + 3, h + 3, rx + 1.5).stroke({ width: ew + 3, color: THEME.edgeBloom, alpha: 0.085 });
+  if (ew && opts.glow !== false) g.roundRect(X - 1.5, Y - 1.5, w + 3, h + 3, rx + 1.5).stroke({ width: ew + 3, color: THEME.edgeBloom, alpha: 0.085 });
   // body
-  g.roundRect(0, 0, w, h, rx).fill(fg(base, horiz ? 'h' : 'v'));
+  g.roundRect(X, Y, w, h, rx).fill(fg(base, horiz ? 'h' : 'v'));
   // top gloss band (gel shine)
   if (opts.gloss !== false) {
-    g.roundRect(2.5, 2, w - 5, h * 0.46, Math.max(0, rx - 2)).fill({ color: THEME.gloss, alpha: 0.13 });
+    g.roundRect(X + 2.5, Y + 2, w - 5, h * 0.46, Math.max(0, rx - 2)).fill({ color: THEME.gloss, alpha: 0.13 });
     // soft centered specular glint near the top (reads as gloss, not a dash)
     const gw = Math.min(w * 0.42, w - 16);
-    if (gw > 8) g.roundRect((w - gw) / 2, 3, gw, Math.max(1.5, h * 0.055), 3).fill({ color: THEME.gloss, alpha: 0.26 });
+    if (gw > 8) g.roundRect(X + (w - gw) / 2, Y + 3, gw, Math.max(1.5, h * 0.055), 3).fill({ color: THEME.gloss, alpha: 0.26 });
   }
   // bottom inner shade — grounds the surface
-  g.roundRect(3, h * 0.60, w - 6, h * 0.38, Math.max(0, rx - 3)).fill({ color: THEME.shadow, alpha: 0.20 });
+  g.roundRect(X + 3, Y + h * 0.60, w - 6, h * 0.38, Math.max(0, rx - 3)).fill({ color: THEME.shadow, alpha: 0.20 });
   // inner cool glass rim (glass thickness)
-  g.roundRect(1.6, 1.6, w - 3.2, h - 3.2, Math.max(0, rx - 1.6)).stroke({ width: 1.1, color: THEME.cyan, alpha: 0.16 });
+  g.roundRect(X + 1.6, Y + 1.6, w - 3.2, h - 3.2, Math.max(0, rx - 1.6)).stroke({ width: 1.1, color: THEME.cyan, alpha: 0.16 });
   // 2-tone neon edge: deep under-layer + bright candy edge
   if (ew) {
-    g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew + 1.2, color: THEME.edgeDeep, alpha: 0.8 });
-    g.roundRect(ew / 2, ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: edge, alpha: 1 });
+    g.roundRect(X + ew / 2, Y + ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew + 1.2, color: THEME.edgeDeep, alpha: 0.8 });
+    g.roundRect(X + ew / 2, Y + ew / 2, w - ew, h - ew, Math.max(0, rx - ew / 2)).stroke({ width: ew, color: edge, alpha: 1 });
   }
   return g;
 }

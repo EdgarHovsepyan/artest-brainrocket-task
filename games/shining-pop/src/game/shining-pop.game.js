@@ -3414,8 +3414,12 @@
     
 
     
-    bmCardBg.clear()
-      
+    bmCardBg.clear();
+    if (window.__glassInto) {
+      // Wave 1: premium candy-glass card (unified with the rebuilt betting bar).
+      window.__glassInto(bmCardBg, cardW, cardH, 18, { x: -cardW / 2, y: -cardH / 2, fill: [[0, '#553597'], [0.5, '#301d5e'], [1, '#160d37']], edge: 0xff77cf, edgeWidth: 2 });
+    } else bmCardBg
+
       .roundRect(-cardW/2-10, -cardH/2-7, cardW+20, cardH+18, 22)
       .fill({ color: 0xff007f, alpha: 0.05 })
       .roundRect(-cardW/2-4, -cardH/2-2, cardW+8, cardH+8, 19)

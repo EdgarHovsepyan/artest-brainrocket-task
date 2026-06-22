@@ -3,6 +3,7 @@ import * as PIXI from 'pixi.js';
 import { gsap } from 'gsap';
 import { SymbolRigPool } from './spine/SymbolRigPool.js';
 import { makeSkin } from './ui/betting-bar-skin.js';
+import { glassInto } from './ui/ui-kit.js';
 import { BettingBarMobile } from './ui/betting-bar-mobile.js';
 import { BettingBarWeb } from './ui/betting-bar-web.js';
 
@@ -14,6 +15,8 @@ import { BettingBarWeb } from './ui/betting-bar-web.js';
 gsap.ticker.lagSmoothing(500, 33);
 
 (globalThis as Record<string, unknown>).__makeSkin = makeSkin;
+
+(globalThis as Record<string, unknown>).__glassInto = glassInto;
 
 (globalThis as Record<string, unknown>).BettingBarMobile = BettingBarMobile;
 
