@@ -196,6 +196,8 @@ export class SlotController extends Component {
           feature: (name = 'STICKY WILDS') => this.view.showFeatureUnlocked(name),
           buy: (mode: BonusMode = 'reels') => void this.onBuy(mode),
           vfx: () => this.view.vfxHud(),
+          auto: (n = 5) => this.startAuto(n), // debug/QA: start autoplay for n spins
+          autoStop: () => this.stopAuto(),
           // Force a wild win on the given paylines — debug/QA only (?debug).
           win: (lines: number[] = [0, 1, 2]) => {
             const grid: number[][] = Array.from({ length: 5 }, () => [0, 0, 0]);
@@ -456,7 +458,7 @@ export class SlotController extends Component {
     this.autoplay = startAutoplay(spins, this.autoplay);
     this.view.setAutoVisual(true);
     this.bar.setAutoplay(this.autoplay.remaining);
-    this.onSpinPressed();
+    this.onSpinPressed(true); // autoplay's first spin (fromAuto bypasses the manual guard)
   }
 
   private stopAuto(): void {
@@ -474,12 +476,16 @@ export class SlotController extends Component {
     });
   }
 
-  private onSpinPressed(): void {
+  private onSpinPressed(fromAuto = false): void {
     if (this.state === 'spinning') {
       if (this.canStop) this.view.quickStopReels();
       return;
     }
-    if (this.state !== 'idle' || this.autoplay.active) return;
+    // AUTOPLAY FIX: block a MANUAL press while autoplay is running, but let
+    // autoplay's OWN spins through (startAuto + the continuation loop call this
+    // with fromAuto=true). Without the exception they hit `autoplay.active` and
+    // autoplay never spins at all.
+    if (this.state !== 'idle' || (this.autoplay.active && !fromAuto)) return;
     if (!this.model.canSpin()) {
       this.view.showError(
         'Insufficient balance',
@@ -578,7 +584,7 @@ export class SlotController extends Component {
         else {
           const d = interSpinDelayMs(this.turboMode);
           this.scheduleOnce(() => {
-            if (this.autoplay.active && this.state === 'idle') this.onSpinPressed();
+            if (this.autoplay.active && this.state === 'idle') this.onSpinPressed(true); // autoplay continuation
           }, d / 1000);
         }
       }

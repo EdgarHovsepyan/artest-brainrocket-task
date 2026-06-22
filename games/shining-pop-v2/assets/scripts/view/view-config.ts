@@ -170,18 +170,17 @@ export const VIEW_CONFIG = {
     symbolPulseScale: 1.3,
     symbolPulseMs: 240,
 
-    // FULL-SIZE WIN CELEBRATION (owner, 2026-06-21). The Wild (id 0) and Scatter
-    // (id 8) fill the whole cell, so the normal win-pop overshoot shoves them past
-    // the reel/board edge — they used to be tempered to a flat 0.35 on BOTH the
-    // pop AND the jelly, which made their win celebration read as "not animating".
-    // Split the two: keep the POSITIONAL pop conservative (popTemper, avoids the
-    // overflow/clip) but let the JELLY wobble run much stronger (jellyTemper) so
-    // these full-size symbols visibly DANCE on a win. (Used by symbol-view.playWin.)
-    fullSizePopTemper: 0.42,
-    fullSizeJellyTemper: 0.8,
-    // Smaller in-plane win rotate for full-size Wild/Scatter (vs the standard
-    // winTilt.deg used by the rest) — gentle alive motion that never tips them out.
-    fullSizeWinRotate: { deg: 7, ms: 380 },
+    // FULL-SIZE WIN CELEBRATION (owner — reported the Wild/Scatter still "not
+    // celebrating like the others"). They fill the whole cell, so the original
+    // 0.35 flat temper made them read static. Now that the per-reel mask is widened
+    // (layout.winPopMaskMargin) the pop has horizontal room, so we boost toward
+    // PARITY: JELLY runs at FULL strength (1.0 = the same wobble/dance as every
+    // other winning symbol — the key "like the others" cue), the POP is a stronger
+    // 0.55 (still slightly tempered for their cell-filling size), and the rotate is
+    // a touch larger but still gentler than the standard 13deg so they never tip out.
+    fullSizePopTemper: 0.55,
+    fullSizeJellyTemper: 1.0,
+    fullSizeWinRotate: { deg: 9, ms: 380 },
 
     winAnticipation: { enabled: true, dip: 0.9, ms: 80 },
 
