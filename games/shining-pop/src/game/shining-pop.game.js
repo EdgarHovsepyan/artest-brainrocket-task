@@ -196,7 +196,7 @@
   
   const SYM = { R:0,G:1,B:2,P:3,O:4,C:5,BELL:6,CROWN:7,STAR:8 };
   const SYM_COUNT = 9, STAR = SYM.STAR;
-  const SYM_NAME = ['Amethyst','Sapphire','Topaz','Cherry','Lemon','Plum','Grapes','Hearts','Star'];
+  const SYM_NAME = ['Amethyst','Sapphire','Topaz','Cherry','Lemon','Plum','Grapes','Wild','Star'];
 
 
   
