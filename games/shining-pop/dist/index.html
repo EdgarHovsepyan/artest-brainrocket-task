@@ -78,7 +78,10 @@ canvas{display:block;
    studio idents but with a visible branded progress system. */
 #loader{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:0;
-  background:radial-gradient(ellipse at center, #0c0610 0%, #000000 70%);
+  /* Show the GAME candy background on the loader (was a flat black radial). The
+     dark gradient overlay keeps the logo + progress bar readable over it; #0a0610
+     is the fallback colour shown until bg.jpg decodes. */
+  background:linear-gradient(180deg,rgba(8,4,14,.26) 0%,rgba(8,4,14,.40) 55%,rgba(8,4,14,.70) 100%),#0a0610 center/cover no-repeat url('assets/images/bg.jpg');
   transition:opacity .42s cubic-bezier(.16,1,.3,1)}
 #loader.gone{opacity:0;pointer-events:none}
 #loader .lwrap{position:relative;display:flex;flex-direction:column;
@@ -86,7 +89,7 @@ canvas{display:block;
   /* Beat 1 — soft branded arrival (web-animations: ease-out entrance) */
   animation:lin .6s cubic-bezier(.16,1,.3,1) both}
 #loader .llogo{width:min(70vw,420px);max-height:50vh;object-fit:contain;
-  mix-blend-mode:screen;
+  filter:drop-shadow(0 6px 18px rgba(0,0,0,.55));
   animation:lbreathe 2.6s ease-in-out infinite}
 /* ── EXTRA STUDIO frame — studio img + PROGRESS BAR (2026-05-30 user
    redesign: "studio EXTRA img loading ONLY with progress; remove the
@@ -3594,11 +3597,11 @@ BeGambleAware.org · 1-800-GAMBLER`,style:{fontFamily:"Fredoka",fontSize:9,fill:
 <main aria-label="Shining Pop slot game">
 <div id="loader">
   <div class="lwrap">
-    <!-- 2026-06-15 (owner: loader showed ARTEST|BrainRocket text that broke the
-         responsive layout) — replaced with the GAME's OWN logo, centred + fully
-         responsive via the .llogo rule (min(70vw,420px), max-height 50vh, contain,
-         screen-blend so the jpg's dark bg drops out on the black loader). -->
-    <img class="llogo" src="assets/images/logo.jpg" alt="Shining Pop" />
+    <!-- The GAME's own logo, centred + responsive (.llogo: min(70vw,420px),
+         max-height 50vh, contain). Uses logo-loader.png (the logo.jpg black bg keyed
+         out to transparent) + a drop-shadow so it reads cleanly over the candy-bg
+         loader — screen-blend only worked on the old flat-black loader. -->
+    <img class="llogo" src="assets/images/logo-loader.png" alt="Shining Pop" />
     <div class="lgroup">
       <div class="lbar"><div class="lfill" id="lfill"></div><i class="lshine"></i></div>
       <div class="lp" id="lprog">LOADING</div>
