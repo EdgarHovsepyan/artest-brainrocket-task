@@ -1896,16 +1896,16 @@ export class SlotView extends Component {
       const sp = i * 6;
       hg.lineWidth = 9 - t * 6;
 
-      // Sugar Rush candy-glass: cyan portal glow (was pink)
-      hg.strokeColor = new Color(127, 231, 255, Math.round((1 - t) * (1 - t) * 76));
+      // softer, calmer glass glow — matches the design's clean cabinet, not a loud halo
+      hg.strokeColor = new Color(150, 236, 255, Math.round((1 - t) * (1 - t) * 40));
       hg.roundRect(-w / 2 - sp, -h / 2 - sp, w + sp * 2, h + sp * 2, 18 + sp);
       hg.stroke();
     }
     const haloOp = halo.addComponent(UIOpacity);
-    haloOp.opacity = 170;
+    haloOp.opacity = 120;
     tween(haloOp)
-      .to(1.7, { opacity: 255 }, { easing: 'sineInOut' })
-      .to(1.7, { opacity: 140 }, { easing: 'sineInOut' })
+      .to(2.6, { opacity: 175 }, { easing: 'sineInOut' })
+      .to(2.6, { opacity: 105 }, { easing: 'sineInOut' })
       .union()
       .repeatForever()
       .start();
