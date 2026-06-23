@@ -1752,13 +1752,9 @@ export class SlotView extends Component {
       const sp = i * 6;
       hg.lineWidth = 9 - t * 6;
 
-      hg.strokeColor = new Color(
-        255,
-        Math.round(60 + (1 - t) * 110),
-        Math.round(150 + (1 - t) * 60),
-        Math.round((1 - t) * (1 - t) * 90),
-      );
-      hg.roundRect(-w / 2 - sp, -h / 2 - sp, w + sp * 2, h + sp * 2, 16 + sp);
+      // Sugar Rush candy-glass: cyan portal glow (was pink)
+      hg.strokeColor = new Color(127, 231, 255, Math.round((1 - t) * (1 - t) * 76));
+      hg.roundRect(-w / 2 - sp, -h / 2 - sp, w + sp * 2, h + sp * 2, 18 + sp);
       hg.stroke();
     }
     const haloOp = halo.addComponent(UIOpacity);
@@ -1776,30 +1772,40 @@ export class SlotView extends Component {
     g.roundRect(-w / 2 - 6, -h / 2 - 12, w + 12, h + 8, 18);
     g.fill();
 
-    g.fillColor = new Color(14, 7, 26, 158);
-    g.roundRect(-w / 2, -h / 2, w, h, 14);
+    // translucent candy-glass base (Final Sugar Rush reel frame)
+    g.fillColor = new Color(10, 6, 20, 87);
+    g.roundRect(-w / 2, -h / 2, w, h, 18);
     g.fill();
-    for (let i = 1; i <= 3; i++) {
-      const inset = i * 5;
-      g.fillColor = new Color(7, 3, 16, 14);
-      g.roundRect(
-        -w / 2 + inset,
-        -h / 2 + inset,
-        w - inset * 2,
-        h - inset * 2,
-        Math.max(2, 12 - i * 2),
-      );
-      g.fill();
-    }
+    // upper-half glass lighten (sugar-glass gloss)
+    g.fillColor = new Color(255, 255, 255, 41);
+    g.roundRect(-w / 2 + 4, 0, w - 8, h / 2 - 6, 16);
+    g.fill();
 
-    g.lineWidth = 3;
-    g.strokeColor = new Color(255, 150, 205, 205);
-    g.roundRect(-w / 2, -h / 2, w, h, 14);
+    // cyan glass rim
+    g.lineWidth = 2;
+    g.strokeColor = new Color(127, 231, 255, 140);
+    g.roundRect(-w / 2, -h / 2, w, h, 18);
     g.stroke();
 
-    g.fillColor = new Color(245, 247, 250, 20);
+    // top sheen highlight
+    g.fillColor = new Color(245, 247, 250, 36);
     g.roundRect(-w / 2 + 8, h / 2 - 16, w - 16, 9, 6);
     g.fill();
+
+    // gold corner-gem rivets (4)
+    const RIV = 7;
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1]) {
+        const cx = sx * (w / 2 - 13);
+        const cy = sy * (h / 2 - 13);
+        g.fillColor = new Color(233, 184, 78, 255);
+        g.circle(cx, cy, RIV);
+        g.fill();
+        g.fillColor = new Color(255, 217, 122, 220);
+        g.circle(cx - 1.5, cy + 1.5, RIV * 0.45);
+        g.fill();
+      }
+    }
 
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
