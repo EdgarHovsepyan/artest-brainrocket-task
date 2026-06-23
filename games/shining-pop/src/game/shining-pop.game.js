@@ -1090,7 +1090,6 @@
   }
 
   
-  const gemC = trimCanvas(stripCanvas(_blankC, 264));
   function gemTex(drawGlyph){
 
     
@@ -1279,22 +1278,6 @@
 
   
   
-  function stepTex(kind){
-    const S = 200, c = document.createElement('canvas');
-    c.width = c.height = S;
-    const x = c.getContext('2d');
-    x.translate(S/2, S/2);
-    x.lineJoin = 'round';
-    x.lineCap  = 'round';
-    x.strokeStyle = '#f5f7fa';   
-    x.lineWidth   = S * 0.085;
-    const a = S * 0.22;
-    x.beginPath();
-    x.moveTo(-a, 0); x.lineTo(a, 0);
-    if(kind === 'plus'){ x.moveTo(0, -a); x.lineTo(0, a); }
-    x.stroke();
-    return T(c);
-  }
 
   
 
@@ -3491,7 +3474,6 @@
 
     bmWarn.text = socialFilter('Buy Bonus may not be available in all\njurisdictions. Please play responsibly.');
 
-    bmWarn.text = socialFilter('Buy Bonus may not be available in all\njurisdictions. Please play responsibly.');
 
 
     
@@ -7724,7 +7706,6 @@
   }
 
   
-  const easeOutQuint = p => 1 - Math.pow(1-p,5);
 
   
 
@@ -10403,7 +10384,6 @@
           
           [introCard1, introCard2, introCard3].forEach(card => {
             if(!card._shine) return;
-            const cardW = card._value ? Math.max(140, card._plate ? 168 : 140) : 168;
             
             const w = 168, h = 168*1.65;
             const sweepDur = 3500;

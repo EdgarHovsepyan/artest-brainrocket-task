@@ -138,19 +138,6 @@ export function iconSpin(s, col = THEME.icon) {
   return g;
 }
 
-// a small 4-point sparkle star (candy "shine").
-function sparkleStar(g, cx, cy, rad, col = 0xffffff, alpha = 0.95) {
-  g.poly([
-    cx, cy - rad,
-    cx + rad * 0.26, cy - rad * 0.26,
-    cx + rad, cy,
-    cx + rad * 0.26, cy + rad * 0.26,
-    cx, cy + rad,
-    cx - rad * 0.26, cy + rad * 0.26,
-    cx - rad, cy,
-    cx - rad * 0.26, cy - rad * 0.26,
-  ]).fill({ color: col, alpha });
-}
 
 // Draws ONE chasing-arrow ring pass: a TOP arc + a BOTTOM arc (180° apart) with
 // clear gaps at left & right, each ending in a fat tangent arrowhead so it reads
