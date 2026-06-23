@@ -1,0 +1,24 @@
+{
+  "$comment": "Single source of truth for the Shining Pop V3 (Sugar Rush) brand palette + ceremony tier colours. Drift-tested against view/palette.ts (PAL) + view-config ceremony tiers in tests/design-tokens.test.ts. Decoupled from the shared games/design-tokens.json (v2) on purpose: V3's Sugar Rush direction uses a cyan/white ceremony escalation (EPIC white / SUPER cyan / MEGA fuchsia / BIG pink) that v2 does not. Change a colour HERE, then update the consumer — the test fails if they diverge.",
+  "brand": {
+    "pageBg": "#0a0610",
+    "chrome": "#f5f7fa",
+    "accent": "#ff007f",
+    "accentHot": "#ff2f93",
+    "accentGlow": "#ff5a9c",
+    "accentGlow2": "#ff5ab0",
+    "pinkBloom": "#ff8ab8",
+    "valueText": "#ffe6f4",
+    "violet": "#9a3bd6",
+    "megaFuchsia": "#ff2ad0",
+    "cyan": "#7fe7ff",
+    "winGreen": "#52d189",
+    "lossRed": "#ff6b6b"
+  },
+  "ceremonyTiers": {
+    "EPIC": "#ffffff",
+    "SUPER": "#7fe7ff",
+    "MEGA": "#ff2ad0",
+    "BIG": "#ff8ab8"
+  }
+}

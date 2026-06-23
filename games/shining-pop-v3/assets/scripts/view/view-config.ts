@@ -144,7 +144,11 @@ export const VIEW_CONFIG = {
   },
 
   win: {
-    symbolPulseScale: 1.3,
+    // Sugar Rush C1: winners get a STATIC cyan ring + glow — no scale-pop/jelly/tilt.
+    staticRing: true,
+    ring: { coreColor: '#ffffff', coreWidthPx: 2, glowColor: '#7fe7ff', glowBlurPx: 20, glowAlpha: 0.9 },
+
+    symbolPulseScale: 1.0,
     symbolPulseMs: 240,
 
     // Cell-filling symbols (Wild/Scatter): pop tempered for their size but jelly at
@@ -172,7 +176,7 @@ export const VIEW_CONFIG = {
       9: { heat: 0.86 },
     } as Record<number, { heat: number }>,
 
-    winBounceLoop: { enabled: true, jelly: 0.15, ms: 290, heatTempo: 0.6 },
+    winBounceLoop: { enabled: false, jelly: 0.15, ms: 290, heatTempo: 0.6 },
 
     winSustainScale: 1.16,
 
@@ -181,13 +185,13 @@ export const VIEW_CONFIG = {
     // each deterministically on its own cell; clear()/resetHome restore strip home.
     liftWinSymbols: true,
 
-    winTilt: { enabled: true, deg: 13, ms: 540 },
+    winTilt: { enabled: false, deg: 13, ms: 540 },
 
-    haloTint: { hot: '#fff0c8', cold: '#c8e1ff', hotHeat: 1.3, coldHeat: 0.9 },
+    haloTint: { hot: '#ffffff', cold: '#7fe7ff', hotHeat: 1.3, coldHeat: 0.9 },
 
     wildHappyFace: { enabled: true, offsetYFrac: 0.3, scale: 1.05, fadeMs: 160 },
 
-    loserDimOpacity: 95,
+    loserDimOpacity: 140,
 
     lineCycleSeconds: 0.85,
 
@@ -286,7 +290,7 @@ export const VIEW_CONFIG = {
         name: 'EPIC',
         minMultiple: 100,
         shakeAmp: 20,
-        color: '#ff1e8c',
+        color: '#ffffff',
         headerKey: 'header_mega_win',
         coinParticles: 1,
         boardDimAlpha: 0.78,
@@ -297,7 +301,7 @@ export const VIEW_CONFIG = {
         name: 'SUPER',
         minMultiple: 50,
         shakeAmp: 15,
-        color: '#ff5ab0',
+        color: '#7fe7ff',
         headerKey: 'header_mega_win',
         coinParticles: 1,
         boardDimAlpha: 0.56,
@@ -308,7 +312,7 @@ export const VIEW_CONFIG = {
         name: 'MEGA',
         minMultiple: 30,
         shakeAmp: 11,
-        color: '#ff79c4',
+        color: '#ff2ad0',
         headerKey: 'header_mega_win',
         coinParticles: 1,
         boardDimAlpha: 0.28,
@@ -319,7 +323,7 @@ export const VIEW_CONFIG = {
         name: 'BIG',
         minMultiple: 10,
         shakeAmp: 7,
-        color: '#ffa8dc',
+        color: '#ff8ab8',
         headerKey: 'header_win',
         coinParticles: 0,
         boardDimAlpha: 0.12,

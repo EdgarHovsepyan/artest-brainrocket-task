@@ -7,24 +7,11 @@
 // Authority: VISUAL tokens only. Never a payout, weight, RTP, bet level or odds —
 // those live in logic/ (math-core). Math decides; view renders.
 import { Color } from 'cc';
+import { HEX } from './hex';
 
-// ── RAW SOURCE-OF-TRUTH ──
-export const HEX = {
-  pink: {
-    p50: '#ffe6f4', p100: '#ffd9ec', p200: '#ff8ab8', p300: '#ff5ab0', p400: '#ff2f93',
-    p500: '#ff007f', /* PRIMARY ★ */ p600: '#d6006e', p700: '#b8005e', p900: '#6a0540',
-  },
-  fuchsia: '#ff2ad0', // mega/hot tier, top-volatility buy
-  violet: '#9a3bd6', // autoplay control only
-  cyan: '#7fe7ff', // SCATTER + free-spins + win-ring signalling ONLY
-  mint: '#52d189', // WIN signalling + free-spins multiplier rail ONLY
-  gold: '#e9b84e', // high-symbol frames / premium chrome / cabinet rivets
-  goldLight: '#ffd97a',
-  caramel: '#ff9a3c', // turbo
-  bg900: '#08050e', bg800: '#0a0610', panel: '#160c22', panel2: '#21102f',
-  panelAlt: '#0f0818', pageBody: '#07040c',
-  text: '#fff4fb', textMute: '#a99bbc', textDim: '#cdbede', textSub: '#9a8cae',
-} as const;
+// HEX (raw source-of-truth) lives in ./hex (cc-free) so node tests + palette.ts can
+// use it without importing 'cc'. Re-exported here for convenience.
+export { HEX };
 
 const C = (hex: string, a = 255): Color => {
   const c = new Color();

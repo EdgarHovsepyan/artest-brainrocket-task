@@ -1,4 +1,4 @@
-import { HEX } from './theme';
+import { HEX } from './hex';
 
 // PAL is the legacy named token table consumed across the view layer. It now SHIMS
 // over theme.ts: every brand-signal color is sourced from HEX (the single source),

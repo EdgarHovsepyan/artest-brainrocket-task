@@ -57,10 +57,13 @@ export const SCATTER_LINES: string[] = [
 export const SCATTER_TEASER = `SCATTER ✦ ${SCATTER_MIN}+ rainbow lollipops anywhere → FREE SPINS`;
 
 export function maxWinMultiple(): number {
+  // Engine-derived (PAYTABLE Wild x5 * WILD_STRIKE cap). NOTE: this is 6000x; the
+  // design handoff says "5,000x max" — engine wins (working-rule). A true 5,000x
+  // ceiling would need an engine cap constant, not a hand-typed display number.
   return PAYTABLE[SYMBOLS.WILD][5] * WILD_STRIKE.maxMultiplier;
 }
 
-export const RTP_DISPLAY = '97.50%';
+export const RTP_DISPLAY = '97.80%';
 export const VOLATILITY_DISPLAY = 'MED-HIGH';
 
 export const RULES_LINES: string[] = [

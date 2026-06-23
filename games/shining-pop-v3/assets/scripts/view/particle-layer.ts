@@ -7,16 +7,19 @@ const { ccclass } = _decorator;
 const WHITE = new Color(255, 255, 255, 255);
 const COIN = new Color(255, 196, 64, 255);
 
+// Sugar Rush burst palette: pink-led with cyan/mint/fuchsia signal + gold. Each entry
+// is a fresh Color; candy() returns a .clone() so per-particle alpha fades never mutate
+// the shared swatch (singleton-mutation guard).
 const CANDY = [
-  new Color(255, 120, 180, 255),
-  new Color(255, 90, 156, 255),
-  new Color(126, 240, 192, 255),
-  new Color(255, 205, 90, 255),
-  new Color(200, 160, 255, 255),
-  new Color(255, 250, 252, 255),
-  new Color(150, 215, 255, 255),
+  new Color(255, 0, 127, 255), // pink p500
+  new Color(255, 138, 184, 255), // pink p200
+  new Color(127, 231, 255, 255), // cyan
+  new Color(82, 209, 137, 255), // mint
+  new Color(255, 42, 208, 255), // fuchsia
+  new Color(233, 184, 78, 255), // gold
+  new Color(255, 250, 252, 255), // sugar white
 ];
-const candy = () => CANDY[(Math.random() * CANDY.length) | 0]!;
+const candy = () => CANDY[(Math.random() * CANDY.length) | 0]!.clone();
 
 interface PhysParticle {
   slot: PoolShard;

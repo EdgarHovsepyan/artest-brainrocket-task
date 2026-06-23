@@ -15,7 +15,7 @@ import { PAL } from '../assets/scripts/view/palette';
 import { VIEW_CONFIG } from '../assets/scripts/view/view-config';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const tokens = JSON.parse(readFileSync(join(HERE, '..', '..', 'design-tokens.json'), 'utf8')) as {
+const tokens = JSON.parse(readFileSync(join(HERE, '..', 'design-tokens.json'), 'utf8')) as {
   brand: Record<string, string>;
   ceremonyTiers: Record<string, string>;
 };
