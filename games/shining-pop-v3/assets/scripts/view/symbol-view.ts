@@ -323,6 +323,7 @@ export class SymbolView extends Component {
 
     if (lift && worldCenter) this.liftForWin(lift, worldCenter);
     const { symbolPulseScale, symbolPulseMs } = VIEW_CONFIG.win;
+    const staticRing = VIEW_CONFIG.win.staticRing ?? false;
 
     const heat = VIEW_CONFIG.win.symbolProfiles[this._currentId]?.heat ?? 1.0;
 
@@ -331,6 +332,7 @@ export class SymbolView extends Component {
     const half = symbolPulseMs / 2 / 1000;
     Tween.stopAllByTarget(this.node);
     this.node.setScale(1, 1, 1);
+    this.node.eulerAngles = new Vec3(0, 0, 0); // C1 static ring: never leave a winner tilted
     // Full-size symbols (Wild/Scatter) already fill the cell: temper the POP so the overshoot stays inside the
     // board, but keep the JELLY strong so they still celebrate. Non-full-size symbols are unaffected (temper = 1).
     const fs = FULL_SIZE_IDS.has(this._currentId);
@@ -353,21 +355,26 @@ export class SymbolView extends Component {
     const antDip = ant?.enabled ? 1 - (1 - ant.dip) * heat : 1;
     const popStart = delay + antDur;
 
-    const popTween = tween(this.node).delay(delay);
-    if (antDur > 0)
-      popTween.to(antDur, { scale: new Vec3(antDip, antDip, 1) }, { easing: 'quadOut' });
-    popTween
-      .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
-      .to(half, { scale: new Vec3(zoom, zoom, 1) }, { easing: 'quadIn' })
-      .start();
-    if (bnc.enabled) {
-      tween(this.node)
-        .delay(popStart + half * 2)
-        .to(bhalfBeat, { scale: bUp }, { easing: 'backOut' })
-        .to(bhalfBeat, { scale: bDn }, { easing: 'quadIn' })
-        .union()
-        .repeatForever()
+    // C1 (Sugar Rush): static cyan ring — winners DON'T scale-pop/jelly. The cyan
+    // halo + glow + sparkles below carry the win. The pop/bounce only run if the
+    // designer re-enables motion (staticRing=false).
+    if (!staticRing) {
+      const popTween = tween(this.node).delay(delay);
+      if (antDur > 0)
+        popTween.to(antDur, { scale: new Vec3(antDip, antDip, 1) }, { easing: 'quadOut' });
+      popTween
+        .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
+        .to(half, { scale: new Vec3(zoom, zoom, 1) }, { easing: 'quadIn' })
         .start();
+      if (bnc.enabled) {
+        tween(this.node)
+          .delay(popStart + half * 2)
+          .to(bhalfBeat, { scale: bUp }, { easing: 'backOut' })
+          .to(bhalfBeat, { scale: bDn }, { easing: 'quadIn' })
+          .union()
+          .repeatForever()
+          .start();
+      }
     }
 
     const tlt = VIEW_CONFIG.win.winTilt;
