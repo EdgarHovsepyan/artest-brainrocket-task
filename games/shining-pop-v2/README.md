@@ -91,15 +91,19 @@ scales, colors, tiers); the view code reads those numbers and never hard-codes f
 ### Motion — Cocos Tween
 
 All movement is `cc.tween`. The reel uses a custom ease (wind-up → cruise →
-committed decel) and a **candy land bounce** on stop (squash → rebound → damped
-settle). Symbols, the HUD count-up, and the ceremony beats are all tween-driven.
+committed decel) and a **candy land bounce** on stop — each symbol squashes then
+**elastic-rebounds** (a back-out overshoot), with the recoil amplitude scaled by the
+symbol's tier (high-value candies recoil deeper) and **decoupled from the crisp
+positional stop**. Symbols, the HUD count-up, and the ceremony beats are all tween-driven.
 
 ### Shaders — custom `.effect` (CCEffect)
 
 **13 hand-written shaders** in `assets/resources/effects/` carry the "shine",
 applied as sprite materials:
 
-- **`symbol-win`** — rim-light + a specular sweep + a body charge on a winning symbol.
+- **`symbol-win`** — rim-light + twinkling star-glints + a body charge on a winning
+  symbol, plus an iridescent **rainbow shine-slide gated to MEGA/EPIC wins only**
+  (`u_prestige`) — fully off for every normal win.
 - **`soft-burst`** / **`particle-glow`** — additive glow behind wins and particles.
 - **`payline-glow`** / **`reel-portal`** / **`grid-merge`** — line and reel/feature transitions.
 - **`buy-plasma`** / **`crystal-idle`** / **`svarka-additive`** / **`screen-post`** … — ambient + post.
@@ -107,8 +111,9 @@ applied as sprite materials:
 ### Vector VFX — `cc.Graphics`
 
 The candy **win-lines** are drawn live: a multi-stroke neon glow with a bright
-**glint that flows along the path**. The reel window's soft top/bottom **feather**
-is Graphics too.
+**glint that flows along the path** — and **every** winning payline is drawn in full
+(the complete symbol run, never stopping at the last matched cell). The reel window's
+soft top/bottom **feather** is Graphics too.
 
 ### Win presentation — the on-symbol celebration
 
@@ -121,6 +126,10 @@ This is the heart of the feel:
   overshoot → a looping jelly bounce + a gentle in-plane tilt, with the
   `symbol-win` rim-light and an additive halo. Intensity scales per-symbol "heat"
   (the Wild is hottest). **Losing symbols dim** so the win reads cleanly.
+- **L→R cascade + chained count-up.** Winning cells ignite in a subtle left-to-right
+  wave, and the HUD **count-up is chained to that cascade** — the tally starts as the
+  last winning reel lights up, so the number follows the symbols instead of racing
+  ahead. On **MEGA/EPIC** wins the winners also catch the rainbow shine-slide.
 - **Particles** (pooled): corner sparkles on _every_ winning symbol, plus ember
   bursts / star-pops / bubbles, and a coin geyser on big wins.
 - **Big-win ceremony** (`CeremonyView`): a detonation flash, a pitch-climbing
