@@ -196,7 +196,7 @@
   
   const SYM = { R:0,G:1,B:2,P:3,O:4,C:5,BELL:6,CROWN:7,STAR:8 };
   const SYM_COUNT = 9, STAR = SYM.STAR;
-  const SYM_NAME = ['Cherry','Lemon','Plum','Grapes','Watermelon','Bell','Seven','Crown','Star'];
+  const SYM_NAME = ['Amethyst','Sapphire','Topaz','Cherry','Lemon','Plum','Grapes','Hearts','Star'];
 
 
   
@@ -1533,7 +1533,12 @@
 
 
   const SYM_TEX = [];
-  for(let i=0;i<9;i++) SYM_TEX[i] = TEX['s'+i];
+  // Art-tier remap (RTP-locked): gems are the LOW symbols, candy the HIGH symbols.
+  // PAY values + reel weights stay per pay-ID; only the texture shown per position is
+  // reassigned. ID 0..8 -> art file: gems(s5,s6,s7) onto the 3 lowest, candy(s0..s4)
+  // onto the highs (top = hearts), star unchanged. SYM_NAME above is remapped to match.
+  const ART_REMAP = [5, 6, 7, 0, 1, 2, 3, 4, 8];
+  for(let i=0;i<9;i++) SYM_TEX[i] = TEX['s'+ART_REMAP[i]];
   
   const glowTex = (() => {
     const g = new PIXI.Graphics();
