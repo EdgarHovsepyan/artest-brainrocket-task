@@ -144,6 +144,11 @@ export class SymbolView extends Component {
     this.wildFaceSwapped = false;
     const frame = this.frames[id] ?? null;
     if (this.sprite) this.sprite.spriteFrame = frame;
+    // Restore base render size — the previous symbol may have grown it for its Wild/Scatter win-face.
+    if (this.art) {
+      const baseArt = this.size * VIEW_CONFIG.layout.symbolFill;
+      this.art.getComponent(UITransform)?.setContentSize(baseArt, baseArt);
+    }
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
 
     // Idle-breathe amplitude (VIEW_CONFIG.symbols.idleBreatheAmp); Wild stays 0 since its own FX carry it.
@@ -446,6 +451,13 @@ export class SymbolView extends Component {
         const id = this._currentId;
         if (this.wildFaceSwapped && (id === SYMBOLS.WILD || id === 8) && this.sprite) {
           this.sprite.spriteFrame = winF;
+          // The win-face art packs the symbol smaller inside a larger frame (the Scatter's candy
+          // explosion, the Wild's celebratory puff). Grow the render so the burst reads at full
+          // size instead of being squeezed into the cell — the win cell is lifted above the reel
+          // masks so it isn't clipped. setSymbol restores the base size on the next spin.
+          const grow = id === SYMBOLS.WILD ? 1.2 : 1.7;
+          const a = this.size * VIEW_CONFIG.layout.symbolFill * grow;
+          this.art?.getComponent(UITransform)?.setContentSize(a, a);
         }
       },
       Math.max(0, delay),
