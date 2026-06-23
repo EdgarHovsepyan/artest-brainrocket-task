@@ -4,6 +4,7 @@ import {
   Color,
   Component,
   EffectAsset,
+  EventTouch,
   Graphics,
   Label,
   Mask,
@@ -60,6 +61,8 @@ import { BuyBonusModal, BuyTier } from './buy-bonus-modal';
 const { ccclass } = _decorator;
 
 const ACID = new Color(255, 0, 127, 255);
+// Sugar Rush win/FS mint (#52d189) — bonus HUD + free-spin accents.
+const MINT = new Color(82, 209, 137, 255);
 const INK = new Color(20, 10, 32, 255);
 const PLATE = new Color(25, 17, 64, 255);
 const PLATE_EDGE = new Color(184, 111, 218, 255);
@@ -112,17 +115,35 @@ export interface AutoplayPanelConfig {
   allowInfinity: boolean;
   stopOnFeature: boolean;
   stopOnBigWin: boolean;
+  // Cents loss/single-win limits (0 = off). Cycle through preset steps as pills.
+  lossLimitCents: number;
+  singleWinLimitCents: number;
 }
 
 export type AutoplayOptionKey = 'stopOnFeature' | 'stopOnBigWin';
+export type AutoplayLimitKey = 'lossLimit' | 'singleWin';
 
 export interface SettingsPanelConfig {
   soundOn: boolean;
-  turboMode: 0 | 1 | 2;
+  soundVol: number;
+  musicVol: number;
+  quickSpin: boolean;
   reducedFx: boolean;
+  batterySaver: boolean;
+  lang: string;
 }
 
-export type SettingsKey = 'sound' | 'turboMode' | 'reducedFx';
+export type SettingsKey =
+  | 'sound'
+  | 'music'
+  | 'soundVol'
+  | 'musicVol'
+  | 'quickSpin'
+  | 'reducedFx'
+  | 'batterySaver'
+  | 'lang';
+
+export type InfoTab = 'paytable' | 'paylines' | 'features' | 'rules';
 
 @ccclass('SlotView')
 export class SlotView extends Component {
@@ -216,11 +237,17 @@ export class SlotView extends Component {
   private autoplayPanel: Node | null = null;
   private autoplayStartCb: ((spins: number) => void) | null = null;
   private autoplayOptionCb: ((key: AutoplayOptionKey, value: boolean) => void) | null = null;
+  private autoplayLimitCb: ((key: AutoplayLimitKey, cents: number) => void) | null = null;
   private settingsPanel: Node | null = null;
-  private settingsChangeCb: ((key: SettingsKey, value: number | boolean) => void) | null = null;
+  private settingsChangeCb:
+    | ((key: SettingsKey, value: number | boolean | string) => void)
+    | null = null;
   private menuHub: Node | null = null;
+  // Mirror of sound/music on-state for the menu-hub inline toggles (driven by controller).
+  private menuSoundOn = true;
+  private menuMusicOn = true;
   private infoPanel: Node | null = null;
-  private infoTab: 'rules' | 'paytable' | 'info' = 'rules';
+  private infoTab: InfoTab = 'paytable';
   private quickBetPanel: Node | null = null;
 
   onOverlay: ((open: boolean) => void) | null = null;
@@ -413,11 +440,12 @@ export class SlotView extends Component {
 
       this.updateFreeSpinScene(this.inBonus);
     }
+    // FS world tints (Sugar Rush): crowns mint, reels cyan, wilds cyan/teal.
     const tints: Record<typeof mode, [number, number, number, number]> = {
       idle: [0, 0, 0, 0],
-      wilds: [255, 90, 156, 26],
-      crowns: [255, 200, 70, 44],
-      reels: [186, 60, 218, 44],
+      wilds: [127, 231, 255, 26],
+      crowns: [82, 209, 137, 44],
+      reels: [127, 231, 255, 44],
     };
     const [r, g, b, a] = tints[mode];
     if (!this.bonusWash) {
@@ -555,9 +583,9 @@ export class SlotView extends Component {
       hud.setPosition(0, 388, 0);
       this.glassCounterChrome(hud, 540, 76);
       this.mkLabel('FREE SPINS', -120, 14, 13, MUTED, hud);
-      this.bonusHudSpins = this.mkLabel('1 / 8', -120, -14, 22, ACID, hud, true);
+      this.bonusHudSpins = this.mkLabel('1 / 8', -120, -14, 22, MINT, hud, true);
       this.mkLabel('TOTAL WIN', 130, 14, 13, MUTED, hud);
-      this.bonusHudWin = this.mkLabel('0.00', 130, -14, 22, ACID, hud, true);
+      this.bonusHudWin = this.mkLabel('0.00', 130, -14, 22, MINT, hud, true);
       const op = hud.addComponent(UIOpacity);
       op.opacity = 0;
       tween(op).to(0.3, { opacity: 255 }, { easing: 'sineOut' }).start();
@@ -614,6 +642,67 @@ export class SlotView extends Component {
   dismissError(): void {
     const root = this.node.parent ?? this.node;
     root.getChildByName('errorModal')?.destroy();
+  }
+
+  // Two-button confirm dialog (e.g. confirm-before-debit for Buy Feature). Layered above
+  // any open modal; backdrop tap = cancel. onCancel is optional.
+  showConfirm(
+    title: string,
+    body: string,
+    okLabel: string,
+    cancelLabel: string,
+    onOk: () => void,
+    onCancel?: () => void,
+  ): void {
+    const root = this.node.parent ?? this.node;
+    root.getChildByName('confirmModal')?.destroy();
+    const w = 460;
+    const h = 230;
+
+    const layer = this.mkNode('confirmModal', 2600, 2200, root);
+    layer.setSiblingIndex(root.children.length - 1);
+    const scrim = layer.addComponent(Graphics);
+    scrim.fillColor = new Color(8, 4, 16, 205);
+    scrim.rect(-1300, -1100, 2600, 2200);
+    scrim.fill();
+    const cancel = (): void => {
+      layer.destroy();
+      onCancel?.();
+    };
+    // Backdrop tap cancels (balance unchanged).
+    layer.on(Node.EventType.TOUCH_END, () => cancel());
+
+    const card = this.mkNode('confirmCard', w, h, layer);
+    card.setPosition(0, this.bottomInset / 2, 0);
+    // Swallow taps on the card so they don't reach the backdrop cancel handler.
+    card.on(Node.EventType.TOUCH_END, () => undefined);
+    this.surfChrome(card, w, h, 46);
+    this.mkLabel(title, 0, h / 2 - 32, 22, ACID, card, true);
+    this.mkLabel(body, 0, h / 2 - 82, 15, MUTED, card);
+    this.mkTextButton(
+      cancelLabel,
+      -110,
+      -h / 2 + 40,
+      170,
+      46,
+      () => cancel(),
+      card,
+    );
+    const ok = this.mkTextButton(
+      okLabel,
+      110,
+      -h / 2 + 40,
+      170,
+      46,
+      () => {
+        layer.destroy();
+        onOk();
+      },
+      card,
+    );
+    ok.setActive(true);
+    // setActive recolours the label to INK; force WHITE for contrast on the pink CTA fill.
+    ok.label.color = Color.WHITE;
   }
 
   showRealityCheck(
@@ -852,6 +941,61 @@ export class SlotView extends Component {
         lbl.color = on ? INK : Color.WHITE;
       },
     };
+  }
+
+  // Horizontal 0..1 slider: a track + draggable cyan knob. Tap or drag anywhere on the
+  // track sets the value by finger X. cb fires live with the clamped value.
+  private mkSlider(
+    x: number,
+    y: number,
+    w: number,
+    value: number,
+    cb: (v: number) => void,
+    parent = this.node,
+    accent: Color = new Color(127, 231, 255, 255),
+  ): void {
+    const h = 34;
+    const track = this.mkNode('slider', w, h, parent);
+    track.setPosition(x, y, 0);
+    const ut = track.getComponent(UITransform)!;
+    const g = track.addComponent(Graphics);
+    const half = w / 2;
+    const railY = 0;
+    let cur = Math.max(0, Math.min(1, value));
+    const redraw = (): void => {
+      g.clear();
+      // Rail.
+      g.lineWidth = 6;
+      g.strokeColor = new Color(255, 255, 255, 36);
+      g.moveTo(-half + 8, railY);
+      g.lineTo(half - 8, railY);
+      g.stroke();
+      // Filled portion.
+      const kx = -half + 8 + cur * (w - 16);
+      g.lineWidth = 6;
+      g.strokeColor = new Color(accent.r, accent.g, accent.b, 220);
+      g.moveTo(-half + 8, railY);
+      g.lineTo(kx, railY);
+      g.stroke();
+      // Knob.
+      g.fillColor = new Color(255, 255, 255, 255);
+      g.circle(kx, railY, 9);
+      g.fill();
+      g.fillColor = new Color(accent.r, accent.g, accent.b, 255);
+      g.circle(kx, railY, 6);
+      g.fill();
+    };
+    redraw();
+    const setFromTouch = (e: EventTouch): void => {
+      const p = ut.convertToNodeSpaceAR(
+        new Vec3(e.getUILocation().x, e.getUILocation().y, 0),
+      );
+      cur = Math.max(0, Math.min(1, (p.x + half - 8) / (w - 16)));
+      redraw();
+      cb(cur);
+    };
+    track.on(Node.EventType.TOUCH_START, setFromTouch);
+    track.on(Node.EventType.TOUCH_MOVE, setFromTouch);
   }
 
   private build(): void {
@@ -2210,10 +2354,12 @@ export class SlotView extends Component {
     if (this.buyModal?.isOpen()) this.fitBuyModal();
   }
 
+  // Sugar Rush buy accents + volatility tags. wilds=Sticky Wilds (fuchsia, top vol),
+  // crowns=Sticky Crowns (mint, balanced), reels=Wild Reels (cyan).
   private static BUY_PRESENT: Record<string, { accent: string; special: string }> = {
-    wilds: { accent: '#ff5ab0', special: 'Wilds stick & bounce every spin' },
-    crowns: { accent: '#ffcf5a', special: 'Crowns lock in for the feature' },
-    reels: { accent: '#b86fda', special: 'Full wild reels strike in' },
+    wilds: { accent: '#ff2ad0', special: 'TOP VOLATILITY · Wilds stick & bounce' },
+    crowns: { accent: '#52d189', special: 'BALANCED · Crowns lock in for the feature' },
+    reels: { accent: '#7fe7ff', special: 'Full wild reels strike in' },
   };
 
   configureBuyMenu(options: BuyOption[]): void {
@@ -2224,9 +2370,22 @@ export class SlotView extends Component {
       host.setSiblingIndex(root.children.length - 1);
       this.buyModal = host.addComponent(BuyBonusModal);
       this.buyModal.on('buy', (mode) => {
-        this.buyMenuOpen = false;
-        this.buyModal?.close();
-        this.buyCb?.(mode as string);
+        const m = mode as string;
+        // Confirm-before-debit. Reuse the model-supplied cost string the modal already
+        // showed (never recompute cost in the view); CANCEL leaves balance unchanged.
+        const name = this.buyNameByMode[m] ?? m.toUpperCase();
+        const cost = this.buyCostByMode[m] ?? '';
+        this.showConfirm(
+          'CONFIRM PURCHASE',
+          `Buy ${name} for ${cost}?`,
+          'BUY',
+          'CANCEL',
+          () => {
+            this.buyMenuOpen = false;
+            this.buyModal?.close();
+            this.buyCb?.(m);
+          },
+        );
       });
       this.buyModal.on('bet:inc', () => this.buyBetStepCb?.(1));
       this.buyModal.on('bet:dec', () => this.buyBetStepCb?.(-1));
@@ -2235,6 +2394,11 @@ export class SlotView extends Component {
       this.buyModal.on('cancel', () => this.closeBuyMenu());
       this.buyModal.on('buy:blocked', () => this.audio.click());
     }
+    this.buyModeOrder = options.map((o) => o.mode);
+    options.forEach((o) => {
+      this.buyNameByMode[o.mode] = o.name;
+      this.buyCostByMode[o.mode] = o.costText;
+    });
     const tiers: BuyTier[] = options.map((o, i) => {
       const present = SlotView.BUY_PRESENT[o.mode] ?? { accent: '#ff7ad0', special: '' };
       return {
@@ -2251,6 +2415,11 @@ export class SlotView extends Component {
   }
 
   private buyBetText = '';
+  // Model-supplied cost/name strings cached per mode so the confirm dialog can reuse the
+  // exact string the modal showed (the view never recomputes a cost).
+  private buyCostByMode: Record<string, string> = {};
+  private buyNameByMode: Record<string, string> = {};
+  private buyModeOrder: string[] = [];
 
   setBuyBet(betText: string): void {
     this.buyBetText = betText;
@@ -2259,6 +2428,10 @@ export class SlotView extends Component {
 
   refreshBuyCosts(costTexts: string[]): void {
     this.buyModal?.setCosts(costTexts);
+    costTexts.forEach((t, i) => {
+      const mode = this.buyModeOrder[i];
+      if (mode) this.buyCostByMode[mode] = t;
+    });
   }
 
   setBuyAffordable(flags: boolean[]): void {
@@ -2309,7 +2482,8 @@ export class SlotView extends Component {
     const cols = 3;
     const rows = Math.ceil(counts.length / cols);
     const w = 380;
-    const h = 92 + rows * 60 + 2 * 56;
+    // 2 stop toggles + 2 cents-limit rows below the count grid.
+    const h = 92 + rows * 60 + 4 * 56;
     const panel = this.mkNode('autoplayPanel', w, h, this.node);
     panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     panel.active = wasOpen;
@@ -2368,9 +2542,51 @@ export class SlotView extends Component {
     );
     toggleRow('Stop on Big Win', `≥ 25× total bet`, cfg.stopOnBigWin, 'stopOnBigWin', ty - 56);
 
+    // Cents-limit rows (0 = off). Tapping the pill cycles to the next preset and re-arms.
+    const limitRow = (
+      label: string,
+      desc: string,
+      cents: number,
+      key: AutoplayLimitKey,
+      y: number,
+    ): void => {
+      const lbl = this.mkLabel(label, -64, y + 8, 14, MUTED, panel);
+      lbl.horizontalAlign = Label.HorizontalAlign.LEFT;
+      const d = this.mkLabel(desc, -64, y - 12, 10, MUTED, panel);
+      d.horizontalAlign = Label.HorizontalAlign.LEFT;
+      const steps = SlotView.LIMIT_STEPS_CENTS;
+      const idx = steps.indexOf(cents);
+      const curIdx = idx >= 0 ? idx : 0;
+      const on = cents > 0;
+      const pill = this.mkTextButton(
+        on ? fmt(cents) : 'OFF',
+        w / 2 - 70,
+        y,
+        84,
+        36,
+        () => {
+          const next = steps[(curIdx + 1) % steps.length];
+          this.autoplayLimitCb?.(key, next);
+        },
+        panel,
+      );
+      pill.setActive(on);
+    };
+    limitRow('Loss Limit', 'Stop if total loss reaches', cfg.lossLimitCents, 'lossLimit', ty - 112);
+    limitRow(
+      'Single Win Limit',
+      'Stop if one spin wins',
+      cfg.singleWinLimitCents,
+      'singleWin',
+      ty - 168,
+    );
+
     this.addPanelDismiss(panel, w, h, () => this.closeAutoplayPanel());
     this.autoplayPanel = panel;
   }
+
+  // Cents presets for autoplay loss / single-win limits (0 = off, then dollar steps).
+  private static LIMIT_STEPS_CENTS: readonly number[] = [0, 500, 1000, 2500, 5000, 10000, 25000];
 
   openAutoplayPanel(): void {
     this.closeOverlays();
@@ -2382,48 +2598,67 @@ export class SlotView extends Component {
     this.popClose(this.autoplayPanel);
   }
 
+  // Six-control settings (shared view<->controller contract): Sound vol, Music vol,
+  // Quick Spin, Reduce Motion, Battery Saver, Language. Each control reflects its incoming
+  // value and calls settingsChangeCb(key, value).
   configureSettingsPanel(cfg: SettingsPanelConfig): void {
     const wasOpen = this.settingsPanel?.active ?? false;
     this.settingsPanel?.destroy();
     const w = 380;
-    const h = 92 + 3 * 62;
+    const h = 92 + 6 * 62;
     const panel = this.mkNode('settingsPanel', w, h, this.node);
     panel.setPosition(0, VIEW_CONFIG.layout.reelCenterY, 0);
     panel.active = wasOpen;
     this.surfChrome(panel, w, h, 44);
     this.mkLabel('SETTINGS', 0, h / 2 - 28, 22, ACID, panel);
-    const row = (label: string, desc: string, y: number) => {
-      const l = this.mkLabel(label, -64, y + 8, 14, MUTED, panel);
+    const rowLabel = (label: string, desc: string, y: number): void => {
+      const l = this.mkLabel(label, -w / 2 + 28, y + 8, 14, MUTED, panel);
       l.horizontalAlign = Label.HorizontalAlign.LEFT;
-      const d = this.mkLabel(desc, -64, y - 12, 10, MUTED, panel);
+      const d = this.mkLabel(desc, -w / 2 + 28, y - 12, 10, MUTED, panel);
       d.horizontalAlign = Label.HorizontalAlign.LEFT;
     };
     let y = h / 2 - 78;
-    row('Sound', 'SFX & win audio', y);
+
+    // Row 1 — Sound volume slider.
+    rowLabel('Sound Volume', 'SFX & win audio', y);
+    this.mkSlider(
+      w / 2 - 86,
+      y,
+      120,
+      cfg.soundVol,
+      (v) => this.settingsChangeCb?.('soundVol', v),
+      panel,
+    );
+    y -= 62;
+
+    // Row 2 — Music volume slider.
+    rowLabel('Music Volume', 'Background music', y);
+    this.mkSlider(
+      w / 2 - 86,
+      y,
+      120,
+      cfg.musicVol,
+      (v) => this.settingsChangeCb?.('musicVol', v),
+      panel,
+      new Color(82, 209, 137, 255),
+    );
+    y -= 62;
+
+    // Row 3 — Quick Spin toggle.
+    rowLabel('Quick Spin', 'Faster reel stops', y);
     this.mkTextButton(
-      cfg.soundOn ? 'ON' : 'OFF',
+      cfg.quickSpin ? 'ON' : 'OFF',
       w / 2 - 64,
       y,
       72,
       36,
-      () => this.settingsChangeCb?.('sound', !cfg.soundOn),
+      () => this.settingsChangeCb?.('quickSpin', !cfg.quickSpin),
       panel,
-    ).setActive(cfg.soundOn);
+    ).setActive(cfg.quickSpin);
     y -= 62;
-    row('Turbo Speed', 'Spin pacing — affects auto delay', y);
-    (['OFF', 'TURBO', 'MEGA'] as const).forEach((name, mode) => {
-      this.mkTextButton(
-        name,
-        w / 2 - 178 + mode * 62,
-        y,
-        56,
-        32,
-        () => this.settingsChangeCb?.('turboMode', mode),
-        panel,
-      ).setActive(cfg.turboMode === mode);
-    });
-    y -= 62;
-    row('Reduced Effects', 'Less motion & particles', y);
+
+    // Row 4 — Reduce Motion toggle.
+    rowLabel('Reduce Motion', 'Less motion & particles', y);
     this.mkTextButton(
       cfg.reducedFx ? 'ON' : 'OFF',
       w / 2 - 64,
@@ -2433,10 +2668,43 @@ export class SlotView extends Component {
       () => this.settingsChangeCb?.('reducedFx', !cfg.reducedFx),
       panel,
     ).setActive(cfg.reducedFx);
+    y -= 62;
+
+    // Row 5 — Battery Saver toggle.
+    rowLabel('Battery Saver', 'Cap quality & resolution', y);
+    this.mkTextButton(
+      cfg.batterySaver ? 'ON' : 'OFF',
+      w / 2 - 64,
+      y,
+      72,
+      36,
+      () => this.settingsChangeCb?.('batterySaver', !cfg.batterySaver),
+      panel,
+    ).setActive(cfg.batterySaver);
+    y -= 62;
+
+    // Row 6 — Language select (cycles the supported codes).
+    rowLabel('Language', 'Interface language', y);
+    const langs = SlotView.LANGS;
+    const curLang = langs.indexOf(cfg.lang) >= 0 ? cfg.lang : langs[0];
+    this.mkTextButton(
+      curLang,
+      w / 2 - 64,
+      y,
+      72,
+      36,
+      () => {
+        const next = langs[(langs.indexOf(curLang) + 1) % langs.length];
+        this.settingsChangeCb?.('lang', next);
+      },
+      panel,
+    );
 
     this.addPanelDismiss(panel, w, h, () => this.closeSettingsPanel());
     this.settingsPanel = panel;
   }
+
+  private static LANGS: readonly string[] = ['EN', 'ES', 'DE', 'FR', 'PT'];
 
   openSettingsPanel(): void {
     this.closeOverlays();
@@ -2448,7 +2716,7 @@ export class SlotView extends Component {
     this.popClose(this.settingsPanel);
   }
 
-  private buildInfoPanel(tab: 'rules' | 'paytable' | 'info'): void {
+  private buildInfoPanel(tab: InfoTab): void {
     const wasOpen = this.infoPanel?.active ?? true;
     this.infoPanel?.destroy();
     this.infoTab = tab;
@@ -2461,12 +2729,13 @@ export class SlotView extends Component {
     panel.active = wasOpen;
     this.surfChrome(panel, w, h, 46);
     this.mkLabel('GAME INFORMATION', 0, h / 2 - 26, info.titleSize, ACID, panel);
-    (['rules', 'paytable', 'info'] as const).forEach((name, i) => {
+    const tabs: InfoTab[] = ['paytable', 'paylines', 'features', 'rules'];
+    tabs.forEach((name, i) => {
       this.mkTextButton(
         name.toUpperCase(),
-        (i - 1) * 130,
+        (i - 1.5) * 124,
         h / 2 - 66,
-        118,
+        112,
         34,
         () => this.buildInfoPanel(name),
         panel,
@@ -2543,7 +2812,9 @@ export class SlotView extends Component {
         const ht = wrapLine(line, y, info.captionSize, line.startsWith('   ') ? MUTED : ACID);
         y -= ht + info.lineGap;
       }
-    } else {
+    } else if (tab === 'paylines') {
+      this.buildPaylinesTab(panel, w, top, info.leftMargin);
+    } else if (tab === 'features') {
       let y = top;
       const stat = (label: string, value: string) => {
         this.mkLabel(label, -w / 2 + info.leftMargin, y, 12, MUTED, panel).horizontalAlign =
@@ -2582,9 +2853,52 @@ export class SlotView extends Component {
     this.infoPanel = panel;
   }
 
+  // Paylines tab: 10 mini 5x3 grids, each lighting the exact cells of PAYLINES[i].
+  private buildPaylinesTab(panel: Node, w: number, top: number, leftMargin: number): void {
+    const cols = 2;
+    const cellPx = 11;
+    const cellGap = 2;
+    const gridW = GRID.reels * cellPx + (GRID.reels - 1) * cellGap;
+    const gridH = GRID.rows * cellPx + (GRID.rows - 1) * cellGap;
+    const colGap = (w - leftMargin * 2 - cols * gridW) / (cols + 1);
+    const rowPitch = gridH + 30;
+    const lit = new Color(127, 231, 255, 255); // cyan signal for active line cells.
+    const dim = new Color(255, 255, 255, 28);
+    PAYLINES.forEach((line, i) => {
+      const col = i % cols;
+      const rowIdx = Math.floor(i / cols);
+      const gx = -w / 2 + leftMargin + colGap + col * (gridW + colGap);
+      const gy = top - 12 - rowIdx * rowPitch;
+      const cellNode = this.mkNode(`payline${i}`, gridW, gridH, panel);
+      cellNode.setPosition(gx + gridW / 2, gy - gridH / 2, 0);
+      const g = cellNode.addComponent(Graphics);
+      for (let r = 0; r < GRID.reels; r++) {
+        for (let row = 0; row < GRID.rows; row++) {
+          const cx = -gridW / 2 + r * (cellPx + cellGap);
+          // PAYLINES rows are top=0..bottom; draw top row at the top of the mini grid.
+          const cy = gridH / 2 - cellPx - row * (cellPx + cellGap);
+          const on = line[r] === row;
+          g.fillColor = on ? lit : dim;
+          g.roundRect(cx, cy, cellPx, cellPx, 2);
+          g.fill();
+        }
+      }
+      const cap = this.mkLabel(`LINE ${i + 1}`, gx + gridW / 2, gy - gridH - 9, 10, MUTED, panel);
+      cap.horizontalAlign = Label.HorizontalAlign.CENTER;
+    });
+  }
+
   openInfoPanel(): void {
     this.closeOverlays();
     if (!this.infoPanel) this.buildInfoPanel(this.infoTab);
+    this.popOpen(this.infoPanel);
+    this.audio.modalOpen();
+  }
+
+  // Open the info panel on a specific tab (used by the menu-hub nav rows).
+  openInfoPanelAt(tab: InfoTab): void {
+    this.closeOverlays();
+    this.buildInfoPanel(tab);
     this.popOpen(this.infoPanel);
     this.audio.modalOpen();
   }
@@ -2599,22 +2913,44 @@ export class SlotView extends Component {
     this.popOpen(this.menuHub);
   }
 
+  // 5-row menu hub. Toggle rows (SOUND FX / MUSIC) flip an inline ON/OFF pill and DO NOT
+  // close the hub; nav rows (GAME RULES / PAYTABLE / SETTINGS) close the hub then open the
+  // target. No 'Game History' row.
   private static MENU_PRESENT: Record<string, { accent: string; caption: string }> = {
-    'BUY FEATURE': { accent: '#ff5ab0', caption: 'Skip the wait — buy any feature' },
-    'QUICK BET': { accent: '#ffcf5a', caption: 'Preset stake grid' },
-    'GAME INFO': { accent: '#7fe7ff', caption: 'Rules, paytable, RTP' },
-    SETTINGS: { accent: '#c566ff', caption: 'Sound, turbo, reduced FX' },
-    AUTOPLAY: { accent: '#b86fda', caption: 'Run a planned series of spins' },
+    'SOUND FX': { accent: '#ff5ab0', caption: 'Spin & win sound effects' },
+    MUSIC: { accent: '#52d189', caption: 'Background music' },
+    'GAME RULES': { accent: '#7fe7ff', caption: 'How the game works' },
+    PAYTABLE: { accent: '#ffcf5a', caption: 'Symbol pays & features' },
+    SETTINGS: { accent: '#c566ff', caption: 'Volume, motion, language' },
   };
 
   private buildMenuHub(): Node {
     const cfg = VIEW_CONFIG.menu;
-    const entries: [string, () => void][] = [
-      ['BUY FEATURE', () => this.openBuyMenu()],
-      ['QUICK BET', () => this.openQuickBetPanel()],
-      ['GAME INFO', () => this.openInfoPanel()],
-      ['SETTINGS', () => this.openSettingsPanel()],
-      ['AUTOPLAY', () => this.openAutoplayPanel()],
+    type MenuEntry =
+      | { kind: 'toggle'; label: string; get: () => boolean; set: (on: boolean) => void }
+      | { kind: 'nav'; label: string; open: () => void };
+    const entries: MenuEntry[] = [
+      {
+        kind: 'toggle',
+        label: 'SOUND FX',
+        get: () => this.menuSoundOn,
+        set: (on) => {
+          this.menuSoundOn = on;
+          this.settingsChangeCb?.('sound', on);
+        },
+      },
+      {
+        kind: 'toggle',
+        label: 'MUSIC',
+        get: () => this.menuMusicOn,
+        set: (on) => {
+          this.menuMusicOn = on;
+          this.settingsChangeCb?.('music', on);
+        },
+      },
+      { kind: 'nav', label: 'GAME RULES', open: () => this.openInfoPanelAt('rules') },
+      { kind: 'nav', label: 'PAYTABLE', open: () => this.openInfoPanelAt('paytable') },
+      { kind: 'nav', label: 'SETTINGS', open: () => this.openSettingsPanel() },
     ];
     const w = cfg.panelW;
     const titleBand = 64;
@@ -2627,10 +2963,9 @@ export class SlotView extends Component {
 
     const rowW = w - 36;
     let y = h / 2 - titleBand - cfg.rowH / 2 - 4;
-    entries.forEach(([label, open], i) => {
-      void i;
-      const present = SlotView.MENU_PRESENT[label] ?? { accent: '#ff7ad0', caption: '' };
-      const row = this.mkNode(`menuRow_${label}`, rowW, cfg.rowH, hub);
+    entries.forEach((entry) => {
+      const present = SlotView.MENU_PRESENT[entry.label] ?? { accent: '#ff7ad0', caption: '' };
+      const row = this.mkNode(`menuRow_${entry.label}`, rowW, cfg.rowH, hub);
       row.setPosition(0, y, 0);
 
       const tile = row.addComponent(Graphics);
@@ -2654,10 +2989,10 @@ export class SlotView extends Component {
       gg.circle(0, 0, cfg.gemSize * 0.42);
       gg.fill();
 
-      const labelNode = this.mkNode('label', rowW * 0.7, cfg.labelSize + 4, row);
+      const labelNode = this.mkNode('label', rowW * 0.6, cfg.labelSize + 4, row);
       labelNode.setPosition(-rowW / 2 + 56, 8, 0);
       const lbl = labelNode.addComponent(Label);
-      lbl.string = label;
+      lbl.string = entry.label;
       lbl.fontSize = cfg.labelSize;
       lbl.lineHeight = cfg.labelSize + 2;
       lbl.color = new Color().fromHEX(PAL.valueText);
@@ -2666,7 +3001,7 @@ export class SlotView extends Component {
       if (labelUt) labelUt.setAnchorPoint(0, 0.5);
       applyFont(lbl, 'display');
 
-      const captionNode = this.mkNode('caption', rowW * 0.7, cfg.captionSize + 4, row);
+      const captionNode = this.mkNode('caption', rowW * 0.6, cfg.captionSize + 4, row);
       captionNode.setPosition(-rowW / 2 + 56, -10, 0);
       const cap = captionNode.addComponent(Label);
       cap.string = present.caption;
@@ -2678,41 +3013,86 @@ export class SlotView extends Component {
       if (capUt) capUt.setAnchorPoint(0, 0.5);
       applyFont(cap, 'body');
 
-      const chevNode = this.mkNode('chev', 14, 14, row);
-      chevNode.setPosition(rowW / 2 - 22, 0, 0);
-      const cg = chevNode.addComponent(Graphics);
-      cg.lineWidth = 2.4;
-      cg.strokeColor = new Color(255, 200, 240, 200);
-      cg.moveTo(-3, 6);
-      cg.lineTo(4, 0);
-      cg.lineTo(-3, -6);
-      cg.stroke();
-
+      // Press feedback (shared).
       row.on(Node.EventType.TOUCH_START, () => {
         Tween.stopAllByTarget(row);
         tween(row)
           .to(0.08, { scale: new Vec3(0.97, 0.97, 1) }, { easing: 'quadOut' })
           .start();
       });
-      const release = (tap: boolean): void => {
+      const settle = (): void => {
         Tween.stopAllByTarget(row);
         tween(row)
           .to(0.18, { scale: new Vec3(1, 1, 1) }, { easing: 'backOut' })
           .start();
-        if (tap) {
-          this.audio.click();
-          hub.active = false;
-          open();
-        }
       };
-      row.on(Node.EventType.TOUCH_END, () => release(true));
-      row.on(Node.EventType.TOUCH_CANCEL, () => release(false));
+
+      if (entry.kind === 'toggle') {
+        // Inline ON/OFF pill; tapping the row flips it WITHOUT closing the hub.
+        const pillNode = this.mkNode('togglePill', 64, 30, row);
+        pillNode.setPosition(rowW / 2 - 44, 0, 0);
+        const pg = pillNode.addComponent(Graphics);
+        const pillLbl = this.mkLabel('', 0, 0, 13, INK, pillNode, true);
+        const paint = (on: boolean): void => {
+          pg.clear();
+          pg.fillColor = on ? new Color(82, 209, 137, 255) : new Color(48, 32, 64, 255);
+          pg.roundRect(-32, -15, 64, 30, 12);
+          pg.fill();
+          pg.lineWidth = 1.5;
+          pg.strokeColor = on ? new Color(190, 255, 220, 220) : new Color(150, 160, 180, 160);
+          pg.roundRect(-32, -15, 64, 30, 12);
+          pg.stroke();
+          pillLbl.string = on ? 'ON' : 'OFF';
+          pillLbl.color = on ? INK : new Color(210, 214, 224, 255);
+        };
+        paint(entry.get());
+        const release = (tap: boolean): void => {
+          settle();
+          if (tap) {
+            this.audio.click();
+            const next = !entry.get();
+            entry.set(next);
+            paint(entry.get());
+            // Stay open: do NOT set hub.active = false.
+          }
+        };
+        row.on(Node.EventType.TOUCH_END, () => release(true));
+        row.on(Node.EventType.TOUCH_CANCEL, () => release(false));
+      } else {
+        const chevNode = this.mkNode('chev', 14, 14, row);
+        chevNode.setPosition(rowW / 2 - 22, 0, 0);
+        const cg = chevNode.addComponent(Graphics);
+        cg.lineWidth = 2.4;
+        cg.strokeColor = new Color(255, 200, 240, 200);
+        cg.moveTo(-3, 6);
+        cg.lineTo(4, 0);
+        cg.lineTo(-3, -6);
+        cg.stroke();
+        const release = (tap: boolean): void => {
+          settle();
+          if (tap) {
+            this.audio.click();
+            hub.active = false;
+            entry.open();
+          }
+        };
+        row.on(Node.EventType.TOUCH_END, () => release(true));
+        row.on(Node.EventType.TOUCH_CANCEL, () => release(false));
+      }
 
       y -= cfg.rowH + cfg.rowGap;
     });
 
     this.addPanelDismiss(hub, w, h, () => (hub.active = false));
     return hub;
+  }
+
+  // Controller mirrors sound/music on-state here so the menu-hub toggles reflect it.
+  setMenuSoundOn(on: boolean): void {
+    this.menuSoundOn = on;
+  }
+  setMenuMusicOn(on: boolean): void {
+    this.menuMusicOn = on;
   }
 
   private panelFitScale(node: Node): number {
@@ -3114,6 +3494,51 @@ export class SlotView extends Component {
     this.reels.forEach((r) => r.setReducedMotion(on));
   }
 
+  // Alias seam used by the controller's Reduce Motion setting (WCAG 2.3.3). Mirrors
+  // setReducedFx so callers can name the intent (motion) distinctly from the FX flag.
+  setReducedMotion(on: boolean): void {
+    this.setReducedFx(on);
+  }
+
+  private batterySaver = false;
+  // Battery Saver (R7): drop the VfxGovernor quality ceiling to its floor AND cap the
+  // device-pixel-ratio (resolutionScale <= 1) to cut fill-rate. Effects also reduce via
+  // setReducedFx. OFF restores full quality + DPR.
+  setBatterySaver(on: boolean): void {
+    this.batterySaver = on;
+    this.setReducedFx(on);
+    // VfxGovernor ceiling: floor when saving, full otherwise. The ceiling lever lives on
+    // the ParticleLayer; call its passthrough if present (lockstep with the perf seam).
+    const minScale = VIEW_CONFIG.vfx.quality.minScale;
+    const layer = this.particles as unknown as {
+      setQualityCeiling?: (s: number) => void;
+    } | null;
+    layer?.setQualityCeiling?.(on ? minScale : 1);
+    // DPR clamp: cap resolutionScale to 1 when saving, restore to devicePixelRatio off.
+    // Guarded — the engine `screen` singleton may not be in the local typings.
+    try {
+      const sc = (
+        globalThis as unknown as {
+          cc?: { screen?: { setResolutionScale?: (s: number) => void } };
+        }
+      ).cc?.screen;
+      if (sc?.setResolutionScale) {
+        const dpr =
+          (globalThis as unknown as { devicePixelRatio?: number }).devicePixelRatio ?? 1;
+        sc.setResolutionScale(on ? Math.min(1, dpr) : dpr);
+      }
+    } catch {
+      // No-op if the platform doesn't expose resolution scaling.
+    }
+  }
+
+  // Localization stub: record the chosen UI language. No string table yet, so this is a
+  // no-op map; existing copy stays until a table lands (no logic/ touch).
+  private uiLang = 'EN';
+  setLanguage(code: string): void {
+    this.uiLang = code;
+  }
+
   onSpinClicked(cb: () => void): void {
     this.spinCb = cb;
   }
@@ -3132,7 +3557,10 @@ export class SlotView extends Component {
   onAutoplayOption(cb: (key: AutoplayOptionKey, value: boolean) => void): void {
     this.autoplayOptionCb = cb;
   }
-  onSettingsChange(cb: (key: SettingsKey, value: number | boolean) => void): void {
+  onAutoplayLimit(cb: (key: AutoplayLimitKey, cents: number) => void): void {
+    this.autoplayLimitCb = cb;
+  }
+  onSettingsChange(cb: (key: SettingsKey, value: number | boolean | string) => void): void {
     this.settingsChangeCb = cb;
   }
   onSoundClicked(cb: () => void): void {

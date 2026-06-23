@@ -20,6 +20,7 @@ import {
   evaluateContinuation,
   idleAutoplay,
   interSpinDelayMs,
+  recordSpin as recordAutoSpin,
   spinStarted,
   startAutoplay,
   stopAutoplay,
@@ -79,6 +80,14 @@ export class SlotController extends Component {
   private reducedFx = false;
   private autoplay: AutoplayState = idleAutoplay();
   private muted = false;
+
+  // Settings (Surface D) — sound/music are independent buses; volumes in [0,1].
+  private musicOn = true;
+  private soundVol = 0.8;
+  private musicVol = 0.6;
+  private quickSpin = false;
+  private batterySaver = false;
+  private lang = 'EN';
 
   onLoad(): void {
     // Lock 60fps — avoids GPU/thermal cost of high-refresh panels for no perceptible gain.
@@ -416,28 +425,89 @@ export class SlotController extends Component {
     return (['off', 'turbo', 'max'] as const)[this.turboMode];
   }
 
-  private applySetting(key: 'sound' | 'turboMode' | 'reducedFx', value: number | boolean): void {
-    if (key === 'sound') {
-      this.muted = !value;
-      this.view.setMuted(this.muted);
-      this.view.setSoundVisual(this.muted);
-      this.bar.setSoundOn(!this.muted);
-    } else if (key === 'turboMode') {
-      this.setTurboMode(value as 0 | 1 | 2);
-    } else {
-      this.reducedFx = value as boolean;
-      this.view.setReducedFx(this.reducedFx);
-      this.bar.setReducedFx(this.reducedFx);
+  private applySetting(
+    key:
+      | 'sound'
+      | 'music'
+      | 'soundVol'
+      | 'musicVol'
+      | 'quickSpin'
+      | 'reducedFx'
+      | 'batterySaver'
+      | 'lang',
+    value: number | boolean | string,
+  ): void {
+    switch (key) {
+      case 'sound': {
+        // Master SFX on/off (mute) — drives the existing muted seam + bar/sound visuals.
+        this.muted = !(value as boolean);
+        this.view.setMuted(this.muted);
+        this.view.setSoundVisual(this.muted);
+        this.bar.setSoundOn(!this.muted);
+        break;
+      }
+      case 'music': {
+        this.musicOn = value as boolean;
+        this.view.audio.setMusicEnabled(this.musicOn);
+        break;
+      }
+      case 'soundVol': {
+        this.soundVol = this.clamp01(value as number);
+        this.view.audio.setSfxVolume(this.soundVol);
+        break;
+      }
+      case 'musicVol': {
+        this.musicVol = this.clamp01(value as number);
+        this.view.audio.setMusicVolume(this.musicVol);
+        break;
+      }
+      case 'quickSpin': {
+        this.quickSpin = value as boolean;
+        // Quick Spin maps onto turbo mode 1 (fast) / 0 (normal). setTurboMode itself
+        // calls refreshSettingsPanel, so return early to avoid a double render.
+        this.setTurboMode(this.quickSpin ? 1 : 0);
+        this.view.openSettingsPanel();
+        return;
+      }
+      case 'reducedFx': {
+        this.reducedFx = value as boolean;
+        this.view.setReducedFx(this.reducedFx);
+        this.view.setReducedMotion(this.reducedFx);
+        this.bar.setReducedFx(this.reducedFx);
+        break;
+      }
+      case 'batterySaver': {
+        this.batterySaver = value as boolean;
+        // View owns the VfxGovernor ceiling + DPR clamp (resolutionScale <= 1, R7).
+        this.view.setBatterySaver(this.batterySaver);
+        break;
+      }
+      case 'lang': {
+        this.lang = value as string;
+        this.view.setLanguage(this.lang);
+        break;
+      }
     }
     this.refreshSettingsPanel();
     this.view.openSettingsPanel();
   }
 
+  private clamp01(x: number): number {
+    return x < 0 ? 0 : x > 1 ? 1 : x;
+  }
+
   private refreshSettingsPanel(): void {
+    // quickSpin reflects turbo being engaged (fast/max), so the panel toggle stays
+    // in lockstep with the standalone bar turbo control.
+    this.quickSpin = this.turboMode > 0;
     this.view.configureSettingsPanel({
       soundOn: !this.muted,
-      turboMode: this.turboMode,
+      soundVol: this.soundVol,
+      musicVol: this.musicVol,
+      quickSpin: this.quickSpin,
       reducedFx: this.reducedFx,
+      batterySaver: this.batterySaver,
+      lang: this.lang,
     });
   }
 
@@ -473,6 +543,8 @@ export class SlotController extends Component {
       allowInfinity: true,
       stopOnFeature: this.autoplay.stopOnFeature,
       stopOnBigWin: this.autoplay.stopOnBigWin,
+      lossLimitCents: this.autoplay.lossLimitCents,
+      singleWinLimitCents: this.autoplay.singleWinLimitCents,
     });
   }
 
@@ -535,6 +607,13 @@ export class SlotController extends Component {
       this.view.showWins(outcome.result);
       this.view.burstParticles(outcome.result, outcome.winCents / this.model.bet);
       if (immediateCents > 0) {
+        // LDW honesty (loss-disguised-as-win): a "win" that is <= the stake is not a
+        // net gain. When the win is an LDW we never celebrate it as a win unless the
+        // jurisdiction explicitly permits LDW celebration (UKGC/SE/DE forbid it ->
+        // always neutral). The count-up still runs because showing the amount is honest.
+        const ldw = immediateCents <= outcome.betCents;
+        const celebrate = !ldw || this.comply.allowLdwCelebration;
+
         // A2 — chain the count-up to the L->R win cascade: start it as the cascade
         // reaches the last winning reel, so the number follows the symbols igniting
         // instead of racing ahead of them. (Cascade stagger itself is owner-tuned.)
@@ -545,10 +624,13 @@ export class SlotController extends Component {
           this.view.countUp(immediateCents);
           this.bar.setLastWin(immediateCents / 100);
         }, cascadeS);
-        if (!outcome.freeSpins) {
+        if (ldw && !celebrate) {
+          // Neutral, honest readout — no ceremony, no win sting, no prestige.
+          this.view.setBanner('WIN');
+        } else if (!outcome.freeSpins) {
           this.view.playCeremony(immediateCents, outcome.betCents, outcome.wildStrike);
         }
-        if (immediateCents > outcome.betCents) {
+        if (celebrate && immediateCents > outcome.betCents) {
           const mult = immediateCents / outcome.betCents;
           const tier = mult >= 50 ? 5 : mult >= 30 ? 4 : mult >= 10 ? 3 : mult >= 2 ? 2 : 1;
           this.view.audio.win(tier);
@@ -595,12 +677,18 @@ export class SlotController extends Component {
         return;
       }
       if (this.autoplay.active) {
-        const verdict = evaluateContinuation(this.autoplay, {
+        const spin = {
           isFeature: outcome.freeSpins != null,
           winCents: outcome.winCents,
           betCents: outcome.betCents,
           balanceCents: this.model.balance,
-        });
+        };
+        // evaluateContinuation reads the PRIOR cumulative net-loss tally on the state
+        // and folds THIS spin in for the lossLimit check (loss-limit / single-win-limit
+        // route through stopAuto via the StopReason union). Record after evaluating so
+        // the running tally is current for the next continuation.
+        const verdict = evaluateContinuation(this.autoplay, spin);
+        this.autoplay = recordAutoSpin(this.autoplay, spin);
         if (verdict.stop) this.stopAuto();
         else {
           const d = interSpinDelayMs(this.turboMode);
@@ -662,9 +750,15 @@ export class SlotController extends Component {
     this.view.wipe(wipeTone, -1, 1);
     this.view.setBonusAtmosphere('idle');
     this.view.countUp(winCents);
-    const ldw = winCents <= this.model.bet;
+    // LDW honesty: a bonus total that does not exceed the stake is not a net win.
+    // Only celebrate (win sting via the ceremony) when it is a real win OR the
+    // jurisdiction permits LDW celebration; otherwise show a neutral completion banner.
+    const ldw = winCents > 0 && winCents <= this.model.bet;
+    const celebrate = !ldw || this.comply.allowLdwCelebration;
     const tierBet = Math.min(this.model.bet, Math.max(1, Math.round(winCents / 9)));
-    this.view.playCeremony(winCents, ldw ? this.model.bet : tierBet, 1);
+    if (celebrate) {
+      this.view.playCeremony(winCents, ldw ? this.model.bet : tierBet, 1);
+    }
     this.bar.setLastWin(winCents / 100);
     this.view.setBanner(ldw ? 'FREE SPINS COMPLETE' : 'FREE SPINS WIN');
   }
