@@ -26,6 +26,7 @@ const OUT = path.join(process.cwd(), 'public');
 const GAMES = [
   { slug: 'shining-pop', src: 'games/shining-pop/dist' },
   { slug: 'shining-pop-v2', src: 'games/shining-pop-v2/build/web-mobile' },
+  { slug: 'shining-pop-v3', src: 'games/shining-pop-v3/build/web-mobile' },
 ];
 
 rmSync(OUT, { recursive: true, force: true });

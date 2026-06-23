@@ -59,8 +59,25 @@ const C = {
   dark: '#24082c',
   cyan: '#bfe8ff',
   centerRim: '#ffd6f4',
+  // Surface 2 (R12): Sugar Rush control palette — exact design radial-gradient stops
+  // for the glossy pink spin DOME (circle at 36% 26%).
+  domeHot: '#ffffff', // white hot-spot (offset up-left)
+  domeHi: '#ffd9ec', // 14%
+  domeMid: '#ff5ab0', // 44%
+  domeCore: '#ff007f', // 72% — brand pink-500
+  domeEdge: '#b8005e', // 100% — pink-700
+  // Glass-pill readout edges: balance cyan-ish, win mint-ish (cyan/mint = win signal).
+  readCyan: '#7fe7ff',
+  readMint: '#52d189',
+  microCyan: '#9fe9ff', // Space-Mono micro-label tint per design (#9fe9ff)
+  // Autoplay candy gem = violet (R12); turbo gem = caramel.
+  violet: '#9a3bd6',
+  violetHi: '#d3a3f0',
+  violetLo: '#7a2bb0',
   // Surface E (R12): caramel turbo signal (web keeps its dark outline below).
   caramel: '#ff9a3c',
+  caramelHi: '#ffd07a',
+  caramelLo: '#e8731f',
   caramelLine: '#8a5200',
 };
 function col(hex: string, a?: number): Color {
@@ -221,6 +238,7 @@ export class BettingBarWeb extends Component {
     bold = true,
     parent: Node = this.node,
     ax = 0,
+    font?: 'body' | 'display' | 'mono',
   ): Label {
     const n = new Node('t');
     n.layer = this.node.layer;
@@ -237,7 +255,9 @@ export class BettingBarWeb extends Component {
     l.lineHeight = fs + 4;
     l.isBold = bold;
     l.color = col(color);
-    applyFont(l, color === C.value ? 'display' : 'body');
+    // Sugar Rush type system: micro-labels (BALANCE/WIN/BET) = Space-Mono, values =
+    // Luckiest Guy (display), everything else = Fredoka (body). Caller may override.
+    applyFont(l, font ?? (color === C.value ? 'display' : 'body'));
     return l;
   }
 
@@ -444,7 +464,7 @@ export class BettingBarWeb extends Component {
     g.lineTo(211, this.Y(212));
     g.stroke();
 
-    this.lbl('BALANCE', 232, 167, 17, C.label);
+    this.lbl('BALANCE', 232, 167, 13, C.microCyan, true, this.node, 0, 'mono');
     this.balValue = this.lbl('0.00', 232, 195, 28, C.value);
     this.make3D(this.balValue);
     this.balCur = this.lbl('USD', 330, 200, 16, C.cur, false);
@@ -453,19 +473,42 @@ export class BettingBarWeb extends Component {
   private banners: { x: number; w: number; cap: Label; val: Label }[] = [];
 
   private buildBanner(x: number, w: number, label: string, sink: (l: Label) => void): void {
+    // Glass-pill readout per design (rgba(10,6,20,.5) over a translucent body, cyan-ish
+    // 1px edge). WIN gets the cyan win-signal edge; TOTAL BET stays pink-spine neutral.
+    const isWin = label === 'LAST WIN';
+    const edge = isWin ? C.readCyan : C.edge;
     const g = this.gfx('banner_' + label);
-    g.fillColor = col(C.banner);
-    g.roundRect(x, this.Y(224), w, 76, 38);
+    // glass body: dark plum base + a top inner-light band (glass chrome)
+    g.fillColor = col('#0a0614', 0.5);
+    g.roundRect(x, this.Y(224), w, 76, 24);
     g.fill();
-    g.fillColor = col('#ffffff', 0.08);
-    g.roundRect(x + 2.5, this.Y(180), w - 5, 30, 34);
+    g.fillColor = col(C.banner, 0.55);
+    g.roundRect(x + 1, this.Y(223), w - 2, 74, 23);
     g.fill();
-    g.lineWidth = 2;
-    g.strokeColor = col(C.edge);
-    g.roundRect(x + 1, this.Y(223), w - 2, 74, 37);
+    g.fillColor = col('#ffffff', 0.1);
+    g.roundRect(x + 2.5, this.Y(182), w - 5, 26, 20);
+    g.fill();
+    // 1px inner light then the tinted edge
+    g.lineWidth = 1.2;
+    g.strokeColor = col('#ffffff', 0.16);
+    g.roundRect(x + 2, this.Y(222), w - 4, 72, 22);
     g.stroke();
-    const cap = this.lbl(label, x + w / 2 - 7, 186, 18, C.label);
-    const val = this.lbl('0.00', x + w / 2 + 7, 186, 27, C.value);
+    g.lineWidth = 2;
+    g.strokeColor = col(edge, isWin ? 0.55 : 0.85);
+    g.roundRect(x + 1, this.Y(223), w - 2, 74, 23);
+    g.stroke();
+    const cap = this.lbl(
+      label,
+      x + w / 2 - 7,
+      184,
+      13,
+      isWin ? C.microCyan : C.label,
+      true,
+      this.node,
+      0,
+      'mono',
+    );
+    const val = this.lbl('0.00', x + w / 2 + 7, 188, 27, C.value);
     this.banners.push({ x, w, cap, val });
     sink(val);
   }
@@ -664,33 +707,61 @@ export class BettingBarWeb extends Component {
   }
 
   private buildRightCluster(): void {
-    const circleBtn = (cx: number, cy: number, r: number): { node: Node; g: Graphics } => {
+    // gem (optional) = {edge, mid, hi} candy-gem stops -> glossy conic+dome gem per
+    // design (autoplay violet, turbo caramel). Omit for the neutral plum circle button.
+    const circleBtn = (
+      cx: number,
+      cy: number,
+      r: number,
+      gem?: { edge: string; mid: string; hi: string; glow: string },
+    ): { node: Node; g: Graphics } => {
       const n = this.localNode(this.node, cx, this.Y(cy), r * 2, r * 2);
 
+      const glowCol = gem ? gem.glow : C.active;
       const glowN = this.localNode(n, 0, 0, (r + 12) * 2, (r + 12) * 2);
       const gg = glowN.addComponent(Graphics);
       for (let k = 6; k >= 1; k--) {
-        gg.fillColor = col(C.active, 0.05);
+        gg.fillColor = col(glowCol, 0.05);
         gg.circle(0, 0, r + 1 + k * 1.8);
         gg.fill();
       }
-      gg.fillColor = col(C.activeHi, 0.18);
+      gg.fillColor = col(gem ? gem.hi : C.activeHi, 0.18);
       gg.circle(0, 0, r + 2);
       gg.fill();
       const glowOp = glowN.addComponent(UIOpacity);
       glowOp.opacity = 0;
       (n as unknown as { __glowOp: UIOpacity }).__glowOp = glowOp;
       const g = n.addComponent(Graphics);
-      g.fillColor = col(C.panel);
-      g.circle(0, 0, r);
-      g.fill();
-      g.fillColor = col(C.panelHi, 0.5);
-      g.circle(-r * 0.18, r * 0.3, r * 0.62);
-      g.fill();
-      g.lineWidth = 1.8;
-      g.strokeColor = col(C.edge, 0.92);
-      g.circle(0, 0, r - 1);
-      g.stroke();
+      if (gem) {
+        // candy gem: dark edge -> mid -> pale hot-spot offset up-left + white rim ticks
+        g.fillColor = col(gem.edge);
+        g.circle(0, 0, r);
+        g.fill();
+        g.fillColor = col(gem.mid);
+        g.circle(-r * 0.16, r * 0.26, r * 0.78);
+        g.fill();
+        g.fillColor = col(gem.hi, 0.95);
+        g.circle(-r * 0.26, r * 0.34, r * 0.34);
+        g.fill();
+        g.lineWidth = r * 0.07;
+        g.strokeColor = col('#ffffff', 0.7);
+        for (let q = 0; q < 4; q++) {
+          const a0 = q * (Math.PI / 2) + 0.2;
+          g.arc(0, 0, r * 0.92, a0, a0 + Math.PI / 2 - 0.4, false);
+          g.stroke();
+        }
+      } else {
+        g.fillColor = col(C.panel);
+        g.circle(0, 0, r);
+        g.fill();
+        g.fillColor = col(C.panelHi, 0.5);
+        g.circle(-r * 0.18, r * 0.3, r * 0.62);
+        g.fill();
+        g.lineWidth = 1.8;
+        g.strokeColor = col(C.edge, 0.92);
+        g.circle(0, 0, r - 1);
+        g.stroke();
+      }
       return { node: n, g };
     };
 
@@ -735,7 +806,12 @@ export class BettingBarWeb extends Component {
     x2lbl.node.setPosition(0, 0, 0);
     this.hitNode(gambleX - 38, 148, 76, 76, () => this.events.emit('bet:double'), [gamble.node]);
 
-    const turbo = circleBtn(2200, 150, 30);
+    const turbo = circleBtn(2200, 150, 30, {
+      edge: C.caramelLo,
+      mid: C.caramel,
+      hi: C.caramelHi,
+      glow: C.caramel,
+    });
     const tGlyph = this.localNode(turbo.node, 0, 0, 30, 30);
     const tg = tGlyph.addComponent(Graphics);
 
@@ -748,26 +824,36 @@ export class BettingBarWeb extends Component {
       tg.lineTo(1, 3);
       tg.close();
     };
-    tg.fillColor = col(C.caramel);
+    // Glyph now sits on the caramel gem face: white fill + dark caramel rim so it reads.
+    tg.fillColor = col('#fff7ea');
     boltPath();
     tg.fill();
-    tg.lineWidth = 1.4;
+    tg.lineWidth = 1.6;
     tg.strokeColor = col(C.caramelLine);
     boltPath();
     tg.stroke();
     this.turboGlyphOp = tGlyph.addComponent(UIOpacity);
 
-    this.icon(tGlyph, 0, 0, 36, 'ic_bolt', C.caramel, () => tg.clear());
+    this.icon(tGlyph, 0, 0, 36, 'ic_bolt', '#fff7ea', () => tg.clear());
     const pip = this.localNode(turbo.node, 13, 13, 12, 12);
     const pg = pip.addComponent(Graphics);
-    pg.fillColor = col(C.caramel);
+    pg.fillColor = col('#fff7ea');
     pg.circle(0, 0, 5);
     pg.fill();
+    pg.lineWidth = 1.2;
+    pg.strokeColor = col(C.caramelLine);
+    pg.circle(0, 0, 5);
+    pg.stroke();
     pip.active = false;
     this.turboPip = pip;
     this.hitNode(2170, 120, 60, 60, () => this.events.emit('turbo'), [turbo.node]);
 
-    const auto = circleBtn(2200, 222, 30);
+    const auto = circleBtn(2200, 222, 30, {
+      edge: C.violetLo,
+      mid: C.violet,
+      hi: C.violetHi,
+      glow: C.violet,
+    });
     const aGlyph = this.localNode(auto.node, 0, 0, 30, 30);
     const ag2 = aGlyph.addComponent(Graphics);
 
@@ -817,37 +903,60 @@ export class BettingBarWeb extends Component {
     this.spinBody = bodyN;
     const rg = bodyN.addComponent(Graphics);
     const INNER = R * 0.74;
-    const cHi = col(C.ringHi);
-    const cLo = col(C.ringLo);
-    const STEPS = 10;
-    for (let k = 0; k < STEPS; k++) {
-      const t = k / (STEPS - 1);
-      const lc = new Color();
-      Color.lerp(lc, cHi, cLo, t);
-      rg.fillColor = lc;
-      rg.circle(0, 0, R - t * (R * 0.1));
+
+    // Surface 2 — SPIN DOME (Sugar Rush). Cocos Graphics can't do a radial-gradient,
+    // so approximate the design's `radial-gradient(circle at 36% 26%, #fff 0%,
+    // #ffd9ec 14%, #ff5ab0 44%, #ff007f 72%, #b8005e 100%)` with concentric filled
+    // circles, deep base -> brand core -> lighter mid -> white hot-spot offset up-left.
+
+    // (a) peppermint outer ring (conic in the design) approximated as a pink edge band.
+    rg.fillColor = col(C.domeEdge);
+    rg.circle(0, 0, R);
+    rg.fill();
+    rg.fillColor = col(C.domeCore);
+    rg.circle(0, 0, R * 0.96);
+    rg.fill();
+    // thin white peppermint highlight ticks around the rim (4 quadrant arcs)
+    rg.lineWidth = R * 0.05;
+    rg.strokeColor = col('#ffffff', 0.8);
+    for (let q = 0; q < 4; q++) {
+      const a0 = q * (Math.PI / 2) + 0.18;
+      rg.arc(0, 0, R * 0.985, a0, a0 + Math.PI / 2 - 0.36, false);
+      rg.stroke();
+    }
+
+    // (b) glossy inner dome — stacked radial stops, centre offset up-left to 36%/26%.
+    const cx = -R * 0.14;
+    const cy = R * 0.24;
+    const domeStops: { r: number; c: string }[] = [
+      { r: R * 0.9, c: C.domeEdge }, // 100% edge
+      { r: R * 0.74, c: C.domeCore }, // 72% brand pink
+      { r: R * 0.52, c: C.domeMid }, // 44% lighter pink
+      { r: R * 0.3, c: C.domeHi }, // 14% pale pink
+      { r: R * 0.14, c: C.domeHot }, // 0% white hot-spot
+    ];
+    for (const s of domeStops) {
+      rg.fillColor = col(s.c);
+      rg.circle(cx, cy, s.r);
       rg.fill();
     }
 
-    rg.fillColor = col(C.ringMid);
-    rg.circle(0, 0, R * 0.94);
-    rg.fill();
-
-    rg.fillColor = col(C.spinFace);
-    rg.circle(0, 0, INNER);
-    rg.fill();
-
-    rg.lineWidth = 2;
-    rg.strokeColor = col(C.centerRim, 0.9);
-    rg.circle(0, 0, R * 0.94);
+    // (c) inset rim: bright top-left specular line + dark bottom candy shade.
+    rg.lineWidth = R * 0.05;
+    rg.strokeColor = col('#ffffff', 0.85);
+    rg.arc(0, 0, R * 0.9, Math.PI * 0.35, Math.PI * 1.0, false);
     rg.stroke();
-    rg.lineWidth = 2;
-    rg.strokeColor = col('#000000', 0.35);
-    rg.circle(0, 0, INNER);
+    rg.lineWidth = R * 0.07;
+    rg.strokeColor = col('#7a0044', 0.55);
+    rg.arc(0, 0, R * 0.9, Math.PI * 1.05, Math.PI * 1.9, false);
     rg.stroke();
 
-    rg.fillColor = col('#ffffff', 0.22);
-    rg.ellipse(0, R * 0.4, R * 0.5, R * 0.14);
+    // (d) crisp top specular ellipse highlight (the design's white top-cap blob).
+    rg.fillColor = col('#ffffff', 0.92);
+    rg.ellipse(0, R * 0.46, R * 0.3, R * 0.1);
+    rg.fill();
+    rg.fillColor = col('#ffffff', 0.35);
+    rg.ellipse(0, R * 0.42, R * 0.5, R * 0.16);
     rg.fill();
 
     const arrowNode = this.localNode(ring, 0, 0, R, R);

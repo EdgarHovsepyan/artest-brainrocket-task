@@ -67,8 +67,26 @@ const C = {
   divider: '#cf78e0',
   gloss: '#ffffff',
   glow: '#ff4ad0',
+  // Surface 2 (R12, lockstep with betting-bar-web): SPIN DOME radial-gradient stops
+  // (circle at 36% 26%): white -> #ffd9ec -> #ff5ab0 -> #ff007f -> #b8005e edge.
+  domeHot: '#ffffff',
+  domeHi: '#ffd9ec',
+  domeMid: '#ff5ab0',
+  domeCore: '#ff007f',
+  domeEdge: '#b8005e',
+  // Glass-pill readout edges (cyan/mint = win/scatter signal) + Space-Mono micro tint.
+  readCyan: '#7fe7ff',
+  readMint: '#52d189',
+  microCyan: '#9fe9ff',
+  // Autoplay candy gem = violet (R12); turbo gem = caramel.
+  violet: '#9a3bd6',
+  violetHi: '#d3a3f0',
+  violetLo: '#7a2bb0',
   // Surface E (R12): caramel turbo signal — pink=brand, cyan=win, gold=coins preserved.
   caramel: '#ff9a3c',
+  caramelHi: '#ffd07a',
+  caramelLo: '#e8731f',
+  caramelLine: '#8a5200',
 };
 function col(hex: string, a?: number): Color {
   const c = new Color();
@@ -152,6 +170,8 @@ export class BettingBarMobile extends Component {
     r: number,
     fill: string,
     edgeW: number,
+    edgeColor: string = C.edge,
+    edgeAlpha = 1,
   ): void {
     this.rr(g, x, y, w, h, r);
     g.fillColor = col(fill);
@@ -159,7 +179,7 @@ export class BettingBarMobile extends Component {
     if (edgeW) {
       this.rr(g, x, y, w, h, r);
       g.lineWidth = edgeW;
-      g.strokeColor = col(C.edge);
+      g.strokeColor = col(edgeColor, edgeAlpha);
       g.stroke();
     }
 
@@ -184,6 +204,36 @@ export class BettingBarMobile extends Component {
       g.circle(cx, Y(cy), r);
       g.lineWidth = edgeW;
       g.strokeColor = col(C.edge);
+      g.stroke();
+    }
+  }
+
+  // Candy gem (conic+dome approximation, lockstep with betting-bar-web circleBtn gem):
+  // dark edge -> mid -> pale hot-spot offset up-left + white quadrant rim ticks.
+  private gemInto(
+    g: Graphics,
+    cx: number,
+    cy: number,
+    r: number,
+    edge: string,
+    mid: string,
+    hi: string,
+  ): void {
+    const sy = this.Y(cy);
+    g.fillColor = col(edge);
+    g.circle(cx, sy, r);
+    g.fill();
+    g.fillColor = col(mid);
+    g.circle(cx - r * 0.16, sy + r * 0.26, r * 0.78);
+    g.fill();
+    g.fillColor = col(hi, 0.95);
+    g.circle(cx - r * 0.26, sy + r * 0.34, r * 0.34);
+    g.fill();
+    g.lineWidth = r * 0.07;
+    g.strokeColor = col('#ffffff', 0.7);
+    for (let q = 0; q < 4; q++) {
+      const a0 = q * (Math.PI / 2) + 0.2;
+      g.arc(cx, sy, r * 0.92, a0, a0 + Math.PI / 2 - 0.4, false);
       g.stroke();
     }
   }
@@ -213,8 +263,9 @@ export class BettingBarMobile extends Component {
     g.fillColor = col(C.divider, 0.5);
     g.fill();
 
-    this.panelInto(g, 60, 210, 200, 46, 23, C.banner, 1.8);
-    this.panelInto(g, 280, 210, 200, 46, 23, C.banner, 1.8);
+    // WIN + BALANCE readouts = cyan-edged glass pills (cyan = win signal, per design).
+    this.panelInto(g, 60, 210, 200, 46, 23, '#0a0614', 1.8, C.readCyan, 0.55);
+    this.panelInto(g, 280, 210, 200, 46, 23, '#0a0614', 1.8, C.readCyan, 0.5);
 
     this.panelInto(g, 170, 479, 200, 54, 27, C.panel, 1.8);
     [237, 303].forEach((x) => {
@@ -225,8 +276,10 @@ export class BettingBarMobile extends Component {
     g.strokeColor = col(C.divider, 0.28);
     g.stroke();
 
-    this.circleInto(g, 104, 506, 30, C.panel, 1.8);
-    this.circleInto(g, 436, 506, 30, C.panel, 1.8);
+    // Autoplay candy gem (violet) + turbo candy gem (caramel), grouped with the bet
+    // stepper per design. Glyphs are drawn on top in buildAutoplay/buildTurbo.
+    this.gemInto(g, 104, 506, 30, C.violetLo, C.violet, C.violetHi);
+    this.gemInto(g, 436, 506, 30, C.caramelLo, C.caramel, C.caramelHi);
 
     this.panelInto(g, 14, 560, 512, 44, 22, C.panel, 1.8);
     g.moveTo(330, Y(568));
@@ -285,17 +338,63 @@ export class BettingBarMobile extends Component {
     ui.setContentSize(W, H);
     this.spinGroup.addComponent(UIOpacity).opacity = 255;
 
+    // Surface 2 — SPIN DOME (lockstep with betting-bar-web). Graphics can't do a
+    // radial-gradient, so approximate `radial-gradient(circle at 36% 26%, #fff 0%,
+    // #ffd9ec 14%, #ff5ab0 44%, #ff007f 72%, #b8005e 100%)` with stacked circles:
+    // deep edge -> brand core -> lighter mid -> white hot-spot offset up-left.
     const face = this.gfx('face', this.spinGroup);
-    this.circleInto(face, 270, 392, 70, C.ring, 0);
-    face.circle(270, Y(392), 69);
-    face.lineWidth = 4;
-    face.strokeColor = col(C.ringInner, 0.6);
+    const SCX = 270;
+    const SCY = Y(392); // screen-space centre (mobile Y = -y)
+    const SR = 70;
+
+    // (a) peppermint-approx outer ring (deep edge + brand band + white quadrant ticks)
+    face.fillColor = col(C.domeEdge);
+    face.circle(SCX, SCY, SR);
+    face.fill();
+    face.fillColor = col(C.domeCore);
+    face.circle(SCX, SCY, SR * 0.96);
+    face.fill();
+    face.lineWidth = SR * 0.05;
+    face.strokeColor = col('#ffffff', 0.8);
+    for (let q = 0; q < 4; q++) {
+      const a0 = q * (Math.PI / 2) + 0.18;
+      face.arc(SCX, SCY, SR * 0.985, a0, a0 + Math.PI / 2 - 0.36, false);
+      face.stroke();
+    }
+
+    // (b) glossy inner dome — hot-spot offset up-left (36%/26%). Up = +screen-y.
+    const hcx = SCX - SR * 0.14;
+    const hcy = SCY + SR * 0.24;
+    const domeStops: { r: number; c: string }[] = [
+      { r: SR * 0.9, c: C.domeEdge },
+      { r: SR * 0.74, c: C.domeCore },
+      { r: SR * 0.52, c: C.domeMid },
+      { r: SR * 0.3, c: C.domeHi },
+      { r: SR * 0.14, c: C.domeHot },
+    ];
+    for (const s of domeStops) {
+      face.fillColor = col(s.c);
+      face.circle(hcx, hcy, s.r);
+      face.fill();
+    }
+
+    // (c) inset rim: bright top-left specular arc + dark candy shade at the bottom.
+    face.lineWidth = SR * 0.05;
+    face.strokeColor = col('#ffffff', 0.85);
+    face.arc(SCX, SCY, SR * 0.9, Math.PI * 0.35, Math.PI * 1.0, false);
     face.stroke();
-    this.circleInto(face, 270, 392, 55, C.spin, 0);
-    face.circle(270, Y(392), 55);
-    face.lineWidth = 2.2;
-    face.strokeColor = col(C.centerRim, 0.4);
+    face.lineWidth = SR * 0.07;
+    face.strokeColor = col('#7a0044', 0.55);
+    face.arc(SCX, SCY, SR * 0.9, Math.PI * 1.05, Math.PI * 1.9, false);
     face.stroke();
+
+    // (d) top specular ellipse highlight (white top-cap blob).
+    face.fillColor = col('#ffffff', 0.92);
+    face.ellipse(SCX, SCY + SR * 0.46, SR * 0.3, SR * 0.1);
+    face.fill();
+    face.fillColor = col('#ffffff', 0.32);
+    face.ellipse(SCX, SCY + SR * 0.42, SR * 0.5, SR * 0.16);
+    face.fill();
 
     const arrow = this.gfx('arrow', this.spinGroup);
     arrow.arc(270, Y(392), 28, Math.PI * 0.27, Math.PI * 1.73, false);
@@ -370,10 +469,11 @@ export class BettingBarMobile extends Component {
     glyph.lineTo(98, Y(496));
     glyph.lineTo(98, Y(516));
     glyph.close();
-    glyph.fillColor = col(C.active);
+    // White glyph on the violet autoplay gem so it reads (design uses a white face).
+    glyph.fillColor = col('#f4e6ff');
     glyph.fill();
 
-    this.icon(glyph.node, 104, 506, 36, 'ic_autoplay', C.active, () => glyph.clear());
+    this.icon(glyph.node, 104, 506, 36, 'ic_autoplay', '#f4e6ff', () => glyph.clear());
     this.autoGlyph = glyph.node;
     this.autoCount = this.mkLabel('autoCount', 104, 506, 17, C.value, 0.5);
     this.autoCount.string = '';
@@ -413,9 +513,13 @@ export class BettingBarMobile extends Component {
     glyph.lineTo(444, Y(504));
     glyph.lineTo(436, Y(504));
     glyph.close();
-    glyph.fillColor = col(C.caramel);
+    // White bolt on the caramel turbo gem so it reads (design uses a white face).
+    glyph.fillColor = col('#fff7ea');
     glyph.fill();
-    this.icon(glyph.node, 436, 507, 30, 'ic_bolt', C.caramel, () => glyph.clear());
+    glyph.lineWidth = 1;
+    glyph.strokeColor = col(C.caramelLine);
+    glyph.stroke();
+    this.icon(glyph.node, 436, 507, 30, 'ic_bolt', '#fff7ea', () => glyph.clear());
     this.turboGlyphOp = glyph.node.addComponent(UIOpacity);
     this.turboGlyphOp.opacity = 115;
 
@@ -426,7 +530,7 @@ export class BettingBarMobile extends Component {
     pip.lineTo(449, Y(519) - pr);
     pip.lineTo(449 - pr, Y(519));
     pip.close();
-    pip.fillColor = col(C.caramel);
+    pip.fillColor = col('#fff7ea');
     pip.fill();
     this.turboPip = pip.node;
     this.turboPip.active = false;
@@ -634,6 +738,7 @@ export class BettingBarMobile extends Component {
     color: string,
     anchorX: number,
     parent: Node = this.node,
+    font?: 'body' | 'display' | 'mono',
   ): Label {
     const n = new Node(name);
     parent.addChild(n);
@@ -645,7 +750,9 @@ export class BettingBarMobile extends Component {
     (n as unknown as { __baseFs: number }).__baseFs = size;
     lab.color = col(color);
     lab.isBold = true;
-    applyFont(lab, color === C.value ? 'display' : 'body');
+    // Sugar Rush type system: micro-labels = Space-Mono, values = Luckiest Guy
+    // (display), rest = Fredoka (body). Caller may override the family.
+    applyFont(lab, font ?? (color === C.value ? 'display' : 'body'));
 
     if (color === C.value) this.make3D(lab);
     n.setPosition(new Vec3(x, this.Y(y), 0));
@@ -663,15 +770,18 @@ export class BettingBarMobile extends Component {
     lo.width = 2;
   }
   private makeLabels(): void {
-    this.mkLabel('lastWinLabel', 100, 233, 13, C.label, 0.5).string = 'LAST WIN';
+    // Micro-labels (Space-Mono, cyan win-signal tint); values keep display font.
+    this.mkLabel('lastWinLabel', 100, 233, 11, C.microCyan, 0.5, this.node, 'mono').string =
+      'WIN';
     this.mkLabel('lastWinValue', 180, 233, 17, C.value, 0).string = '0.00';
-    this.mkLabel('totalBetLabel', 320, 233, 13, C.label, 0.5).string = 'TOTAL BET';
+    this.mkLabel('totalBetLabel', 320, 233, 11, C.label, 0.5, this.node, 'mono').string =
+      'TOTAL BET';
     this.mkLabel('totalBetValue', 400, 233, 17, C.value, 0).string = '0';
     this.mkLabel('stepValue', 270, 507, 24, C.value, 0.5).string = '0';
-    this.mkLabel('balLabel', 36, 582, 13, C.label, 0).string = 'BALANCE';
+    this.mkLabel('balLabel', 36, 582, 11, C.microCyan, 0, this.node, 'mono').string = 'BALANCE';
     this.mkLabel('balValue', 104, 582, 15, C.value, 0).string = '0';
     this.mkLabel('balCur', 196, 582, 11, C.cur, 0).string = 'USD';
-    this.mkLabel('betLabel', 242, 582, 12, C.label, 0).string = 'BET';
+    this.mkLabel('betLabel', 242, 582, 11, C.microCyan, 0, this.node, 'mono').string = 'BET';
     this.mkLabel('betValue', 272, 582, 15, C.value, 0).string = '0';
   }
 

@@ -1955,15 +1955,40 @@ export class SlotView extends Component {
     sep.setPosition(0, reelCenterY, 0);
     const sg = sep.addComponent(Graphics);
 
-    const { cell, gap } = VIEW_CONFIG.layout;
+    // Per-CELL grid (15 cells = 5 reels × 3 rows) matching the design's quiet cell
+    // wells, NOT faint per-reel columns. Each cell is a rounded square aligned to where
+    // the symbol actually renders. Cell centre matches the canonical formula used for
+    // win cells (x = -gw/2 + cell/2 + r*pitch ; y = (1 - row)*pitch in this node space,
+    // which sits at reelCenterY exactly like the reels root).
+    const { cell } = VIEW_CONFIG.layout;
+    const R = 9; // design cell radius
     for (let r = 0; r < GRID.reels; r++) {
-      const x = -this.gw / 2 + r * this.pitch;
-      const y = -this.gh / 2;
-      sg.fillColor = new Color(255, 255, 255, 6);
-      sg.roundRect(x, y, cell, this.gh, 10);
-      sg.fill();
+      const cx = -this.gw / 2 + cell / 2 + r * this.pitch;
+      for (let row = 0; row < GRID.rows; row++) {
+        const cy = (1 - row) * this.pitch;
+        const x0 = cx - cell / 2;
+        const y0 = cy - cell / 2;
+
+        // approximate the design radial 'circle at 50% 40%, rgba(42,22,60,.55) ->
+        // rgba(10,6,18,.62)' with a dark base round-rect + a slightly-lighter,
+        // upper-biased center round-rect inset a few px (Graphics can't do radials).
+        sg.fillColor = new Color(12, 7, 18, 165); // dark edge
+        sg.roundRect(x0, y0, cell, cell, R);
+        sg.fill();
+
+        // lighter center, inset ~7px and nudged toward 50%/40% (upper) like the radial
+        const ins = 7;
+        sg.fillColor = new Color(42, 22, 60, 140); // lighter plum core
+        sg.roundRect(x0 + ins, y0 + ins + 4, cell - ins * 2, cell - ins * 2, R - 3);
+        sg.fill();
+
+        // faint cyan 1px border (.18 alpha) — design's quiet cell rim
+        sg.lineWidth = 1;
+        sg.strokeColor = new Color(127, 231, 255, 46);
+        sg.roundRect(x0, y0, cell, cell, R);
+        sg.stroke();
+      }
     }
-    void gap;
   }
 
   private buildReels(): void {
