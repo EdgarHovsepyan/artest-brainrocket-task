@@ -101,6 +101,10 @@ export class BettingBarMobile extends Component {
   private g!: Graphics;
   private labels: Record<string, Label> = {};
 
+  // cocos-design-handoff: design-rendered material PNGs replace the flat Graphics that
+  // faked glossy candy surfaces. Cached per-name so each sprite loads once.
+  private matCache: Record<string, SpriteFrame> = {};
+
   private uiBoost = 1;
 
   private currency = 'USD';
@@ -263,9 +267,11 @@ export class BettingBarMobile extends Component {
     g.fillColor = col(C.divider, 0.5);
     g.fill();
 
-    // WIN + BALANCE readouts = cyan-edged glass pills (cyan = win signal, per design).
-    this.panelInto(g, 60, 210, 200, 46, 23, '#0a0614', 1.8, C.readCyan, 0.55);
-    this.panelInto(g, 280, 210, 200, 46, 23, '#0a0614', 1.8, C.readCyan, 0.5);
+    // WIN + TOTAL-BET readouts: flat glass-pill Graphics replaced by 9-sliced
+    // 'mat/mat_pill_glass' sprites (corners hold, edges stretch). Micro-labels + values
+    // are added later in makeLabels() so they sit ON TOP. Centres = (160,233)/(380,233).
+    this.matInto(this.node, 'mat_pill_glass', 160, Y(233), 200, 46, -1, true);
+    this.matInto(this.node, 'mat_pill_glass', 380, Y(233), 200, 46, -1, true);
 
     this.panelInto(g, 170, 479, 200, 54, 27, C.panel, 1.8);
     [237, 303].forEach((x) => {
@@ -276,17 +282,23 @@ export class BettingBarMobile extends Component {
     g.strokeColor = col(C.divider, 0.28);
     g.stroke();
 
-    // Autoplay candy gem (violet) + turbo candy gem (caramel), grouped with the bet
-    // stepper per design. Glyphs are drawn on top in buildAutoplay/buildTurbo.
-    this.gemInto(g, 104, 506, 30, C.violetLo, C.violet, C.violetHi);
-    this.gemInto(g, 436, 506, 30, C.caramelLo, C.caramel, C.caramelHi);
+    // Autoplay candy gem (violet) + turbo candy gem (caramel): flat conic+dome Graphics
+    // replaced by design-rendered gem sprites. Glyphs/count are drawn later in
+    // buildAutoplay/buildTurbo so they stay ON TOP. Centres (104,506)/(436,506), d=60.
+    this.matInto(this.node, 'mat_gem_violet', 104, Y(506), 60, 60, -1, false);
+    this.matInto(this.node, 'mat_gem_caramel', 436, Y(506), 60, 60, -1, false);
 
-    this.panelInto(g, 14, 560, 512, 44, 22, C.panel, 1.8);
-    g.moveTo(330, Y(568));
-    g.lineTo(330, Y(596));
-    g.lineWidth = 1.2;
-    g.strokeColor = col(C.divider, 0.3);
-    g.stroke();
+    // BALANCE / BET readout strip: flat glass-pill Graphics replaced by a 9-sliced
+    // 'mat/mat_pill_glass' sprite. The BALANCE|BET divider is an overlay detail, so it
+    // is drawn on a fresh Graphics node appended AFTER the sprite (higher sibling) so it
+    // is not hidden behind the pill. Labels/values added later sit on top of both.
+    this.matInto(this.node, 'mat_pill_glass', 270, Y(582), 512, 44, -1, true);
+    const strip = this.gfx('stripDivider');
+    strip.moveTo(330, Y(568));
+    strip.lineTo(330, Y(596));
+    strip.lineWidth = 1.2;
+    strip.strokeColor = col(C.divider, 0.3);
+    strip.stroke();
 
     // Surface E (3): subtle down-caret cue under the centre BET value to signal it
     // opens the quick-bet menu (tap-on-value). Centered at x=270, clear of dividers.
@@ -329,6 +341,50 @@ export class BettingBarMobile extends Component {
     return n;
   }
 
+  // cocos-design-handoff material sprite: build a Sprite node synchronously (build is
+  // sync, load is async) and fill in the design-rendered SpriteFrame when it arrives.
+  // `slice` -> 9-slice (pills/cabinet) so corners/rivets hold while edges stretch.
+  private matInto(
+    parent: Node,
+    name: string,
+    cx: number,
+    cyScreen: number,
+    w: number,
+    h: number,
+    sibling: number,
+    slice = false,
+  ): Node {
+    const n = new Node(name);
+    n.layer = this.node.layer;
+    parent.addChild(n);
+    const ui = n.addComponent(UITransform);
+    ui.setAnchorPoint(0.5, 0.5);
+    ui.setContentSize(w, h);
+    n.setPosition(cx, cyScreen, 0);
+    if (sibling >= 0) n.setSiblingIndex(sibling);
+    const sp = n.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = slice ? Sprite.Type.SLICED : Sprite.Type.SIMPLE;
+    const apply = (sf: SpriteFrame): void => {
+      if (slice) {
+        sf.insetTop = sf.insetBottom = sf.insetLeft = sf.insetRight = 46;
+      }
+      sp.spriteFrame = sf;
+    };
+    const cached = this.matCache[name];
+    if (cached) {
+      apply(cached);
+    } else {
+      resources.load(`mat/${name}/spriteFrame`, SpriteFrame, (err, sf) => {
+        if (!err && sf && n.isValid) {
+          this.matCache[name] = sf;
+          apply(sf);
+        }
+      });
+    }
+    return n;
+  }
+
   private buildSpin(): void {
     const Y = this.Y.bind(this);
     this.spinGroup = new Node('spin');
@@ -338,63 +394,15 @@ export class BettingBarMobile extends Component {
     ui.setContentSize(W, H);
     this.spinGroup.addComponent(UIOpacity).opacity = 255;
 
-    // Surface 2 — SPIN DOME (lockstep with betting-bar-web). Graphics can't do a
-    // radial-gradient, so approximate `radial-gradient(circle at 36% 26%, #fff 0%,
-    // #ffd9ec 14%, #ff5ab0 44%, #ff007f 72%, #b8005e 100%)` with stacked circles:
-    // deep edge -> brand core -> lighter mid -> white hot-spot offset up-left.
-    const face = this.gfx('face', this.spinGroup);
+    // Surface 2 — SPIN DOME. The flat stacked-circle Graphics that faked the glossy
+    // pink radial dome is replaced by the design-rendered material sprite
+    // 'mat/mat_spin_dome'. Built as a Sprite node inside spinGroup at sibling 0 so the
+    // arrow / stop overlay / breathe-halo (added below) stay ON TOP. Centred on the
+    // spin button, sized to the existing dome diameter (SR*2 = 140).
     const SCX = 270;
     const SCY = Y(392); // screen-space centre (mobile Y = -y)
     const SR = 70;
-
-    // (a) peppermint-approx outer ring (deep edge + brand band + white quadrant ticks)
-    face.fillColor = col(C.domeEdge);
-    face.circle(SCX, SCY, SR);
-    face.fill();
-    face.fillColor = col(C.domeCore);
-    face.circle(SCX, SCY, SR * 0.96);
-    face.fill();
-    face.lineWidth = SR * 0.05;
-    face.strokeColor = col('#ffffff', 0.8);
-    for (let q = 0; q < 4; q++) {
-      const a0 = q * (Math.PI / 2) + 0.18;
-      face.arc(SCX, SCY, SR * 0.985, a0, a0 + Math.PI / 2 - 0.36, false);
-      face.stroke();
-    }
-
-    // (b) glossy inner dome — hot-spot offset up-left (36%/26%). Up = +screen-y.
-    const hcx = SCX - SR * 0.14;
-    const hcy = SCY + SR * 0.24;
-    const domeStops: { r: number; c: string }[] = [
-      { r: SR * 0.9, c: C.domeEdge },
-      { r: SR * 0.74, c: C.domeCore },
-      { r: SR * 0.52, c: C.domeMid },
-      { r: SR * 0.3, c: C.domeHi },
-      { r: SR * 0.14, c: C.domeHot },
-    ];
-    for (const s of domeStops) {
-      face.fillColor = col(s.c);
-      face.circle(hcx, hcy, s.r);
-      face.fill();
-    }
-
-    // (c) inset rim: bright top-left specular arc + dark candy shade at the bottom.
-    face.lineWidth = SR * 0.05;
-    face.strokeColor = col('#ffffff', 0.85);
-    face.arc(SCX, SCY, SR * 0.9, Math.PI * 0.35, Math.PI * 1.0, false);
-    face.stroke();
-    face.lineWidth = SR * 0.07;
-    face.strokeColor = col('#7a0044', 0.55);
-    face.arc(SCX, SCY, SR * 0.9, Math.PI * 1.05, Math.PI * 1.9, false);
-    face.stroke();
-
-    // (d) top specular ellipse highlight (white top-cap blob).
-    face.fillColor = col('#ffffff', 0.92);
-    face.ellipse(SCX, SCY + SR * 0.46, SR * 0.3, SR * 0.1);
-    face.fill();
-    face.fillColor = col('#ffffff', 0.32);
-    face.ellipse(SCX, SCY + SR * 0.42, SR * 0.5, SR * 0.16);
-    face.fill();
+    this.matInto(this.spinGroup, 'mat_spin_dome', SCX, SCY, SR * 2, SR * 2, 0, false);
 
     const arrow = this.gfx('arrow', this.spinGroup);
     arrow.arc(270, Y(392), 28, Math.PI * 0.27, Math.PI * 1.73, false);

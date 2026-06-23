@@ -150,6 +150,9 @@ export class SlotView extends Component {
   private frames: SpriteFrame[] = [];
   private spinFrames: Record<string, SpriteFrame> = {};
   private brandFrames: Record<string, SpriteFrame> = {};
+  // Design-rendered chrome materials (cabinet / cell / glass pill). Loaded once, cached
+  // by path; applied to placeholder Sprite nodes created synchronously at build time.
+  private matFrames: Record<string, SpriteFrame> = {};
 
   private effectMaterials: Record<string, Material | null> = {};
 
@@ -1880,13 +1883,55 @@ export class SlotView extends Component {
     ).node;
   }
 
+  // Create a Sprite node now (build is sync) and apply a design-rendered chrome
+  // SpriteFrame from resources/mat when it arrives (load is async). matPath is the
+  // resource path WITHOUT the '/spriteFrame' suffix, e.g. 'mat/mat_cabinet'. When
+  // inset>0 the sprite is 9-SLICED so corners/rivets hold while edges stretch.
+  private mkMatSprite(
+    name: string,
+    matPath: string,
+    w: number,
+    h: number,
+    parent: Node,
+    inset = 0,
+  ): Node {
+    const n = this.mkNode(name, w, h, parent);
+    const sp = n.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = inset > 0 ? Sprite.Type.SLICED : Sprite.Type.SIMPLE;
+
+    const apply = (sf: SpriteFrame): void => {
+      if (!n.isValid) return;
+      if (inset > 0) {
+        sf.insetTop = inset;
+        sf.insetBottom = inset;
+        sf.insetLeft = inset;
+        sf.insetRight = inset;
+      }
+      sp.spriteFrame = sf;
+      // Re-assert the target surface size (SLICED honours node content size for stretch).
+      n.getComponent(UITransform)!.setContentSize(w, h);
+    };
+
+    const cached = this.matFrames[matPath];
+    if (cached) {
+      apply(cached);
+    } else {
+      resources.load(`${matPath}/spriteFrame`, SpriteFrame, (err, sf) => {
+        if (!err && sf) {
+          this.matFrames[matPath] = sf;
+          apply(sf);
+        }
+      });
+    }
+    return n;
+  }
+
   private buildFrame(): void {
     const { reelCenterY } = VIEW_CONFIG.layout;
 
     const w = this.gw + 14;
     const h = this.gh + 14;
-    const frame = this.mkNode('frame', w, h, this.node);
-    frame.setPosition(0, reelCenterY, 0);
 
     const halo = this.mkNode('portalGlow', w + 120, h + 120, this.node);
     halo.setPosition(0, reelCenterY, 0);
@@ -1910,83 +1955,26 @@ export class SlotView extends Component {
       .repeatForever()
       .start();
 
-    const g = frame.addComponent(Graphics);
+    // Reel cabinet: design-rendered glass+rim+gold-rivet chrome (resources/mat/mat_cabinet),
+    // 9-SLICED so the rivet corners hold while the glass edges stretch to the board size.
+    // Replaces the flat Graphics base/rim/sheen/rivet fills. Node name 'frame' is preserved
+    // (the FS-bg sibling-index logic in updateFreeSpinScene looks it up by that name).
+    const frame = this.mkMatSprite('frame', 'mat/mat_cabinet', w, h, this.node, 46);
+    frame.setPosition(0, reelCenterY, 0);
 
-    g.fillColor = new Color(0, 0, 0, 160);
-    g.roundRect(-w / 2 - 6, -h / 2 - 12, w + 12, h + 8, 18);
-    g.fill();
-
-    // translucent candy-glass base (Final Sugar Rush reel frame)
-    g.fillColor = new Color(10, 6, 20, 87);
-    g.roundRect(-w / 2, -h / 2, w, h, 18);
-    g.fill();
-    // upper-half glass lighten (sugar-glass gloss)
-    g.fillColor = new Color(255, 255, 255, 41);
-    g.roundRect(-w / 2 + 4, 0, w - 8, h / 2 - 6, 16);
-    g.fill();
-
-    // cyan glass rim
-    g.lineWidth = 2;
-    g.strokeColor = new Color(127, 231, 255, 140);
-    g.roundRect(-w / 2, -h / 2, w, h, 18);
-    g.stroke();
-
-    // top sheen highlight
-    g.fillColor = new Color(245, 247, 250, 36);
-    g.roundRect(-w / 2 + 8, h / 2 - 16, w - 16, 9, 6);
-    g.fill();
-
-    // gold corner-gem rivets (4)
-    const RIV = 7;
-    for (const sx of [-1, 1]) {
-      for (const sy of [-1, 1]) {
-        const cx = sx * (w / 2 - 13);
-        const cy = sy * (h / 2 - 13);
-        g.fillColor = new Color(233, 184, 78, 255);
-        g.circle(cx, cy, RIV);
-        g.fill();
-        g.fillColor = new Color(255, 217, 122, 220);
-        g.circle(cx - 1.5, cy + 1.5, RIV * 0.45);
-        g.fill();
-      }
-    }
-
+    // Per-CELL wells (15 = 5 reels × 3 rows) as design-rendered cell sprites, replacing the
+    // flat Graphics cell fills. Same canonical per-cell centre formula as the win cells
+    // (x = -gw/2 + cell/2 + r*pitch ; y = (1 - row)*pitch in this node's space, which sits at
+    // reelCenterY exactly like the reels root). Behind the symbols (buildReels runs after).
     const sep = this.mkNode('reelSeps', this.gw, this.gh, this.node);
     sep.setPosition(0, reelCenterY, 0);
-    const sg = sep.addComponent(Graphics);
-
-    // Per-CELL grid (15 cells = 5 reels × 3 rows) matching the design's quiet cell
-    // wells, NOT faint per-reel columns. Each cell is a rounded square aligned to where
-    // the symbol actually renders. Cell centre matches the canonical formula used for
-    // win cells (x = -gw/2 + cell/2 + r*pitch ; y = (1 - row)*pitch in this node space,
-    // which sits at reelCenterY exactly like the reels root).
     const { cell } = VIEW_CONFIG.layout;
-    const R = 9; // design cell radius
     for (let r = 0; r < GRID.reels; r++) {
       const cx = -this.gw / 2 + cell / 2 + r * this.pitch;
       for (let row = 0; row < GRID.rows; row++) {
         const cy = (1 - row) * this.pitch;
-        const x0 = cx - cell / 2;
-        const y0 = cy - cell / 2;
-
-        // approximate the design radial 'circle at 50% 40%, rgba(42,22,60,.55) ->
-        // rgba(10,6,18,.62)' with a dark base round-rect + a slightly-lighter,
-        // upper-biased center round-rect inset a few px (Graphics can't do radials).
-        sg.fillColor = new Color(12, 7, 18, 165); // dark edge
-        sg.roundRect(x0, y0, cell, cell, R);
-        sg.fill();
-
-        // lighter center, inset ~7px and nudged toward 50%/40% (upper) like the radial
-        const ins = 7;
-        sg.fillColor = new Color(42, 22, 60, 140); // lighter plum core
-        sg.roundRect(x0 + ins, y0 + ins + 4, cell - ins * 2, cell - ins * 2, R - 3);
-        sg.fill();
-
-        // faint cyan 1px border (.18 alpha) — design's quiet cell rim
-        sg.lineWidth = 1;
-        sg.strokeColor = new Color(127, 231, 255, 46);
-        sg.roundRect(x0, y0, cell, cell, R);
-        sg.stroke();
+        const cellNode = this.mkMatSprite(`cell_${r}_${row}`, 'mat/mat_cell', cell, cell, sep);
+        cellNode.setPosition(cx, cy, 0);
       }
     }
   }
@@ -2190,7 +2178,11 @@ export class SlotView extends Component {
   }
 
   private buildHud(): void {
-    this.mkPlate(0, -170, 660, 70, 14, true);
+    // HUD readout plate: design-rendered glass pill (resources/mat/mat_pill_glass),
+    // 9-SLICED so corners hold while the bar stretches to 660×70. Replaces the flat
+    // mkPlate Graphics. Created first so balance/bet/win labels (added next) sit on top.
+    const plate = this.mkMatSprite('hudPlate', 'mat/mat_pill_glass', 660, 70, this.node, 46);
+    plate.setPosition(0, -170, 0);
     this.balanceLabel = this.mkReadout(-220, -170, 'BALANCE', '0.00', Color.WHITE);
     this.betLabel = this.mkReadout(0, -170, 'BET (10 LINES)', '0.00', MUTED);
     this.winLabel = this.mkReadout(220, -170, 'WIN', '0.00', ACID);

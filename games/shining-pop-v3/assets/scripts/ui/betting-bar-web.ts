@@ -117,6 +117,11 @@ let __touchDetected = false;
 export class BettingBarWeb extends Component {
   private events = new EventTarget();
 
+  // cocos-design-handoff: design-rendered material PNGs replace the flat Graphics that
+  // faked the glossy candy surfaces (spin dome, gems, glass readout pills). Cached so
+  // each sprite frame loads once.
+  private matCache: Record<string, SpriteFrame> = {};
+
   private currency = 'USD';
   private balValue!: Label;
   private balCur!: Label;
@@ -406,9 +411,16 @@ export class BettingBarWeb extends Component {
   }
 
   private buildAccount(): void {
-    const g = this.gfx('account');
-    this.panel(g, 40, 148, 440, 76, 38);
+    // BALANCE readout surface: the flat multi-layer glass panel Graphics is replaced by a
+    // 9-sliced 'mat/mat_pill_glass' sprite. Design box = top-left (40,148) 440x76 ->
+    // centre (260,186). Menu/sound glyphs, the cluster divider, and the BALANCE label/
+    // value are all added AFTER (appended above) so they sit ON TOP of the pill sprite.
+    this.matInto(this.node, 'mat_pill_glass', 260, this.Y(186), 440, 76, true).name = 'account';
 
+    // Divider between the menu/sound cluster and the balance readout — an overlay detail,
+    // so it is drawn on its own Graphics node (appended after the sprite => higher
+    // sibling), not on the replaced panel face, otherwise the sprite would hide it.
+    const g = this.gfx('accountDivider');
     const menuGlyph = this.gfx('menuGlyph');
     [27, 38, 49].forEach((dy) => {
       menuGlyph.moveTo(80, this.Y(148 + dy));
@@ -473,30 +485,13 @@ export class BettingBarWeb extends Component {
   private banners: { x: number; w: number; cap: Label; val: Label }[] = [];
 
   private buildBanner(x: number, w: number, label: string, sink: (l: Label) => void): void {
-    // Glass-pill readout per design (rgba(10,6,20,.5) over a translucent body, cyan-ish
-    // 1px edge). WIN gets the cyan win-signal edge; TOTAL BET stays pink-spine neutral.
+    // LAST WIN / TOTAL BET glass-pill readout: the flat multi-layer Graphics is replaced
+    // by a 9-sliced 'mat/mat_pill_glass' sprite (corners hold, edges stretch). Design box
+    // = top-left (x,224) w x 76 -> centre (x+w/2, 186). Cap/value labels are added below
+    // (on this.node, appended after) so they sit ON TOP of the pill sprite.
     const isWin = label === 'LAST WIN';
-    const edge = isWin ? C.readCyan : C.edge;
-    const g = this.gfx('banner_' + label);
-    // glass body: dark plum base + a top inner-light band (glass chrome)
-    g.fillColor = col('#0a0614', 0.5);
-    g.roundRect(x, this.Y(224), w, 76, 24);
-    g.fill();
-    g.fillColor = col(C.banner, 0.55);
-    g.roundRect(x + 1, this.Y(223), w - 2, 74, 23);
-    g.fill();
-    g.fillColor = col('#ffffff', 0.1);
-    g.roundRect(x + 2.5, this.Y(182), w - 5, 26, 20);
-    g.fill();
-    // 1px inner light then the tinted edge
-    g.lineWidth = 1.2;
-    g.strokeColor = col('#ffffff', 0.16);
-    g.roundRect(x + 2, this.Y(222), w - 4, 72, 22);
-    g.stroke();
-    g.lineWidth = 2;
-    g.strokeColor = col(edge, isWin ? 0.55 : 0.85);
-    g.roundRect(x + 1, this.Y(223), w - 2, 74, 23);
-    g.stroke();
+    this.matInto(this.node, 'mat_pill_glass', x + w / 2, this.Y(186), w, 76, true).name =
+      'banner_' + label;
     const cap = this.lbl(
       label,
       x + w / 2 - 7,
@@ -706,6 +701,44 @@ export class BettingBarWeb extends Component {
     return n;
   }
 
+  // cocos-design-handoff material sprite. `parent`/`x`/`y` use the same local space as
+  // localNode (y already screen-space via this.Y at call sites). Build the Sprite node
+  // synchronously and fill in the design-rendered SpriteFrame when the async load lands.
+  // `slice` -> 9-slice for the glass readout pills so corners hold while edges stretch.
+  private matInto(
+    parent: Node,
+    name: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    slice = false,
+  ): Node {
+    const n = this.localNode(parent, x, y, w, h);
+    n.name = name;
+    const sp = n.addComponent(Sprite);
+    sp.sizeMode = Sprite.SizeMode.CUSTOM;
+    sp.type = slice ? Sprite.Type.SLICED : Sprite.Type.SIMPLE;
+    const apply = (sf: SpriteFrame): void => {
+      if (slice) {
+        sf.insetTop = sf.insetBottom = sf.insetLeft = sf.insetRight = 46;
+      }
+      sp.spriteFrame = sf;
+    };
+    const cached = this.matCache[name];
+    if (cached) {
+      apply(cached);
+    } else {
+      resources.load(`mat/${name}/spriteFrame`, SpriteFrame, (err, sf) => {
+        if (!err && sf && n.isValid) {
+          this.matCache[name] = sf;
+          apply(sf);
+        }
+      });
+    }
+    return n;
+  }
+
   private buildRightCluster(): void {
     // gem (optional) = {edge, mid, hi} candy-gem stops -> glossy conic+dome gem per
     // design (autoplay violet, turbo caramel). Omit for the neutral plum circle button.
@@ -713,7 +746,7 @@ export class BettingBarWeb extends Component {
       cx: number,
       cy: number,
       r: number,
-      gem?: { edge: string; mid: string; hi: string; glow: string },
+      gem?: { edge: string; mid: string; hi: string; glow: string; mat: string },
     ): { node: Node; g: Graphics } => {
       const n = this.localNode(this.node, cx, this.Y(cy), r * 2, r * 2);
 
@@ -733,23 +766,11 @@ export class BettingBarWeb extends Component {
       (n as unknown as { __glowOp: UIOpacity }).__glowOp = glowOp;
       const g = n.addComponent(Graphics);
       if (gem) {
-        // candy gem: dark edge -> mid -> pale hot-spot offset up-left + white rim ticks
-        g.fillColor = col(gem.edge);
-        g.circle(0, 0, r);
-        g.fill();
-        g.fillColor = col(gem.mid);
-        g.circle(-r * 0.16, r * 0.26, r * 0.78);
-        g.fill();
-        g.fillColor = col(gem.hi, 0.95);
-        g.circle(-r * 0.26, r * 0.34, r * 0.34);
-        g.fill();
-        g.lineWidth = r * 0.07;
-        g.strokeColor = col('#ffffff', 0.7);
-        for (let q = 0; q < 4; q++) {
-          const a0 = q * (Math.PI / 2) + 0.2;
-          g.arc(0, 0, r * 0.92, a0, a0 + Math.PI / 2 - 0.4, false);
-          g.stroke();
-        }
+        // cocos-design-handoff: the flat conic+dome gem Graphics is replaced by the
+        // design-rendered gem sprite (autoplay violet / turbo caramel). It sits above
+        // the soft glow (added first) and below the glyph the caller adds on `n` next.
+        // `g` stays on the node but draws nothing, preserving the return contract.
+        this.matInto(n, gem.mat, 0, 0, r * 2, r * 2, false);
       } else {
         g.fillColor = col(C.panel);
         g.circle(0, 0, r);
@@ -811,6 +832,7 @@ export class BettingBarWeb extends Component {
       mid: C.caramel,
       hi: C.caramelHi,
       glow: C.caramel,
+      mat: 'mat_gem_caramel',
     });
     const tGlyph = this.localNode(turbo.node, 0, 0, 30, 30);
     const tg = tGlyph.addComponent(Graphics);
@@ -853,6 +875,7 @@ export class BettingBarWeb extends Component {
       mid: C.violet,
       hi: C.violetHi,
       glow: C.violet,
+      mat: 'mat_gem_violet',
     });
     const aGlyph = this.localNode(auto.node, 0, 0, 30, 30);
     const ag2 = aGlyph.addComponent(Graphics);
@@ -901,63 +924,13 @@ export class BettingBarWeb extends Component {
 
     const bodyN = this.localNode(ring, 0, 0, R * 2, R * 2);
     this.spinBody = bodyN;
-    const rg = bodyN.addComponent(Graphics);
-    const INNER = R * 0.74;
 
-    // Surface 2 — SPIN DOME (Sugar Rush). Cocos Graphics can't do a radial-gradient,
-    // so approximate the design's `radial-gradient(circle at 36% 26%, #fff 0%,
-    // #ffd9ec 14%, #ff5ab0 44%, #ff007f 72%, #b8005e 100%)` with concentric filled
-    // circles, deep base -> brand core -> lighter mid -> white hot-spot offset up-left.
-
-    // (a) peppermint outer ring (conic in the design) approximated as a pink edge band.
-    rg.fillColor = col(C.domeEdge);
-    rg.circle(0, 0, R);
-    rg.fill();
-    rg.fillColor = col(C.domeCore);
-    rg.circle(0, 0, R * 0.96);
-    rg.fill();
-    // thin white peppermint highlight ticks around the rim (4 quadrant arcs)
-    rg.lineWidth = R * 0.05;
-    rg.strokeColor = col('#ffffff', 0.8);
-    for (let q = 0; q < 4; q++) {
-      const a0 = q * (Math.PI / 2) + 0.18;
-      rg.arc(0, 0, R * 0.985, a0, a0 + Math.PI / 2 - 0.36, false);
-      rg.stroke();
-    }
-
-    // (b) glossy inner dome — stacked radial stops, centre offset up-left to 36%/26%.
-    const cx = -R * 0.14;
-    const cy = R * 0.24;
-    const domeStops: { r: number; c: string }[] = [
-      { r: R * 0.9, c: C.domeEdge }, // 100% edge
-      { r: R * 0.74, c: C.domeCore }, // 72% brand pink
-      { r: R * 0.52, c: C.domeMid }, // 44% lighter pink
-      { r: R * 0.3, c: C.domeHi }, // 14% pale pink
-      { r: R * 0.14, c: C.domeHot }, // 0% white hot-spot
-    ];
-    for (const s of domeStops) {
-      rg.fillColor = col(s.c);
-      rg.circle(cx, cy, s.r);
-      rg.fill();
-    }
-
-    // (c) inset rim: bright top-left specular line + dark bottom candy shade.
-    rg.lineWidth = R * 0.05;
-    rg.strokeColor = col('#ffffff', 0.85);
-    rg.arc(0, 0, R * 0.9, Math.PI * 0.35, Math.PI * 1.0, false);
-    rg.stroke();
-    rg.lineWidth = R * 0.07;
-    rg.strokeColor = col('#7a0044', 0.55);
-    rg.arc(0, 0, R * 0.9, Math.PI * 1.05, Math.PI * 1.9, false);
-    rg.stroke();
-
-    // (d) crisp top specular ellipse highlight (the design's white top-cap blob).
-    rg.fillColor = col('#ffffff', 0.92);
-    rg.ellipse(0, R * 0.46, R * 0.3, R * 0.1);
-    rg.fill();
-    rg.fillColor = col('#ffffff', 0.35);
-    rg.ellipse(0, R * 0.42, R * 0.5, R * 0.16);
-    rg.fill();
+    // Surface 2 — SPIN DOME. The flat stacked-circle Graphics that faked the glossy
+    // pink radial dome is replaced by the design-rendered material sprite
+    // 'mat/mat_spin_dome', parented to bodyN so it inherits the breathe-pulse tween.
+    // Sized to the dome diameter (R*2). The arrow / stop overlay are added to `ring`
+    // AFTER bodyN, so they stay ON TOP.
+    this.matInto(bodyN, 'mat_spin_dome', 0, 0, R * 2, R * 2, false);
 
     const arrowNode = this.localNode(ring, 0, 0, R, R);
     const ag = arrowNode.addComponent(Graphics);
