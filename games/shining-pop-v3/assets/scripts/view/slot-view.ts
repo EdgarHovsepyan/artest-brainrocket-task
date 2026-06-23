@@ -3925,12 +3925,12 @@ export class SlotView extends Component {
       g.stroke();
     };
     for (const pts of this.candyLinePts) {
-      // Sugar Rush win-line: cyan glow -> white core (cyan == win signalling).
-      stroke(pts, 127, 231, 255, 14 * pulse, 30 * pulse);
-      stroke(pts, 140, 235, 255, 30 * pulse, 19 * pulse);
-      stroke(pts, 180, 244, 255, 70, 11);
-      stroke(pts, 224, 250, 255, 185, 6.5);
-      stroke(pts, 255, 255, 255, 230, 2.8);
+      // Sugar Rush win-line: THIN, soft, cyan-dominant (matches the design's subtle line,
+      // not a thick white zigzag). Max ~13px glow, ~1.3px core.
+      stroke(pts, 127, 231, 255, 10 * pulse, 13 * pulse);
+      stroke(pts, 150, 236, 255, 42, 6);
+      stroke(pts, 210, 248, 255, 150, 3);
+      stroke(pts, 255, 255, 255, 200, 1.3);
 
       if (!this.reducedFx) this.drawFlowGlint(g, pts, t);
     }

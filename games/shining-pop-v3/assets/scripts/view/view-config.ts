@@ -65,9 +65,9 @@ export const VIEW_CONFIG = {
     logo: {
       topY: 322,
 
-      landscapeScale: 0.46,
+      landscapeScale: 0.38,
       landscapeScreenX: 0.5,
-      landscapeScreenY: 0.9,
+      landscapeScreenY: 0.955,
       bonusScreenX: 0.12,
       bonusScreenY: 0.5,
     },
