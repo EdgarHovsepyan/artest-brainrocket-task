@@ -67,6 +67,8 @@ const C = {
   divider: '#cf78e0',
   gloss: '#ffffff',
   glow: '#ff4ad0',
+  // Surface E (R12): caramel turbo signal — pink=brand, cyan=win, gold=coins preserved.
+  caramel: '#ff9a3c',
 };
 function col(hex: string, a?: number): Color {
   const c = new Color();
@@ -231,6 +233,15 @@ export class BettingBarMobile extends Component {
     g.lineTo(330, Y(596));
     g.lineWidth = 1.2;
     g.strokeColor = col(C.divider, 0.3);
+    g.stroke();
+
+    // Surface E (3): subtle down-caret cue under the centre BET value to signal it
+    // opens the quick-bet menu (tap-on-value). Centered at x=270, clear of dividers.
+    g.moveTo(263, Y(524));
+    g.lineTo(270, Y(530));
+    g.lineTo(277, Y(524));
+    g.lineWidth = 2;
+    g.strokeColor = col(C.ring, 0.7);
     g.stroke();
   }
 
@@ -402,9 +413,9 @@ export class BettingBarMobile extends Component {
     glyph.lineTo(444, Y(504));
     glyph.lineTo(436, Y(504));
     glyph.close();
-    glyph.fillColor = col(C.active);
+    glyph.fillColor = col(C.caramel);
     glyph.fill();
-    this.icon(glyph.node, 436, 507, 30, 'ic_bolt', C.active, () => glyph.clear());
+    this.icon(glyph.node, 436, 507, 30, 'ic_bolt', C.caramel, () => glyph.clear());
     this.turboGlyphOp = glyph.node.addComponent(UIOpacity);
     this.turboGlyphOp.opacity = 115;
 
@@ -415,7 +426,7 @@ export class BettingBarMobile extends Component {
     pip.lineTo(449, Y(519) - pr);
     pip.lineTo(449 - pr, Y(519));
     pip.close();
-    pip.fillColor = col(C.active);
+    pip.fillColor = col(C.caramel);
     pip.fill();
     this.turboPip = pip.node;
     this.turboPip.active = false;
@@ -664,6 +675,8 @@ export class BettingBarMobile extends Component {
     this.mkLabel('betValue', 272, 582, 15, C.value, 0).string = '0';
   }
 
+  private hitNodes: { n: Node; x: number; y: number; w: number; h: number }[] = [];
+
   private makeHitAreas(): void {
     const add = (name: string, x: number, y: number, w: number, h: number, fn: () => void) => {
       const n = new Node(name);
@@ -674,6 +687,7 @@ export class BettingBarMobile extends Component {
       n.setPosition(new Vec3(x, this.Y(y), 0));
       n.on(Node.EventType.TOUCH_START, () => this.ping(x + w / 2, y + h / 2));
       n.on(Node.EventType.TOUCH_END, fn);
+      this.hitNodes.push({ n, x, y, w, h });
     };
     const emit = (ev: string) => () => this.events.emit(ev);
 
@@ -681,6 +695,9 @@ export class BettingBarMobile extends Component {
     add('hitAutoplay', 72, 474, 64, 64, emit('autoplay'));
     add('hitMinus', 170, 474, 67, 64, emit('bet:dec'));
     add('hitPlus', 303, 474, 67, 64, emit('bet:inc'));
+    // Surface E (3): tap the centre BET value to open the 6-level quick-bet menu.
+    // Sits in the clear gap between the −/+ steppers (x 237..303), no double-trigger.
+    add('hitBetMenu', 240, 480, 60, 52, emit('betmenu'));
     add('hitTurbo', 404, 474, 64, 64, emit('turbo'));
     add('hitSound', 393, 550, 64, 64, () => this.toggleSoundPanel());
     add('hitMenu', 457, 550, 64, 64, emit('menu'));
@@ -702,7 +719,25 @@ export class BettingBarMobile extends Component {
 
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + safe + H * s, 0));
     this.applyTextScale(s);
+    this.floorHitTargets(s);
     return safe + (H - BAND_TOP) * s;
+  }
+
+  // Surface E (2, R12): every interactive hit node must be >=44px effective at the
+  // smallest viewport. Grow content size to max(designW, 44/s) keeping the center
+  // fixed (anchor 0,1 => shift top-left by half the delta). Glyph visuals untouched.
+  private floorHitTargets(s: number): void {
+    const minDesign = s > 0 ? 44 / s : 44;
+    for (const h of this.hitNodes) {
+      const ui = h.n.getComponent(UITransform);
+      if (!ui) continue;
+      const w = Math.max(h.w, minDesign);
+      const ht = Math.max(h.h, minDesign);
+      const cx = h.x + h.w / 2;
+      const cy = h.y + h.h / 2;
+      ui.setContentSize(w, ht);
+      h.n.setPosition(new Vec3(cx - w / 2, this.Y(cy - ht / 2), 0));
+    }
   }
 
   private applyTextScale(s: number): void {

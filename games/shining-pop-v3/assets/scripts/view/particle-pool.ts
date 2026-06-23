@@ -44,8 +44,10 @@ export class ParticlePool extends Component {
 
   private ensureBuilt(): void {
     if (this.built) return;
-    const { prealloc } = VIEW_CONFIG.particles;
-    for (let i = 0; i < prealloc; i++) this.allocate();
+    // Prealloc the WHOLE pool (full cap, not the smaller `prealloc` hint) at warmup so a
+    // 15-cell win can never grow the pool mid-frame: zero addComponent/allocate during play.
+    const { poolCap } = VIEW_CONFIG.particles;
+    for (let i = 0; i < poolCap; i++) this.allocate();
     this.built = true;
   }
 
@@ -65,6 +67,21 @@ export class ParticlePool extends Component {
     op.opacity = 255;
 
     const slot: PoolShard = { node: n, graphics: g, opacity: op, idx: this.slots.length };
+
+    // Decide the shard render mode (Sprite+material vs Graphics) at PREALLOC time. If the
+    // glow material/frame are ready, attach the Sprite now so no addComponent fires in get()
+    // during play. We keep the Graphics around (cleared) for the no-material fallback path.
+    if (ParticlePool.glowMat && ParticlePool.glowFrame) {
+      g.clear();
+      const sp = n.addComponent(Sprite);
+      sp.sizeMode = Sprite.SizeMode.CUSTOM;
+      sp.type = Sprite.Type.SIMPLE;
+      sp.spriteFrame = ParticlePool.glowFrame;
+      sp.customMaterial = ParticlePool.glowMat;
+      n.getComponent(UITransform)!.setContentSize(GLOW, GLOW);
+      slot.sprite = sp;
+    }
+
     this.slots.push(slot);
     this.freeIdx.push(slot.idx);
     return slot;
@@ -80,28 +97,12 @@ export class ParticlePool extends Component {
     const { poolCap } = VIEW_CONFIG.particles;
     if (this.liveCount >= poolCap) return null;
 
-    let slot: PoolShard;
+    // Pool is fully prealloc'd at warmup, so this is a pure free-list pop — never an
+    // addComponent/allocate during play. If the free list is empty we're at cap → null.
     const idx = this.freeIdx.pop();
-    if (idx !== undefined) {
-      slot = this.slots[idx]!;
-    } else if (this.slots.length < poolCap) {
-      slot = this.allocate();
+    if (idx === undefined) return null;
+    const slot = this.slots[idx]!;
 
-      this.freeIdx.pop();
-    } else {
-      return null;
-    }
-
-    if (!slot.sprite && ParticlePool.glowMat && ParticlePool.glowFrame) {
-      slot.graphics.clear();
-      const sp = slot.node.addComponent(Sprite);
-      sp.sizeMode = Sprite.SizeMode.CUSTOM;
-      sp.type = Sprite.Type.SIMPLE;
-      sp.spriteFrame = ParticlePool.glowFrame;
-      sp.customMaterial = ParticlePool.glowMat;
-      slot.node.getComponent(UITransform)!.setContentSize(GLOW, GLOW);
-      slot.sprite = sp;
-    }
     if (slot.sprite) {
       slot.sprite.color = color;
     } else {
@@ -140,5 +141,11 @@ export class ParticlePool extends Component {
 
   get capacity(): number {
     return this.slots.length;
+  }
+
+  /** Free shards remaining before get() starts returning null (cap minus live). */
+  get headroom(): number {
+    const free = VIEW_CONFIG.particles.poolCap - this.liveCount;
+    return free > 0 ? free : 0;
   }
 }

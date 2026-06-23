@@ -129,10 +129,20 @@ export class ParticleLayer extends Component {
     // Use the shared CANDY palette so every emitter matches the candy theme.
     const warm = CANDY;
 
+    // Cap the per-cell loop so a 15-cell win can't fan out into hundreds of emitters; only
+    // the first ≤6 centers fire embers (the dense cores carry the read).
+    const cellLoop = Math.min(centers.length, 6);
     const ringCount = this.gov.count(8, 5);
-    const cellCount = this.gov.count(cfg.perCell, 3);
-    for (const c of centers) {
-      for (let i = 0; i < ringCount; i++) {
+    // Trim perCell to a sane 10-12 ceiling (config still ships 22; clamp here, not in math/config).
+    const cellCount = this.gov.count(Math.min(cfg.perCell, 11), 3);
+
+    for (let ci = 0; ci < cellLoop; ci++) {
+      const c = centers[ci]!;
+
+      // Clamp this center's two waves to the remaining pool headroom so we never request more
+      // shards than are free (no get()->null churn, live shards stay ≤ poolCap).
+      const ringN = Math.min(ringCount, this.pool.headroom);
+      for (let i = 0; i < ringN; i++) {
         const ang = (i / ringCount) * Math.PI * 2 + Math.random() * 0.4;
         const v = 240 + Math.random() * 120;
         this.spawnPhys(
@@ -148,7 +158,8 @@ export class ParticleLayer extends Component {
         );
       }
 
-      for (let i = 0; i < cellCount; i++) {
+      const cellN = Math.min(cellCount, this.pool.headroom);
+      for (let i = 0; i < cellN; i++) {
         const hot = i % 4 === 3;
         this.spawnPhys(
           c.x + (Math.random() - 0.5) * cfg.spreadPx,

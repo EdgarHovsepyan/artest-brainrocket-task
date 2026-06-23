@@ -150,6 +150,36 @@ export class AudioManager {
     }
   }
 
+  /**
+   * Scale a single bus's gain relative to its design-time mix level.
+   * v in [0,1] multiplies the bus's nominal BUS_DB level — v=1 restores the
+   * default mix, v=0 silences the bus. Smoothed to avoid zipper noise.
+   */
+  setBusVolume(bus: BusId, v: number): void {
+    if (!this.ensure() || !this.ctx) return;
+    const g = this.buses[bus];
+    if (!g) return;
+    const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+    g.gain.setTargetAtTime(db2lin(BUS_DB[bus]) * clamp01(v), this.ctx.currentTime, 0.02);
+  }
+
+  /** SFX master: scales the sfx, gameplay and win buses together. */
+  setSfxVolume(v: number): void {
+    this.setBusVolume('sfx', v);
+    this.setBusVolume('gameplay', v);
+    this.setBusVolume('win', v);
+  }
+
+  /** Music master: scales the music bus. */
+  setMusicVolume(v: number): void {
+    this.setBusVolume('music', v);
+  }
+
+  /** Enable/disable music: full music bus level when on, silent when off. */
+  setMusicEnabled(on: boolean): void {
+    this.setBusVolume('music', on ? 1 : 0);
+  }
+
   private playSample(id: ClipId, bus: BusId, gain = 1, loop = false): AudioBufferSourceNode | null {
     if (this.muted || !this.ensure() || !this.ctx) return null;
     const buf = this.buffers[id];

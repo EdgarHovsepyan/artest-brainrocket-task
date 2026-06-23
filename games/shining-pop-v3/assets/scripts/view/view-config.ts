@@ -500,9 +500,9 @@ export const VIEW_CONFIG = {
       gambleGapPx: 110,
       clusterCoinsX: 0,
       carousel: {
-        cellW: 132,
+        cellW: 120,
 
-        pillCenterX: 388,
+        pillCenterX: 1480,
 
         fadeScale: [1.0, 0.88, 0.82, 0.78] as readonly number[],
         fadeOpacity: [255, 224, 192, 168] as readonly number[],

@@ -34,11 +34,23 @@ export class VfxGovernor {
   private readonly cfg: VfxQualityConfig;
   private emaMs: number;
   private _scale = 1;
+  private _ceiling = 1;
   private frames = 0;
 
   constructor(cfg: VfxQualityConfig = DEFAULT_VFX_QUALITY) {
     this.cfg = cfg;
     this.emaMs = 1000 / cfg.targetFps;
+  }
+
+  /**
+   * Clamp the governor's quality ceiling (e.g. Battery Saver). `scale` is the
+   * maximum quality the governor may recover up to; the live scale is capped
+   * immediately. Bounded to [minScale, 1].
+   */
+  setQualityCeiling(scale: number): void {
+    const { minScale } = this.cfg;
+    this._ceiling = scale < minScale ? minScale : scale > 1 ? 1 : scale;
+    if (this._scale > this._ceiling) this._scale = this._ceiling;
   }
 
   sample(dt: number): void {
@@ -54,6 +66,8 @@ export class VfxGovernor {
       const t = (this.emaMs - upShiftMs) / (downShiftMs - upShiftMs);
       target = 1 - t * (1 - minScale);
     }
+
+    if (target > this._ceiling) target = this._ceiling;
 
     const rate = (target < this._scale ? this.cfg.shedPerSec : this.cfg.recoverPerSec) * dt;
     this._scale =

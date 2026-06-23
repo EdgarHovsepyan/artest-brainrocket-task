@@ -89,6 +89,9 @@ export class CeremonyView extends Component {
     this.dim = dimNode.addComponent(UIOpacity);
     this.dim.opacity = 0;
 
+    // Tapping the dim backdrop skips the ceremony, snapping the count-up to its exact final value.
+    dimNode.on(Node.EventType.TOUCH_END, () => this.fastForward());
+
     // Half-scale wrapper centred on the reels so the banner/Spine render at half size; the reveal/dismiss tweens
     // run on `ov` inside the wrapper, so they still play.
     const ovWrap = this.mk('ceremonyScale', 10, 10, this.node);

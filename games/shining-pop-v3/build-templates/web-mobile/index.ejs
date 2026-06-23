@@ -31,7 +31,7 @@
     html, body { background-color: #0a0610; margin: 0; padding: 0; }
     #GameDiv, #Cocos3dGameContainer, #GameCanvas { background-color: #0a0610; }
 
-    /* CINEMATIC boot loader — Pixi popLoader port: real bg.jpg darkened + blurred,
+    /* CINEMATIC boot loader — flagship popLoader port: real bg.jpg darkened + blurred,
        magenta radial vignette, animated rays, halo behind the real logo, 3-stop
        gradient bar with shine sweep, animated dots. Same anatomy + same beats as
        the flagship; fades when assets settle. */
@@ -116,9 +116,18 @@
       letter-spacing:8px;color:rgba(245,247,250,.66);text-transform:uppercase}
     #brandLoader .cap .pct{font-size:13px;letter-spacing:1px;color:#ff5a9c;
       font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+    /* static tagline under the logo (no new infinite animation — respects
+       the prefers-reduced-motion block, which only targets the animated nodes) */
+    #brandLoader .tagline{position:relative;z-index:2;margin-top:14px;
+      font:600 13px/1 'Fredoka',system-ui,sans-serif;letter-spacing:6px;
+      text-transform:uppercase;color:rgba(255,90,156,.78);
+      text-shadow:0 2px 10px rgba(255,0,127,.35)}
     #brandLoader .brand{position:absolute;bottom:32px;left:0;right:0;
       text-align:center;font:600 10px/1 'Fredoka',system-ui,sans-serif;
       letter-spacing:4px;color:rgba(245,247,250,.35)}
+    /* legal compliance strip — Cocos/WebGL build (engine-neutral, no other-engine names) */
+    #brandLoader .brand.legal{bottom:14px;font-size:9px;letter-spacing:3px;
+      color:rgba(245,247,250,.42)}
     @keyframes bl-breathe{0%,100%{transform:scale(1) translateY(0)}
       50%{transform:scale(1.025) translateY(-3px)}}
     @keyframes bl-halo{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}
@@ -146,11 +155,13 @@
     <div class="vign"></div>
     <div class="halo"></div>
     <img class="logo" src="loader/logo.png" alt="Shining Pop V3"/>
+    <div class="tagline">A PREMIUM CANDY SLOT</div>
     <div class="barwrap">
       <div class="bbar"><div class="bfill"></div><i class="bshine"></i></div>
-      <span class="cap">LOADING<em class="pct">0%</em></span>
+      <span class="cap">LOADING ASSETS<em class="pct">0%</em></span>
     </div>
     <div class="brand">AN ARTEST | BRAINROCKET PRODUCTION</div>
+    <div class="brand legal">WEBGL · 18+ · PLAY RESPONSIBLY</div>
   </div>
   <script>
     /* Branded boot loader — READ-ONLY progress (no engine monkey-patch). Reads

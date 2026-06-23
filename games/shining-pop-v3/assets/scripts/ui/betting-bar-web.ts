@@ -59,6 +59,9 @@ const C = {
   dark: '#24082c',
   cyan: '#bfe8ff',
   centerRim: '#ffd6f4',
+  // Surface E (R12): caramel turbo signal (web keeps its dark outline below).
+  caramel: '#ff9a3c',
+  caramelLine: '#8a5200',
 };
 function col(hex: string, a?: number): Color {
   const c = new Color();
@@ -129,6 +132,7 @@ export class BettingBarWeb extends Component {
   private dragX = 0;
   private dragging = false;
   private moved = 0;
+  private hitNodes: { n: Node; x: number; y: number; w: number; h: number }[] = [];
 
   onLoad(): void {
     const ui = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
@@ -303,6 +307,7 @@ export class BettingBarWeb extends Component {
     ui.setAnchorPoint(0, 1);
     ui.setContentSize(w, h);
     n.setPosition(x, this.Y(y), 0);
+    this.hitNodes.push({ n, x, y, w, h });
 
     let state: 'idle' | 'hover' | 'pressed' | 'disabled' = 'idle';
     let disabled = false;
@@ -743,19 +748,19 @@ export class BettingBarWeb extends Component {
       tg.lineTo(1, 3);
       tg.close();
     };
-    tg.fillColor = col('#ffd23f');
+    tg.fillColor = col(C.caramel);
     boltPath();
     tg.fill();
     tg.lineWidth = 1.4;
-    tg.strokeColor = col('#8a5200');
+    tg.strokeColor = col(C.caramelLine);
     boltPath();
     tg.stroke();
     this.turboGlyphOp = tGlyph.addComponent(UIOpacity);
 
-    this.icon(tGlyph, 0, 0, 36, 'ic_bolt', '#ffd23f', () => tg.clear());
+    this.icon(tGlyph, 0, 0, 36, 'ic_bolt', C.caramel, () => tg.clear());
     const pip = this.localNode(turbo.node, 13, 13, 12, 12);
     const pg = pip.addComponent(Graphics);
-    pg.fillColor = col('#e9bf5a');
+    pg.fillColor = col(C.caramel);
     pg.circle(0, 0, 5);
     pg.fill();
     pip.active = false;
@@ -1092,8 +1097,26 @@ export class BettingBarWeb extends Component {
     const s = Math.min((viewW * 0.9) / W, 0.6, (viewH * 0.32) / H);
     this.node.setScale(s, s, 1);
     this.node.setPosition(new Vec3((-W * s) / 2, -viewH / 2 + H * s, 0));
+    this.floorHitTargets(s);
 
     return (H - (RING_TOP - CROP) - 2) * s;
+  }
+
+  // Surface E (2, R12): floor every interactive hit node to >=44px effective at the
+  // smallest viewport — grow to max(designW, 44/s) keeping the center fixed.
+  // Glyph visuals are untouched (hit nodes carry no art). Large nodes are no-ops.
+  private floorHitTargets(s: number): void {
+    const minDesign = s > 0 ? 44 / s : 44;
+    for (const h of this.hitNodes) {
+      const ui = h.n.getComponent(UITransform);
+      if (!ui) continue;
+      const w = Math.max(h.w, minDesign);
+      const ht = Math.max(h.h, minDesign);
+      const cx = h.x + h.w / 2;
+      const cy = h.y + h.h / 2;
+      ui.setContentSize(w, ht);
+      h.n.setPosition(cx - w / 2, this.Y(cy - ht / 2), 0);
+    }
   }
 
   private fmt(n: number): string {
