@@ -37,109 +37,36 @@
        the flagship; fades when assets settle. */
     @font-face{font-family:'Fredoka';font-style:normal;font-display:swap;
       src:url('loader/Fredoka.ttf') format('truetype')}
+    /* LOADER — ported pixel-for-pixel from the design's "01 · LOADING / SPLASH":
+       full-bleed bg.jpg + radial plum scrim, 300px floating logo, "a premium candy
+       slot" tagline, clean pink-gradient progress bar, Space Mono labels, legal strip. */
     #brandLoader{position:fixed;inset:0;z-index:999;background:#0a0610;
       transition:opacity .45s cubic-bezier(.16,1,.3,1);overflow:hidden;
       display:flex;flex-direction:column;align-items:center;justify-content:center}
     #brandLoader.gone{opacity:0;pointer-events:none}
-    /* bg backdrop: real candy world, dark wash + blur for context-aware boot */
-    #brandLoader .bg{position:absolute;inset:-8%;
-      background:url('loader/bg.jpg') center/cover no-repeat;
-      filter:blur(14px) brightness(.45) saturate(1.1);
-      transform:scale(1.05)}
-    /* magenta radial vignette + soft accent */
-    #brandLoader .vign{position:absolute;inset:0;pointer-events:none;
-      background:
-        radial-gradient(ellipse at center,rgba(255,0,127,.10) 0%,transparent 40%),
-        radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.75) 100%)}
-    /* cinema corner darkening (4-corner cone) */
-    #brandLoader .corners{position:absolute;inset:0;pointer-events:none;
-      background:
-        radial-gradient(ellipse 60% 50% at 0% 0%,rgba(0,0,0,.55),transparent 60%),
-        radial-gradient(ellipse 60% 50% at 100% 0%,rgba(0,0,0,.55),transparent 60%),
-        radial-gradient(ellipse 60% 50% at 0% 100%,rgba(0,0,0,.55),transparent 60%),
-        radial-gradient(ellipse 60% 50% at 100% 100%,rgba(0,0,0,.55),transparent 60%)}
-    /* additive light rays rotating slowly */
-    #brandLoader .rays{position:absolute;top:50%;left:50%;width:140vmin;height:140vmin;
-      transform:translate(-50%,-55%);pointer-events:none;mix-blend-mode:screen;
-      background:conic-gradient(from 0deg,
-        transparent 0deg, rgba(255,0,127,.05) 10deg, transparent 20deg,
-        transparent 60deg, rgba(255,90,156,.06) 70deg, transparent 80deg,
-        transparent 120deg, rgba(184,111,218,.05) 130deg, transparent 140deg,
-        transparent 180deg, rgba(255,0,127,.05) 190deg, transparent 200deg,
-        transparent 240deg, rgba(255,90,156,.06) 250deg, transparent 260deg,
-        transparent 300deg, rgba(184,111,218,.05) 310deg, transparent 320deg);
-      animation:bl-rays 24s linear infinite}
-    /* pink halo behind the logo (additive glow) */
-    #brandLoader .halo{position:absolute;top:43%;left:50%;width:min(560px,72vw);
-      height:min(420px,54vw);transform:translate(-50%,-50%);pointer-events:none;
-      background:radial-gradient(ellipse,rgba(255,0,127,.32) 0%,
-        rgba(255,90,156,.18) 30%,transparent 65%);
-      mix-blend-mode:screen;
-      animation:bl-halo 3.2s ease-in-out infinite}
-    /* the REAL logo art */
-    #brandLoader .logo{position:relative;width:min(380px,58vw);height:auto;
-      filter:drop-shadow(0 6px 22px rgba(0,0,0,.5));
-      animation:bl-breathe 2.6s ease-in-out infinite}
-    /* bar stack */
-    #brandLoader .barwrap{position:relative;margin-top:34px;display:flex;
-      flex-direction:column;align-items:center;gap:14px;z-index:2}
-    /* PROGRESS — a candy MATERIAL fill (owner: "loader material replaced + progress
-       showing material"). Glass channel + a fill that is a real peppermint candy:
-       a pink→gold base, flowing white candy-cane stripes, and a glossy top sheen,
-       so the bar reads as a material being POURED, not a flat coloured div. */
-    #brandLoader .bbar{position:relative;width:min(64vw,320px);height:9px;
-      border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;
-      box-shadow:inset 0 1px 2px rgba(0,0,0,.55),
-        inset 0 0 0 1px rgba(255,0,127,.22),
-        0 0 26px rgba(255,0,127,.16)}
-    #brandLoader .bfill{position:relative;height:100%;width:4%;border-radius:6px;
-      background:
-        linear-gradient(180deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,0) 48%),
-        repeating-linear-gradient(115deg,
-          rgba(255,255,255,.42) 0 8px, rgba(255,255,255,0) 8px 20px),
-        linear-gradient(90deg,#ff007f 0%,#ff5a9c 55%,#ffce47 100%);
-      background-size:auto, 40px 100%, auto;
-      box-shadow:0 0 16px rgba(255,0,127,.72), 0 0 5px rgba(255,206,71,.55);
-      transition:width .4s cubic-bezier(.16,1,.3,1);
-      animation:bl-flow 1.1s linear infinite}
-    /* leading-edge spark on the fill */
-    #brandLoader .bfill::after{content:'';position:absolute;top:-2px;right:-3px;
-      width:9px;height:11px;border-radius:50%;
-      background:radial-gradient(circle,#fff 0%,#ffce47 40%,transparent 70%);
-      box-shadow:0 0 12px rgba(255,206,71,.95)}
-    #brandLoader .bshine{position:absolute;top:0;left:0;height:100%;width:38%;
-      pointer-events:none;
-      background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
-      animation:bl-scan 1.5s ease-in-out infinite}
-    #brandLoader .cap{display:flex;align-items:baseline;gap:8px;
-      font:600 12px/1 'Fredoka',system-ui,sans-serif;
-      letter-spacing:8px;color:rgba(245,247,250,.66);text-transform:uppercase}
-    #brandLoader .cap .pct{font-size:13px;letter-spacing:1px;color:#ff5a9c;
-      font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
-    /* static tagline under the logo (no new infinite animation — respects
-       the prefers-reduced-motion block, which only targets the animated nodes) */
-    #brandLoader .tagline{position:relative;z-index:2;margin-top:14px;
-      font:600 13px/1 'Fredoka',system-ui,sans-serif;letter-spacing:6px;
-      text-transform:uppercase;color:rgba(255,90,156,.78);
-      text-shadow:0 2px 10px rgba(255,0,127,.35)}
-    #brandLoader .brand{position:absolute;bottom:32px;left:0;right:0;
-      text-align:center;font:600 10px/1 'Fredoka',system-ui,sans-serif;
-      letter-spacing:4px;color:rgba(245,247,250,.35)}
-    /* legal compliance strip — Cocos/WebGL build (engine-neutral, no other-engine names) */
-    #brandLoader .brand.legal{bottom:14px;font-size:9px;letter-spacing:3px;
-      color:rgba(245,247,250,.42)}
-    @keyframes bl-breathe{0%,100%{transform:scale(1) translateY(0)}
-      50%{transform:scale(1.025) translateY(-3px)}}
-    @keyframes bl-halo{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}
-      50%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}}
-    @keyframes bl-rays{to{transform:translate(-50%,-55%) rotate(360deg)}}
-    @keyframes bl-scan{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}
-    /* the candy material flows along the fill (stripes scroll = "pouring") */
-    @keyframes bl-flow{to{background-position:0 0, 40px 0, 0 0}}
-    @media (prefers-reduced-motion:reduce){
-      #brandLoader .logo,#brandLoader .halo,#brandLoader .rays,
-      #brandLoader .bshine,#brandLoader .bfill{animation:none}
-    }
+    #brandLoader .bg{position:absolute;inset:0;
+      background:url('loader/bg.jpg') center/cover no-repeat}
+    #brandLoader .scrim{position:absolute;inset:0;pointer-events:none;
+      background:radial-gradient(70% 60% at 50% 40%, rgba(10,6,20,.2), rgba(10,6,20,.72))}
+    #brandLoader .logo{position:relative;z-index:2;width:min(300px,64vw);height:auto;
+      filter:drop-shadow(0 10px 34px rgba(255,0,127,.6));
+      animation:bl-float 4s ease-in-out infinite}
+    #brandLoader .tagline{position:relative;z-index:2;margin-top:4px;
+      font:500 13px/1 'Fredoka',system-ui,sans-serif;color:#ffd9ec}
+    #brandLoader .barwrap{position:relative;z-index:2;width:min(260px,72vw);margin-top:22px}
+    #brandLoader .bbar{height:9px;border-radius:999px;background:rgba(10,6,20,.5);
+      border:1px solid rgba(255,138,184,.35);overflow:hidden}
+    #brandLoader .bfill{height:100%;width:4%;border-radius:999px;
+      background:linear-gradient(90deg,#ff007f,#ff8ab8);
+      box-shadow:0 0 12px rgba(255,90,156,.8);
+      transition:width .4s cubic-bezier(.16,1,.3,1)}
+    #brandLoader .cap{display:flex;justify-content:space-between;margin-top:7px;
+      font:400 9px/1 'Space Mono',ui-monospace,monospace;color:#ffd9ec;letter-spacing:.1em}
+    #brandLoader .legal{position:absolute;left:0;right:0;bottom:12px;text-align:center;
+      font:400 9px/1 'Space Mono',ui-monospace,monospace;letter-spacing:.14em;
+      color:rgba(255,217,236,.6)}
+    @keyframes bl-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    @media (prefers-reduced-motion:reduce){#brandLoader .logo{animation:none}}
   </style>
 </head>
 <body>
@@ -150,18 +77,14 @@
     </div>
   <div id="brandLoader">
     <div class="bg"></div>
-    <div class="rays"></div>
-    <div class="corners"></div>
-    <div class="vign"></div>
-    <div class="halo"></div>
-    <img class="logo" src="loader/logo.png" alt="Shining Pop V3"/>
-    <div class="tagline">A PREMIUM CANDY SLOT</div>
+    <div class="scrim"></div>
+    <img class="logo" src="loader/logo.png" alt="Shining Pop"/>
+    <div class="tagline">a premium candy slot</div>
     <div class="barwrap">
-      <div class="bbar"><div class="bfill"></div><i class="bshine"></i></div>
-      <span class="cap">LOADING ASSETS<em class="pct">0%</em></span>
+      <div class="bbar"><div class="bfill"></div></div>
+      <div class="cap"><span>LOADING ASSETS</span><span class="pct">0%</span></div>
     </div>
-    <div class="brand">AN ARTEST | BRAINROCKET PRODUCTION</div>
-    <div class="brand legal">WEBGL · 18+ · PLAY RESPONSIBLY</div>
+    <div class="legal">WEBGL · 18+ · PLAY RESPONSIBLY</div>
   </div>
   <script>
     /* Branded boot loader — READ-ONLY progress (no engine monkey-patch). Reads
