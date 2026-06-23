@@ -1,0 +1,106 @@
+// CINEMA WAVE — soft LIGHT BURST behind winning symbols. Replaces the 10-layer
+// Graphics radial glow, which BANDED into visible concentric circles on the dark
+// felt (user: "many circles effect" — rejected). A shader gradient is continuous:
+// smooth exponential falloff core + slowly ROTATING god-rays + a gentle flicker,
+// so the winner sits in living warm light with zero banding and zero geometry.
+// Additive; warm ember->gold only. Graphics glow remains the fallback when
+// vfx.materialsEnabled is off or the material failed to load.
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: one
+          blendDstAlpha: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_time:      { value: 0.0 }
+        u_intensity: { value: 1.0 }
+        u_raySpeed:  { value: 0.6 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec4 color;
+
+  // uv0 ALWAYS declared — see the 16323/16324 no-texture-variant gotcha.
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+
+  uniform Constants {
+    float u_time;
+    float u_intensity;
+    float u_raySpeed;
+  };
+
+  vec4 frag () {
+    float a = 1.0;
+    #if USE_TEXTURE
+      a = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
+    #endif
+
+    vec2 p = uv0 - 0.5;
+    float d = length(p) * 2.0;            // 0 centre -> 1 corner-ish
+
+    // Continuous exponential glow — mathematically smooth, can NOT band.
+    float glow = exp(-d * d * 3.4);
+
+    // Slow rotating god-rays: 5 soft blades, faded by the same falloff so they
+    // never reach the cell edge as hard spokes.
+    float ang = atan(p.y, p.x);
+    float rays = pow(abs(sin(ang * 2.5 + u_time * u_raySpeed)), 7.0);
+    rays *= exp(-d * d * 2.2) * 0.45;
+
+    // Gentle candle-flicker so the light feels alive, not static.
+    float flick = 0.92 + 0.08 * sin(u_time * 5.0 + d * 4.0);
+
+    vec3 colr = mix(vec3(1.0, 0.46, 0.1), vec3(1.0, 0.95, 0.78), glow);
+    float outA = clamp((glow + rays) * flick, 0.0, 1.0) * u_intensity * a * color.a;
+
+    vec4 o = vec4(colr * (glow + rays), outA);
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

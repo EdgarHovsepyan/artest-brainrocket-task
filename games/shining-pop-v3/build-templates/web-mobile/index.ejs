@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+
+  <title>SHINING POP V3 — ARTEST | BrainRocket</title>
+
+  <meta name="viewport"
+        content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,minimal-ui=true"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="renderer" content="webkit"/>
+  <meta name="force-rendering" content="webkit"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta name="msapplication-tap-highlight" content="no">
+  <meta name="full-screen" content="yes"/>
+  <meta name="x5-fullscreen" content="true"/>
+  <meta name="360-fullscreen" content="true"/>
+  <meta name="x5-page-mode" content="app">
+
+  <link rel="stylesheet" type="text/css" href="<%= cssUrl %>"/>
+  <style>
+    /* ROOT BG — the canonical game-bg color. Without this, the browser's default
+       white shows through ANY frame the Cocos canvas hasn't repainted (intro
+       fade-out + first-paint gap + occasional throttled-tab re-rasterisation).
+       Setting it here means there is NEVER a white frame, period — independent
+       of what the engine is doing. (2026-06-11: the recurring "white flash after
+       intro hides" bug — fixed at the right layer this time.) */
+    html, body { background-color: #0a0610; margin: 0; padding: 0; }
+    #GameDiv, #Cocos3dGameContainer, #GameCanvas { background-color: #0a0610; }
+
+    /* CINEMATIC boot loader — Pixi popLoader port: real bg.jpg darkened + blurred,
+       magenta radial vignette, animated rays, halo behind the real logo, 3-stop
+       gradient bar with shine sweep, animated dots. Same anatomy + same beats as
+       the flagship; fades when assets settle. */
+    @font-face{font-family:'Fredoka';font-style:normal;font-display:swap;
+      src:url('loader/Fredoka.ttf') format('truetype')}
+    #brandLoader{position:fixed;inset:0;z-index:999;background:#0a0610;
+      transition:opacity .45s cubic-bezier(.16,1,.3,1);overflow:hidden;
+      display:flex;flex-direction:column;align-items:center;justify-content:center}
+    #brandLoader.gone{opacity:0;pointer-events:none}
+    /* bg backdrop: real candy world, dark wash + blur for context-aware boot */
+    #brandLoader .bg{position:absolute;inset:-8%;
+      background:url('loader/bg.jpg') center/cover no-repeat;
+      filter:blur(14px) brightness(.45) saturate(1.1);
+      transform:scale(1.05)}
+    /* magenta radial vignette + soft accent */
+    #brandLoader .vign{position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse at center,rgba(255,0,127,.10) 0%,transparent 40%),
+        radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.75) 100%)}
+    /* cinema corner darkening (4-corner cone) */
+    #brandLoader .corners{position:absolute;inset:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 60% 50% at 0% 0%,rgba(0,0,0,.55),transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 0%,rgba(0,0,0,.55),transparent 60%),
+        radial-gradient(ellipse 60% 50% at 0% 100%,rgba(0,0,0,.55),transparent 60%),
+        radial-gradient(ellipse 60% 50% at 100% 100%,rgba(0,0,0,.55),transparent 60%)}
+    /* additive light rays rotating slowly */
+    #brandLoader .rays{position:absolute;top:50%;left:50%;width:140vmin;height:140vmin;
+      transform:translate(-50%,-55%);pointer-events:none;mix-blend-mode:screen;
+      background:conic-gradient(from 0deg,
+        transparent 0deg, rgba(255,0,127,.05) 10deg, transparent 20deg,
+        transparent 60deg, rgba(255,90,156,.06) 70deg, transparent 80deg,
+        transparent 120deg, rgba(184,111,218,.05) 130deg, transparent 140deg,
+        transparent 180deg, rgba(255,0,127,.05) 190deg, transparent 200deg,
+        transparent 240deg, rgba(255,90,156,.06) 250deg, transparent 260deg,
+        transparent 300deg, rgba(184,111,218,.05) 310deg, transparent 320deg);
+      animation:bl-rays 24s linear infinite}
+    /* pink halo behind the logo (additive glow) */
+    #brandLoader .halo{position:absolute;top:43%;left:50%;width:min(560px,72vw);
+      height:min(420px,54vw);transform:translate(-50%,-50%);pointer-events:none;
+      background:radial-gradient(ellipse,rgba(255,0,127,.32) 0%,
+        rgba(255,90,156,.18) 30%,transparent 65%);
+      mix-blend-mode:screen;
+      animation:bl-halo 3.2s ease-in-out infinite}
+    /* the REAL logo art */
+    #brandLoader .logo{position:relative;width:min(380px,58vw);height:auto;
+      filter:drop-shadow(0 6px 22px rgba(0,0,0,.5));
+      animation:bl-breathe 2.6s ease-in-out infinite}
+    /* bar stack */
+    #brandLoader .barwrap{position:relative;margin-top:34px;display:flex;
+      flex-direction:column;align-items:center;gap:14px;z-index:2}
+    /* PROGRESS — a candy MATERIAL fill (owner: "loader material replaced + progress
+       showing material"). Glass channel + a fill that is a real peppermint candy:
+       a pink→gold base, flowing white candy-cane stripes, and a glossy top sheen,
+       so the bar reads as a material being POURED, not a flat coloured div. */
+    #brandLoader .bbar{position:relative;width:min(64vw,320px);height:9px;
+      border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;
+      box-shadow:inset 0 1px 2px rgba(0,0,0,.55),
+        inset 0 0 0 1px rgba(255,0,127,.22),
+        0 0 26px rgba(255,0,127,.16)}
+    #brandLoader .bfill{position:relative;height:100%;width:4%;border-radius:6px;
+      background:
+        linear-gradient(180deg,rgba(255,255,255,.5) 0%,rgba(255,255,255,0) 48%),
+        repeating-linear-gradient(115deg,
+          rgba(255,255,255,.42) 0 8px, rgba(255,255,255,0) 8px 20px),
+        linear-gradient(90deg,#ff007f 0%,#ff5a9c 55%,#ffce47 100%);
+      background-size:auto, 40px 100%, auto;
+      box-shadow:0 0 16px rgba(255,0,127,.72), 0 0 5px rgba(255,206,71,.55);
+      transition:width .4s cubic-bezier(.16,1,.3,1);
+      animation:bl-flow 1.1s linear infinite}
+    /* leading-edge spark on the fill */
+    #brandLoader .bfill::after{content:'';position:absolute;top:-2px;right:-3px;
+      width:9px;height:11px;border-radius:50%;
+      background:radial-gradient(circle,#fff 0%,#ffce47 40%,transparent 70%);
+      box-shadow:0 0 12px rgba(255,206,71,.95)}
+    #brandLoader .bshine{position:absolute;top:0;left:0;height:100%;width:38%;
+      pointer-events:none;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+      animation:bl-scan 1.5s ease-in-out infinite}
+    #brandLoader .cap{display:flex;align-items:baseline;gap:8px;
+      font:600 12px/1 'Fredoka',system-ui,sans-serif;
+      letter-spacing:8px;color:rgba(245,247,250,.66);text-transform:uppercase}
+    #brandLoader .cap .pct{font-size:13px;letter-spacing:1px;color:#ff5a9c;
+      font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+    #brandLoader .brand{position:absolute;bottom:32px;left:0;right:0;
+      text-align:center;font:600 10px/1 'Fredoka',system-ui,sans-serif;
+      letter-spacing:4px;color:rgba(245,247,250,.35)}
+    @keyframes bl-breathe{0%,100%{transform:scale(1) translateY(0)}
+      50%{transform:scale(1.025) translateY(-3px)}}
+    @keyframes bl-halo{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}
+      50%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}}
+    @keyframes bl-rays{to{transform:translate(-50%,-55%) rotate(360deg)}}
+    @keyframes bl-scan{0%{transform:translateX(-100%)}100%{transform:translateX(280%)}}
+    /* the candy material flows along the fill (stripes scroll = "pouring") */
+    @keyframes bl-flow{to{background-position:0 0, 40px 0, 0 0}}
+    @media (prefers-reduced-motion:reduce){
+      #brandLoader .logo,#brandLoader .halo,#brandLoader .rays,
+      #brandLoader .bshine,#brandLoader .bfill{animation:none}
+    }
+  </style>
+</head>
+<body>
+  <div id="GameDiv" cc_exact_fit_screen="true">
+      <div id="Cocos3dGameContainer">
+        <canvas id="GameCanvas" oncontextmenu="event.preventDefault()" tabindex="99"></canvas>
+      </div>
+    </div>
+  <div id="brandLoader">
+    <div class="bg"></div>
+    <div class="rays"></div>
+    <div class="corners"></div>
+    <div class="vign"></div>
+    <div class="halo"></div>
+    <img class="logo" src="loader/logo.png" alt="Shining Pop V3"/>
+    <div class="barwrap">
+      <div class="bbar"><div class="bfill"></div><i class="bshine"></i></div>
+      <span class="cap">LOADING<em class="pct">0%</em></span>
+    </div>
+    <div class="brand">AN ARTEST | BRAINROCKET PRODUCTION</div>
+  </div>
+  <script>
+    /* Branded boot loader — READ-ONLY progress (no engine monkey-patch). Reads
+       cc boot stages (loaded / inited / scene-up) and EASES the bar toward each
+       stage target so it feels continuous, not a hard staircase. The earlier
+       cc.assetManager.loadAny override was removed: patching a core engine method
+       during boot risked the asset pipeline (and a console error). */
+    (function () {
+      var t0 = Date.now();
+      var fill = null;
+      var pctEl = null;
+      var shown = 4;
+      var setW = function (pct) {
+        if (!fill) fill = document.querySelector('#brandLoader .bfill');
+        if (!pctEl) pctEl = document.querySelector('#brandLoader .pct');
+        if (fill) fill.style.width = pct.toFixed(1) + '%';
+        if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+      };
+      var iv = setInterval(function () {
+        var stage = 0;
+        try {
+          if (window.cc) stage = 1;
+          if (window.cc && window.cc.game && window.cc.game.inited) stage = 2;
+          if (window.cc && window.cc.director && window.cc.director.getScene()) stage = 3;
+          if (window.__shiningPopReady) stage = 4;
+        } catch (e) { stage = 0; }
+        // Stage 3 (empty scene up) caps at 92% — the game still has to load its
+        // assets and build the intro. Only the real ready signal (stage 4, set by
+        // the controller right after buildIntro) fills to 100 and lets the loader
+        // hide, so there is NO black gap between the scene mounting and the intro.
+        var target = [8, 34, 70, 92, 100][stage];
+        // ease toward the stage target → smooth fill (CSS width-transition adds
+        // the final polish); never jumps backward.
+        shown += (target - shown) * 0.16;
+        setW(shown);
+        if ((window.__shiningPopReady && shown > 99.3) || Date.now() - t0 > 30000) {
+          clearInterval(iv);
+          setW(100);
+          var el = document.getElementById('brandLoader');
+          if (el) {
+            setTimeout(function () {
+              el.classList.add('gone');
+              setTimeout(function () { el.parentNode && el.parentNode.removeChild(el); }, 600);
+            }, 240);
+          }
+        }
+      }, 60);
+    })();
+  </script>
+  <%- include(cocosTemplate, {}) %>
+  <script>
+    /* RESPONSIVE CANVAS KICK. The engine sizes the frame from window.innerWidth
+       captured at BOOT and only refreshes on a real 'resize' event. In an embed /
+       automated viewport / late-settling layout that first measure can be stale
+       (tiny innerWidth), freezing the canvas at a small size in the top-left. A
+       no-op resize re-runs the engine's _resizeFrame against the now-correct
+       viewport — safe + idempotent, and it hardens real browsers too. */
+    (function () {
+      function kick() { try { window.dispatchEvent(new Event('resize')); } catch (e) {} }
+      // Kick on load + the next two frames (covers late layout settle)...
+      window.addEventListener('load', function () {
+        requestAnimationFrame(function () { kick(); requestAnimationFrame(kick); });
+      });
+      // ...and exactly ONCE more when the engine reports the scene is up, then stop.
+      // (Deliberately NOT a long interval — repeatedly re-laying a full-size canvas
+      // hammers throttled/headless renderers for no benefit.)
+      var poll = setInterval(function () {
+        if (window.cc && cc.director && cc.director.getScene()) { kick(); clearInterval(poll); }
+      }, 120);
+      setTimeout(function () { clearInterval(poll); }, 6000); // safety stop
+    })();
+  </script>
+  <script>
+    /* CRISPER RENDER (owner: "4K / device pixel ratio 3+"). Cocos 3.8.8 hard-caps
+       the backing-store DPR at min(devicePixelRatio, 2) via a read-only getter, so
+       3x phones render at 2x and the browser upscales the rest (the softness). The
+       supported lever is cc.screen.resolutionScale, which multiplies the framebuffer
+       (effective DPR = min(dpr,2) x resolutionScale) and feeds the custom pipeline +
+       all .effect shaders. We raise it to 1.25 (effective DPR 2.5) on capable
+       devices only — cost is QUADRATIC, so it's GPU-gated + capped to protect 60fps
+       on the multi-shader win ceremony. Reversible: ?crisp=1 forces it off; deleting
+       this block returns the build to stock. */
+    (function () {
+      function tier() {
+        try {
+          var dpr = window.devicePixelRatio || 1;
+          if (dpr <= 1.0) return 1; // desktop @1x: nothing to gain
+          var weak = false;
+          try {
+            var gl = document.createElement('canvas').getContext('webgl');
+            var dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+            var r = dbg ? ('' + gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)).toLowerCase() : '';
+            weak = /mali-4|adreno [23]|powervr|swiftshader|llvmpipe|software/.test(r);
+          } catch (e) {}
+          if (weak) return 1; // protect low-end GPUs
+          var longEdge = Math.max(window.innerWidth, window.innerHeight) * dpr;
+          if (longEdge > 3400) return 1.15; // huge panels: cap fill-rate harder
+          return 1.25; // effective DPR = 2 x 1.25 = 2.5
+        } catch (e) { return 1; }
+      }
+      function apply() {
+        try {
+          if (!(window.cc && cc.screen && typeof cc.screen.resolutionScale !== 'undefined')) return;
+          var m = /[?&]crisp=([0-9.]+)/.exec(location.search);
+          var s = m ? parseFloat(m[1]) : tier();
+          if (s && s !== 1) cc.screen.resolutionScale = s;
+        } catch (e) {}
+      }
+      var p = setInterval(function () {
+        if (window.cc && cc.director && cc.director.getScene()) { apply(); clearInterval(p); }
+      }, 120);
+      setTimeout(function () { clearInterval(p); }, 6000);
+    })();
+  </script>
+</body>
+</html>

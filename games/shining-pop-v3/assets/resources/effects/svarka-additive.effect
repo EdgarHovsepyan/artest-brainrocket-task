@@ -1,0 +1,92 @@
+// Task 6.3 — Svarka plasma core. SRC_ALPHA/ONE additive bright core riding the
+// win-line head. The stacked-alpha disc trio in particle-pool is the always-on
+// fallback; this is the *additive intensifier* on top when materialsEnabled.
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      # No explicit depthStencilState: an explicit block makes this custom-material
+      # glow ESCAPE a parent Mask (the win halo bled out past the reel board). Let
+      # the engine inject the mask stencil so the halo is clipped to the board.
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: one
+          blendDstAlpha: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_time:         { value: 0.0 }
+        u_intensity:    { value: 1.0 }
+        u_pulseSpeed:   { value: 6.0 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec4 color;
+
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+
+  uniform Constants {
+    float u_time;
+    float u_intensity;
+    float u_pulseSpeed;
+  };
+
+  vec4 frag () {
+    vec4 o = vec4(1, 1, 1, 1);
+
+    #if USE_TEXTURE
+      o *= CCSampleWithAlphaSeparated(cc_spriteTexture, uv0);
+    #endif
+
+    vec2 p = uv0 - 0.5;
+    float radial = 1.0 - smoothstep(0.0, 0.5, length(p));
+    float pulse = 0.5 + 0.5 * sin(u_time * u_pulseSpeed);
+    float bright = radial * (0.65 + 0.35 * pulse);
+
+    o *= color;
+    o.rgb *= 1.0 + u_intensity * bright * 1.5;
+    o.a *= bright;
+
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

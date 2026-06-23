@@ -1,0 +1,240 @@
+// GUMMY JELLY WOBBLE BURST — feature-unlock splash for "Shining Pop".
+// A squishy TRANSLUCENT gummy blob (bean/bear silhouette) with subsurface
+// scattering, a jelly rim-light and a wet gloss cap. It WOBBLES (anisotropic
+// squash/stretch off u_time) then, on the dissolve half, FISSIONS into 3 smaller
+// jiggling droplets. The silhouette is an SDF UNION of an elongated capsule + a
+// head bump + two ear-lobes — a lumpy bean with shoulders, never a constant-radius
+// disc. Normal alpha blend so we keep a real body + gloss + soft contact shadow.
+//
+// EFX2406-safe: the texture sample is the LITERAL CCSampleWithAlphaSeparated call
+// written inside #if USE_TEXTURE (the chunk scanner only inlines the literal).
+// uv0 is ALWAYS declared (no-texture variant 16323/16324 gotcha). fbm <= 4 taps.
+//
+// Uniform contract (driver-fed): u_progress 0->1 over life, u_time 0->2.6 for
+// motion, u_intensity master gain 1.4. Vertex color = mode tint (pink/gold/purple)
+// + alpha; the gummy body is multiplied by it so the mode colour carries.
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: one
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_intensity: { value: 1.4 }
+        u_time:      { value: 0.0 }
+        u_progress:  { value: 0.0 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec4 color;
+  // uv0 ALWAYS declared (vertex stage always writes it) — declaring it only
+  // #if USE_TEXTURE breaks the no-texture variant (Cocos Error 16323/16324).
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+
+  uniform Constants {
+    float u_intensity;
+    float u_time;
+    float u_progress;
+  };
+
+  // ---- cheap value-noise -> 3-octave fbm (mobile-safe, <=4 taps) -------------
+  float hash (vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise (vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+  float fbm (vec2 p) {
+    float v = 0.0, amp = 0.5;
+    for (int i = 0; i < 3; i++) { v += amp * vnoise(p); p *= 2.02; amp *= 0.5; }
+    return v;
+  }
+
+  // ---- SDF primitives ---------------------------------------------------------
+  // vertical capsule from a->b, radius r (this is the gummy SPINE — tall, NOT round)
+  float sdCapsule (vec2 p, vec2 a, vec2 b, float r) {
+    vec2 pa = p - a, ba = b - a;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    return length(pa - ba * h) - r;
+  }
+  float sdCircle (vec2 p, vec2 c, float r) { return length(p - c) - r; }
+  // smooth-min union (keeps the joins gummy, no creases)
+  float smin (float a, float b, float k) {
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+  }
+
+  // The gummy-BEAR silhouette as one SDF. p is centred uv in [-1,1].
+  // head + 2 ears + fat torso + 2 arms + 2 legs. wob = anisotropic squash/
+  // stretch; jig = per-lobe wobble. The limbs/ears break any constant radius.
+  float gummyBody (vec2 p, float wob, float jig) {
+    // anisotropic squash: wider when squashed, taller when stretched
+    p.x /= (1.0 + 0.16 * wob);
+    p.y /= (1.0 - 0.16 * wob);
+    float d = sdCircle(p, vec2(0.0, 0.40), 0.265);                      // head
+    d = smin(d, sdCircle(p, vec2(-0.205, 0.585 + 0.03 * jig), 0.115), 0.05); // ear L
+    d = smin(d, sdCircle(p, vec2( 0.205, 0.585 - 0.03 * jig), 0.115), 0.05); // ear R
+    d = smin(d, sdCircle(p * vec2(1.0, 1.14), vec2(0.0, -0.12), 0.40), 0.17); // torso
+    d = smin(d, sdCircle(p, vec2(-0.43, 0.07), 0.155), 0.10);          // arm L
+    d = smin(d, sdCircle(p, vec2( 0.43, 0.07), 0.155), 0.10);          // arm R
+    d = smin(d, sdCircle(p, vec2(-0.22, -0.54), 0.165), 0.10);         // leg L
+    d = smin(d, sdCircle(p, vec2( 0.22, -0.54), 0.165), 0.10);         // leg R
+    return d;
+  }
+
+  vec4 frag () {
+    // BASE ALPHA IS SACRED: read sprite alpha, used as a soft frame mask only.
+    float texA = 1.0;
+    #if USE_TEXTURE
+      texA = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0).a;
+    #endif
+
+    // life: bloom-in (0->0.18) then hold then dissolve on the BACK half.
+    float bloom = smoothstep(0.0, 0.18, u_progress);
+    float life  = 1.0 - smoothstep(0.6, 1.0, u_progress);   // gate everything on this
+    float diss  = smoothstep(0.55, 1.0, u_progress);        // 0..1 dissolve amount
+
+    vec2 p = (uv0 - 0.5) * 2.0;                              // centred [-1,1]
+
+    // squishy timing: a bouncy wobble that eases as it settles
+    float wob = sin(u_time * 5.2) * exp(-u_time * 0.7);      // anisotropic squash drive
+    float jig = sin(u_time * 7.3 + 1.3);
+
+    // global bloom scale: pops from 0 then a tiny jelly overshoot/settle
+    float pop = bloom * (1.0 + 0.10 * sin(u_time * 6.0) * exp(-u_time * 1.1));
+    vec2 ps = p / max(pop, 0.0001);
+
+    // ---- MAIN gummy body SDF ----
+    float d = gummyBody(ps, wob, jig);
+
+    // ---- FISSION: 3 droplets peel off and orbit out as it dissolves ----
+    // each droplet is a small jiggling blob; we union them into the field so the
+    // silhouette literally breaks apart (never a shrinking circle).
+    float fly = diss * 0.95;
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float ang = fi * 2.094395 + u_time * 0.6;              // 120deg apart, slow spin
+      vec2 dir = vec2(cos(ang), sin(ang) * 1.25);            // vertical bias = bean-ish spray
+      vec2 c = dir * fly * (0.55 + 0.12 * fi);
+      float r = (0.20 - 0.05 * fi) * (1.0 - 0.4 * diss)      // droplets shrink as they fade
+              * (1.0 + 0.18 * sin(u_time * (8.0 + fi) + fi));// independent jiggle
+      float dd = sdCircle(ps, c, r);
+      d = smin(d, dd, 0.05);
+    }
+
+    // wobbly gummy EDGE: perturb the iso-surface with a touch of fbm so the
+    // outline ripples like jelly (still bean-shaped, just alive).
+    float edgeN = fbm(ps * 3.4 + vec2(0.0, u_time * 1.1)) - 0.5;
+    d += edgeN * 0.035;
+
+    // ---- soft anti-aliased fill from the SDF (smoothstep -> no banding) ----
+    float aa = 0.02;
+    float body = smoothstep(aa, -aa, d);                    // 1 inside, 0 outside
+    if (body < 0.001 && diss < 0.001) { discard; }          // cheap early-out pre-fission
+
+    // interior depth: 0 at rim -> 1 deep inside (drives subsurface thickness)
+    float depth = smoothstep(0.0, 0.34, -d);
+
+    // ---- SUBSURFACE SCATTERING translucency ----
+    // thin rim = bright/pale (light passes through); thick core = saturated.
+    // a slow caustic in the interior = the look of light bouncing inside jelly.
+    float caustic = fbm(ps * 2.6 - vec2(0.0, u_time * 0.9));
+    caustic = 0.6 + 0.5 * caustic;
+    vec3 deepC = vec3(0.62, 0.10, 0.30);                    // saturated jelly core
+    vec3 thinC = vec3(1.0, 0.78, 0.86);                     // pale translucent rim
+    vec3 jelly = mix(thinC, deepC, depth);                  // thin->thick
+    jelly *= caustic;                                        // living internal glow
+    // subsurface forward-glow: the centre back-lit, glowy
+    jelly += vec3(1.0, 0.55, 0.72) * (1.0 - depth) * 0.45 * depth;
+
+    // ---- JELLY RIM-LIGHT: bright wrap right at the silhouette edge ----
+    float rim = smoothstep(0.055, 0.0, abs(d + 0.012));     // thin band hugging the edge
+    rim = pow(rim, 1.5);
+    vec3 rimC = vec3(1.0, 0.86, 0.72);                      // warm gummy rim glow
+    jelly += rimC * rim * 0.5;
+
+    // ---- WET GLOSS CAP: a small bright highlight high on the body = edible sheen
+    vec2 gp = ps - vec2(-0.16, 0.40 + 0.05 * wob);         // sits upper-left, wobbles
+    float gloss = smoothstep(0.18, 0.0, length(gp * vec2(1.1, 0.8)));
+    gloss *= depth;                                          // only on the body, not air
+    // second tiny sparkle dot for the "fresh candy" wink
+    float spark = smoothstep(0.06, 0.0, length(ps - vec2(0.12, 0.10)));
+    jelly += vec3(1.0) * (gloss * 0.85 + spark * depth * 0.6);
+
+    // ---- MODE TINT: multiply the gummy by the vertex colour so pink/gold/purple
+    // carries; keep some white in the gloss so it still reads wet under any tint.
+    vec3 rgb = jelly * color.rgb;
+    rgb += vec3(gloss * 0.28 + rim * 0.10);                 // tint-independent sheen
+
+    // master gain + bloom, soft-clamped so the jelly stays candy-coloured not white
+    rgb *= u_intensity * (0.9 + 0.3 * bloom);
+    rgb = rgb / (1.0 + max(rgb - 0.85, vec3(0.0)) * 0.7);
+
+    // ---- ALPHA: solid translucent body, soft contact shadow under it ----
+    // gummies are ~0.9 opaque in the meat, ~0.5 at the thin rim -> real jelly.
+    float bodyA = body * mix(0.82, 1.0, depth);
+    // soft contact shadow: a faint dark pool just below the blob (sells weight)
+    float shadow = smoothstep(0.45, 0.0, length((ps - vec2(0.0, -0.62)) * vec2(1.0, 1.7)));
+    shadow *= (1.0 - body) * 0.28 * bloom * life;
+    rgb = mix(rgb, vec3(0.04, 0.0, 0.03), shadow);          // darken where shadow sits
+
+    float alpha = max(bodyA, shadow);
+    // dissolve the body alpha away on the back half (droplets already shrank)
+    alpha *= life;
+    // multiply by the texture frame mask + the vertex alpha (driver fade)
+    alpha *= texA * color.a;
+    alpha = clamp(alpha, 0.0, 1.0);
+
+    vec4 o = vec4(rgb, alpha);
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

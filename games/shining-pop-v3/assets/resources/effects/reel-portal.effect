@@ -1,0 +1,93 @@
+// Task 4.2 — Reel portal warp. Chromatic-fringe additive overlay docked at the
+// reel top/bottom; fires on spin entry (launch) and exit (settle). Vertex
+// wobble is a Wave C polish; this Wave A base does fragment-side fringe only.
+// Graphics fallback = a quick scale/alpha pulse on the consumer side.
+
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one
+          blendSrcAlpha: one
+          blendDstAlpha: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.0 }
+        u_time:         { value: 0.0 }
+        u_intensity:    { value: 1.0 }
+        u_warpAmp:      { value: 0.02 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec4 color;
+
+  in vec2 uv0;
+  #if USE_TEXTURE
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+  #endif
+
+  uniform Constants {
+    float u_time;
+    float u_intensity;
+    float u_warpAmp;
+  };
+
+  vec4 frag () {
+    vec4 o = vec4(1, 1, 1, 1);
+
+    #if USE_TEXTURE
+      float warp = sin(uv0.y * 12.0 + u_time * 6.0) * u_warpAmp;
+      vec2 uvR = vec2(uv0.x + warp, uv0.y);
+      vec2 uvG = vec2(uv0.x, uv0.y);
+      vec2 uvB = vec2(uv0.x - warp, uv0.y);
+      float r = CCSampleWithAlphaSeparated(cc_spriteTexture, uvR).r;
+      vec4  g = CCSampleWithAlphaSeparated(cc_spriteTexture, uvG);
+      float b = CCSampleWithAlphaSeparated(cc_spriteTexture, uvB).b;
+      o = vec4(r, g.g, b, g.a);
+    #endif
+
+    o *= color;
+    o.rgb *= 1.0 + u_intensity * 0.5;
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

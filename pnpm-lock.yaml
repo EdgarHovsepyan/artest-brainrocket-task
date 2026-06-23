@@ -73,6 +73,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/math-core
 
+  games/shining-pop-v3:
+    dependencies:
+      '@artest/math-core':
+        specifier: workspace:*
+        version: link:../../packages/math-core
+
   packages/math-core:
     devDependencies:
       tsx:

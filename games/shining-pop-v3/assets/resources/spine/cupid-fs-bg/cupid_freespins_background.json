@@ -1,0 +1,165 @@
+{
+  "skeleton": {
+    "hash": "4DZdtMjerzQ",
+    "spine": "4.2.43",
+    "x": -1039.73,
+    "y": -1188.43,
+    "width": 2077.04,
+    "height": 1945.47
+  },
+  "bones": [
+    { "name": "root" },
+    { "name": "background_main", "parent": "root" },
+    {
+      "name": "Sky_Left",
+      "parent": "background_main",
+      "x": -488.21,
+      "y": 140.87,
+      "scaleX": 1.0264
+    },
+    { "name": "Floor_Left", "parent": "background_main", "x": -511.5, "y": -354.63 },
+    { "name": "Pink_Pool", "parent": "Floor_Left", "x": 7.5, "y": -77 },
+    { "name": "Clouds_Left", "parent": "background_main", "y": -330.48 },
+    { "name": "clouds_mid 2", "parent": "background_main", "x": 0.5, "y": 188.37 },
+    { "name": "clouds_mid", "parent": "Clouds_Left", "x": 511.5, "y": 542.84 },
+    { "name": "clouds_front", "parent": "Clouds_Left", "x": 512.5, "y": 186.34 },
+    { "name": "clouds_back", "parent": "Clouds_Left", "x": 497, "y": 634.34 },
+    { "name": "Sky_Right", "parent": "background_main", "x": 507.91, "y": 140.87, "scaleX": -1 },
+    { "name": "Floor_Right", "parent": "background_main", "x": 504.98, "y": -353.44, "scaleX": -1 },
+    { "name": "Pink_Pool2", "parent": "Floor_Right", "x": 7.5, "y": -77 },
+    { "name": "Clouds_Right", "parent": "background_main", "y": -330.48, "scaleX": -1 },
+    { "name": "clouds_mid2", "parent": "Clouds_Right", "x": 511.5, "y": 542.84 },
+    { "name": "clouds_front2", "parent": "Clouds_Right", "x": 512.5, "y": 186.34 },
+    { "name": "clouds_back2", "parent": "Clouds_Right", "x": 497, "y": 634.34 },
+    { "name": "Floor_Left2", "parent": "Floor_Left", "x": -164.05, "y": -813.69 },
+    { "name": "Floor_Right2", "parent": "Floor_Right", "x": -233.16, "y": -833.35 }
+  ],
+  "slots": [
+    { "name": "sky", "bone": "Sky_Left", "attachment": "sky2" },
+    { "name": "sky3", "bone": "Sky_Right", "attachment": "sky3" },
+    { "name": "clouds_mid 2", "bone": "clouds_mid 2", "attachment": "clouds_mid 2" },
+    { "name": "clouds_back", "bone": "clouds_back", "attachment": "clouds_back" },
+    { "name": "clouds_back2", "bone": "clouds_back2", "attachment": "clouds_back" },
+    { "name": "clouds_mid", "bone": "clouds_mid", "attachment": "clouds_mid" },
+    { "name": "clouds_mid2", "bone": "clouds_mid2", "attachment": "clouds_mid" },
+    { "name": "clouds_front", "bone": "clouds_front", "attachment": "clouds_front" },
+    { "name": "clouds_front2", "bone": "clouds_front2", "attachment": "clouds_front" },
+    { "name": "Floor", "bone": "Floor_Left", "attachment": "Floor" },
+    { "name": "Floor2", "bone": "Floor_Right", "attachment": "Floor2" },
+    { "name": "Pink_Pool", "bone": "Pink_Pool", "attachment": "Pink_Pool" },
+    { "name": "Pink_Pool2", "bone": "Pink_Pool2", "attachment": "Pink_Pool" },
+    { "name": "SuperFreee spinz 2", "bone": "Sky_Left" }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "clouds_back": {
+          "clouds_back": { "width": 1058, "height": 902 }
+        },
+        "clouds_back2": {
+          "clouds_back": { "width": 1058, "height": 902 }
+        },
+        "clouds_front": {
+          "clouds_front": { "width": 1027, "height": 656 }
+        },
+        "clouds_front2": {
+          "clouds_front": { "width": 1027, "height": 656 }
+        },
+        "clouds_mid": {
+          "clouds_mid": { "width": 1027, "height": 879 }
+        },
+        "clouds_mid2": {
+          "clouds_mid": { "width": 1027, "height": 879 }
+        },
+        "clouds_mid 2": {
+          "clouds_mid 2": { "width": 947, "height": 757 }
+        },
+        "Floor": {
+          "Floor": {
+            "type": "mesh",
+            "uvs": [
+              1, 0.89843, 1, 1, 0.84344, 1, 0.16586, 1, 0, 1, 1.0e-5, 0.90022, 0, 0, 1, 0, 0.84485,
+              0.89624, 0.1644, 0.90034
+            ],
+            "triangles": [
+              2, 8, 1, 4, 9, 3, 2, 3, 9, 8, 0, 1, 8, 2, 9, 4, 5, 9, 7, 8, 9, 9, 5, 6, 8, 7, 0, 7, 9,
+              6
+            ],
+            "vertices": [
+              1, 3, 511.67, -315.56, 1, 1, 17, 680.4, -17.77, 1, 1, 17, 318.3, -17.34, 1, 1, 17,
+              -355.65, -16.55, 1, 1, 17, -364.19, -16.54, 1, 1, 3, -513.32, -315.77, 1, 1, 3,
+              -512.5, 394.5, 1, 1, 3, 512.5, 393.3, 1, 1, 3, 352.64, -313.65, 1, 1, 3, -344.83,
+              -316.06, 1
+            ],
+            "hull": 8
+          }
+        },
+        "Floor2": {
+          "Floor2": {
+            "type": "mesh",
+            "path": "Floor",
+            "uvs": [
+              1, 0.89843, 1, 1, 0.79297, 1, 0.1732, 1, 0, 1, 1.0e-5, 0.89687, 0, 0, 1, 0, 0.79534,
+              0.89951, 0.17352, 0.89839
+            ],
+            "triangles": [
+              4, 5, 9, 2, 9, 8, 8, 0, 1, 9, 5, 6, 6, 8, 9, 7, 8, 6, 0, 8, 7, 3, 4, 9, 3, 9, 2, 2, 8,
+              1
+            ],
+            "vertices": [
+              1, 11, 508.42, -316.35, 1, 1, 18, 739.54, 2.3, 1, 1, 18, 317.04, 0.7, 1, 1, 18,
+              -294.13, -1.62, 1, 1, 18, -299.17, -1.64, 1, 1, 11, -516.57, -319, 1, 1, 11, -519.26,
+              388.62, 1, 1, 11, 505.73, 392.51, 1, 1, 11, 298.64, -317.99, 1, 1, 11, -338.72,
+              -319.53, 1
+            ],
+            "hull": 8
+          }
+        },
+        "Pink_Pool": {
+          "Pink_Pool": { "width": 1010, "height": 305 }
+        },
+        "Pink_Pool2": {
+          "Pink_Pool": { "width": 1010, "height": 305 }
+        },
+        "sky": {
+          "sky2": { "x": -12.17, "y": 2.18, "scaleX": 4, "scaleY": 4, "width": 256, "height": 307 }
+        },
+        "sky3": {
+          "sky3": {
+            "path": "sky2",
+            "x": -2.66,
+            "y": 2.18,
+            "scaleX": 4,
+            "scaleY": 4,
+            "width": 256,
+            "height": 307
+          }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "freespins-idle": {
+      "slots": {
+        "clouds_mid 2": {
+          "attachment": [{ "name": "clouds_mid 2" }]
+        }
+      }
+    },
+    "freespins-intro": {
+      "bones": {
+        "background_main": {
+          "scale": [{}]
+        }
+      }
+    },
+    "freespins-outro": {
+      "bones": {
+        "background_main": {
+          "scale": [{}]
+        }
+      }
+    }
+  }
+}
