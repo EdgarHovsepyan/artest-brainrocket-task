@@ -3480,11 +3480,12 @@ export class SlotView extends Component {
       g.stroke();
     };
     for (const pts of this.candyLinePts) {
-      stroke(pts, 255, 64, 138, 14 * pulse, 30 * pulse);
-      stroke(pts, 255, 96, 168, 30 * pulse, 19 * pulse);
-      stroke(pts, 255, 138, 196, 70, 11);
-      stroke(pts, 255, 178, 220, 185, 6.5);
-      stroke(pts, 255, 250, 252, 230, 2.8);
+      // Sugar Rush win-line: cyan glow -> white core (cyan == win signalling).
+      stroke(pts, 127, 231, 255, 14 * pulse, 30 * pulse);
+      stroke(pts, 140, 235, 255, 30 * pulse, 19 * pulse);
+      stroke(pts, 180, 244, 255, 70, 11);
+      stroke(pts, 224, 250, 255, 185, 6.5);
+      stroke(pts, 255, 255, 255, 230, 2.8);
 
       if (!this.reducedFx) this.drawFlowGlint(g, pts, t);
     }
@@ -3941,7 +3942,7 @@ export class SlotView extends Component {
     return head;
   }
 
-  private strokeLine(pts: Vec3[], bright: boolean, color: Color): void {
+  private strokeLine(pts: Vec3[], bright: boolean, _color: Color): void {
     const g = this.winLineG;
     if (!g || pts.length < 2) return;
     const path = () => {
@@ -3949,15 +3950,22 @@ export class SlotView extends Component {
       for (let i = 1; i < pts.length; i++) g.lineTo(pts[i].x, pts[i].y);
     };
 
-    g.lineWidth = bright ? 5 : 3;
+    // Sugar Rush win-line = cyan glow + white core (cyan == win; LINE_HUES inert).
+    // dark base for contrast on bright candy
+    g.lineWidth = bright ? 6 : 4;
     g.strokeColor = new Color(0, 0, 0, bright ? 90 : 50);
     path();
     g.stroke();
 
-    g.lineWidth = bright ? 2 : 1.5;
-    g.strokeColor = bright
-      ? new Color(color.r, color.g, color.b, 75)
-      : new Color(color.r, color.g, color.b, 40);
+    // cyan glow (outer)
+    g.lineWidth = bright ? 5 : 3;
+    g.strokeColor = new Color(127, 231, 255, bright ? 120 : 60);
+    path();
+    g.stroke();
+
+    // white core (inner)
+    g.lineWidth = bright ? 2 : 1.2;
+    g.strokeColor = new Color(255, 255, 255, bright ? 205 : 90);
     path();
     g.stroke();
   }
