@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="820" alt="ARTEST | BrainRocket" src="https://github.com/user-attachments/assets/f1a2b62f-db87-410d-a631-765c4eb0ebf7" />
+<img width="820" alt="ARTEST | BrainRocket — Shining Pop" src="docs/media/banner.png" />
 
 # Shining Pop — Multi-Engine Slot Studio
 
