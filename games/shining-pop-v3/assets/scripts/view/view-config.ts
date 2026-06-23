@@ -24,7 +24,7 @@ export const VIEW_CONFIG = {
 
     reelCenterY: 90,
 
-    designWidth: 760,
+    designWidth: 560,
     designHeight: 760,
 
     spinBuffer: 14,
