@@ -32,6 +32,7 @@ const GAMES = [
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
+const copied = [];
 for (const g of GAMES) {
   const src = path.join(ROOT, g.src);
   // Skip a game whose static build isn't committed yet (e.g. a work-in-progress
@@ -42,6 +43,7 @@ for (const g of GAMES) {
     continue;
   }
   cpSync(src, path.join(OUT, g.slug), { recursive: true });
+  copied.push(g.slug);
   console.log(`✓ ${g.slug}  ←  ${g.src}`);
 }
 
@@ -53,9 +55,8 @@ for (const f of ['pixi-board.png', 'cocos-desktop.png', 'pixi-desktop.png']) {
 
 writeFileSync(path.join(OUT, 'index.html'), LANDING());
 console.log('✓ index.html  (demo landing)');
-console.log(
-  `\nDemo assembled → ${OUT}\n  /shining-pop      (PixiJS v8)\n  /shining-pop-v2   (Cocos Creator 3.8.8)`,
-);
+console.log(`\nDemo assembled → ${OUT}`);
+for (const slug of copied) console.log(`  /${slug}`);
 
 function LANDING() {
   return `<!doctype html>
