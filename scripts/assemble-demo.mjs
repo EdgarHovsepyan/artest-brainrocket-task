@@ -34,7 +34,13 @@ mkdirSync(OUT, { recursive: true });
 
 for (const g of GAMES) {
   const src = path.join(ROOT, g.src);
-  if (!existsSync(src)) throw new Error(`missing build: ${g.src} — build the game first`);
+  // Skip a game whose static build isn't committed yet (e.g. a work-in-progress
+  // game) rather than failing the whole demo build — the ready games still ship.
+  // The game is picked up automatically as soon as its build/ lands in the repo.
+  if (!existsSync(src)) {
+    console.warn(`⚠ skip ${g.slug} — no committed build at ${g.src}`);
+    continue;
+  }
   cpSync(src, path.join(OUT, g.slug), { recursive: true });
   console.log(`✓ ${g.slug}  ←  ${g.src}`);
 }
