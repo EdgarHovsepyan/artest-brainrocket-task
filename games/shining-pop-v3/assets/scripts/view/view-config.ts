@@ -16,11 +16,11 @@ export const VIEW_CONFIG = {
   },
 
   layout: {
-    cell: 96,
+    cell: 100,
 
-    symbolFill: 0.94,
+    symbolFill: 0.76,
 
-    gap: 5,
+    gap: 8,
 
     reelCenterY: 90,
 
