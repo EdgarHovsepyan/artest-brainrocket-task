@@ -11,3 +11,6 @@ games/shining-pop
 # Cocos-editor-generated project settings — reformatting them just churns + the
 # editor rewrites them on every build (recurring CI format failures otherwise).
 games/shining-pop-v2/settings
+# Work-in-progress game on its own build/format cadence (like shining-pop above);
+# exclude until it's finalized so its churn doesn't red the shared CI.
+games/shining-pop-v3
