@@ -196,7 +196,11 @@
   
   const SYM = { R:0,G:1,B:2,P:3,O:4,C:5,BELL:6,CROWN:7,STAR:8 };
   const SYM_COUNT = 9, STAR = SYM.STAR;
-  const SYM_NAME = ['Amethyst','Sapphire','Topaz','Cherry','Lemon','Plum','Grapes','Wild','Star'];
+  // Display labels (paytable rows, spin-history, line_win event metadata). These name the ART
+  // each pay-ID actually shows AFTER ART_REMAP (see ~line 1540) — gems are the low symbols, candy
+  // the highs — NOT pay-ID order. Candy-cohesive + matches the icon drawn beside it. Copy only;
+  // never reorder to "fix" against PAY/weights/ART_REMAP — that would desync names from the art.
+  const SYM_NAME = ['Purple Gem','Blue Gem','Yellow Gem','Red Candy','Gummy Bears','Candy Cane','Green Candy','Wild','Scatter'];
 
 
   
@@ -4583,10 +4587,10 @@
     };
     if(tab==='rules'){
       line('HOW TO PLAY',13,SURF.heading,true);
-      line('1. Pick your bet with the + and − buttons\n2. Hit SPIN (or the Spacebar)\n3. Land 3 or more matching symbols on a line, starting from the left\n4. Land 3 or more STARs anywhere to win Free Spins\n5. In a hurry? BUY BONUS takes you straight to Free Spins',11);
+      line('1. Pick your bet with the + and − buttons\n2. Hit SPIN (or the Spacebar)\n3. Land 3 or more matching symbols on a line, starting from the left\n4. Land 3 or more SCATTERS anywhere to win Free Spins\n5. In a hurry? BUY BONUS takes you straight to Free Spins',11);
       y+=6;
       line('GAME MECHANICS',13,SURF.heading,true);
-      line('• 5 reels, 3 rows, 10 fixed lines\n• Lines pay left to right, starting on reel 1\n• The STAR is a scatter — it pays from anywhere, no line needed\n• In Free Spins, every line win is multiplied by ×'+FS_MULT+'\n• Land 3+ STARs in Free Spins to win +'+FS_RETRIGGER+' more spins\n• Every spin is separate and decided fairly by the game server',11);
+      line('• 5 reels, 3 rows, 10 fixed lines\n• Lines pay left to right, starting on reel 1\n• The SCATTER lollipop pays from anywhere, no line needed\n• In Free Spins, every line win is multiplied by ×'+FS_MULT+'\n• Land 3+ SCATTERS in Free Spins to win +'+FS_RETRIGGER+' more spins\n• Every spin is separate and decided fairly by the game server',11);
       y+=8;
       const boxY=y;
       [['RTP',RTP_DISPLAY,SURF.win],['MAX WIN',ADVERTISED_MAX_X.toLocaleString('en-US')+'×',SURF.value],['VOL.','MED-HIGH',SURF.link]].forEach(([lbl,val,col],i) => {
@@ -4613,10 +4617,10 @@
         y+=24;
       }
       y+=2;
-      line('STAR SCATTER — pays × total bet',12,SURF.heading,true);
+      line('LOLLIPOP SCATTER — pays × total bet',12,SURF.heading,true);
       const sic=new PIXI.Sprite(SYM_TEX[8]); sic.anchor.set(0,0.5);
       sic.scale.set(symScale(SYM_TEX[8], 26)); sic.position.set(0,y+12); infoBody.addChild(sic);
-      const sv=new PIXI.Text({ text:'3★ = '+SCAT[3]+'×    4★ = '+SCAT[4]+'×    5★ = '+SCAT[5]+'×', style:{ fontFamily:'Luckiest Guy', fontSize:12, fill:SURF.value, letterSpacing:1 }});
+      const sv=new PIXI.Text({ text:'3 = '+SCAT[3]+'×    4 = '+SCAT[4]+'×    5 = '+SCAT[5]+'×', style:{ fontFamily:'Luckiest Guy', fontSize:12, fill:SURF.value, letterSpacing:1 }});
       sv.anchor.set(0,0.5); sv.position.set(34,y+12); infoBody.addChild(sv);
       y+=34;
       line('3 / 4 / 5 scatters also award '+FS_AWARD[3]+' / '+FS_AWARD[4]+' / '+FS_AWARD[5]+' Free Spins.',10,0xc9b0e6);   
