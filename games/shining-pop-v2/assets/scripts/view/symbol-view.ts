@@ -371,11 +371,23 @@ export class SymbolView extends Component {
     const popStart = delay + antDur;
 
     const popTween = tween(this.node).delay(delay);
+    // U6 — the Wild celebrates with a squash-and-stretch "joy-leap" (wide+short crouch -> narrow+tall overshoot
+    // -> springy settle) instead of the uniform pop every other symbol gets. It's lifted above the reel mask for
+    // the win so the vertical stretch can't clip; the timing matches the standard pop so the jelly loop still aligns.
+    const wildLeap = this._currentId === SYMBOLS.WILD;
     if (antDur > 0)
-      popTween.to(antDur, { scale: new Vec3(antDip, antDip, 1) }, { easing: 'quadOut' });
+      popTween.to(
+        antDur,
+        { scale: wildLeap ? new Vec3(zoom * 1.07, antDip * 0.9, 1) : new Vec3(antDip, antDip, 1) },
+        { easing: 'quadOut' },
+      );
     popTween
-      .to(half, { scale: new Vec3(pop, pop, 1) }, { easing: 'backOut' })
-      .to(half, { scale: new Vec3(zoom, zoom, 1) }, { easing: 'quadIn' })
+      .to(
+        half,
+        { scale: wildLeap ? new Vec3(pop * 0.91, pop * 1.12, 1) : new Vec3(pop, pop, 1) },
+        { easing: 'backOut' },
+      )
+      .to(half, { scale: new Vec3(zoom, zoom, 1) }, { easing: wildLeap ? 'backOut' : 'quadIn' })
       .start();
     if (bnc.enabled) {
       tween(this.node)
