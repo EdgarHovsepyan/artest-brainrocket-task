@@ -55,6 +55,8 @@ export class SymbolView extends Component {
 
   private bubbles: Node[] = [];
 
+  private heartPops: Node[] = [];
+
   private winOverlay: Node | null = null;
   private winOverlaySp: Sprite | null = null;
   private winOverlayOp: UIOpacity | null = null;
@@ -459,6 +461,7 @@ export class SymbolView extends Component {
       if (winMat && VIEW_CONFIG.win.symbolFx.enabled) this.playWinShader(popStart, winMat);
       this.playStarPop(popStart, heat);
       this.playBubbles(popStart, heat);
+      if (this._currentId === SYMBOLS.WILD) this.playWildHearts(popStart);
     }
 
     this.swapWildWinFace(popStart);
@@ -687,6 +690,65 @@ export class SymbolView extends Component {
         .delay(0.9)
         .union()
         .repeatForever()
+        .start();
+    });
+  }
+
+  // One-shot rising hearts off the Wild on a win — the hero's heart-lollipop signature flourish.
+  // Not looped (self-completing fade) so it stays light + WCAG-gentle; pooled across wins.
+  private playWildHearts(delay: number): void {
+    const N = 6;
+    const pinks = [
+      new Color(255, 95, 162, 255),
+      new Color(255, 138, 196, 255),
+      new Color(255, 180, 220, 255),
+      new Color(255, 110, 150, 255),
+    ];
+    if (this.heartPops.length === 0) {
+      for (let i = 0; i < N; i++) {
+        const n = new Node('wildHeart');
+        n.layer = this.node.layer;
+        n.addComponent(UITransform).setContentSize(28, 28);
+        const g = n.addComponent(Graphics);
+        const h = 12;
+        g.fillColor = pinks[i % pinks.length];
+        g.moveTo(0, h * 0.32);
+        g.bezierCurveTo(h * 0.55, h * 0.95, h * 1.05, h * 0.1, 0, -h * 0.7);
+        g.bezierCurveTo(-h * 1.05, h * 0.1, -h * 0.55, h * 0.95, 0, h * 0.32);
+        g.close();
+        g.fill();
+        n.addComponent(UIOpacity).opacity = 0;
+        this.node.addChild(n);
+        this.heartPops.push(n);
+      }
+    }
+    const rise = this.size * 0.72;
+    this.heartPops.forEach((n, i) => {
+      const op = n.getComponent(UIOpacity)!;
+      Tween.stopAllByTarget(op);
+      Tween.stopAllByTarget(n);
+      const dx = (i - (N - 1) / 2) * this.size * 0.16;
+      const sway = (i % 2 ? 1 : -1) * this.size * 0.1;
+      op.opacity = 0;
+      n.setPosition(dx, 0, 0);
+      n.setScale(0.2, 0.2, 1);
+      tween(op)
+        .delay(delay + i * 0.06)
+        .to(0.18, { opacity: 235 })
+        .to(0.6, { opacity: 0 }, { easing: 'sineIn' })
+        .start();
+      tween(n)
+        .delay(delay + i * 0.06)
+        .to(
+          0.22,
+          { position: new Vec3(dx + sway, rise * 0.55, 0), scale: new Vec3(1.1, 1.1, 1) },
+          { easing: 'backOut' },
+        )
+        .to(
+          0.56,
+          { position: new Vec3(dx - sway, rise, 0), scale: new Vec3(0.5, 0.5, 1) },
+          { easing: 'sineIn' },
+        )
         .start();
     });
   }
