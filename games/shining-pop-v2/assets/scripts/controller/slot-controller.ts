@@ -8,6 +8,7 @@ import {
   KeyCode,
   Layers,
   Node,
+  profiler,
   view,
 } from 'cc';
 import { SlotModel } from '../model/slot-model';
@@ -83,6 +84,7 @@ export class SlotController extends Component {
   onLoad(): void {
     // Lock 60fps — avoids GPU/thermal cost of high-refresh panels for no perceptible gain.
     game.frameRate = 60;
+    profiler.hideStats(); // hide the engine FPS / draw-call overlay (debug builds show it by default)
     this.model = new SlotModel({ balanceCents: this.startBalanceCents, betCents: this.betCents });
     this.session = newSession(this.nowMs());
     const viewNode = new Node('SlotView');
