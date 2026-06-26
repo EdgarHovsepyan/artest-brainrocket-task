@@ -151,18 +151,35 @@ export class SymbolView extends Component {
     }
     if (this.label) this.label.string = frame ? '' : (SYMBOL_NAMES[id] ?? String(id));
 
-    // Idle-breathe amplitude (VIEW_CONFIG.symbols.idleBreatheAmp); Wild stays 0 since its own FX carry it.
+    // Idle-breathe amplitude (VIEW_CONFIG.symbols.idleBreatheAmp). The Wild — the theme hero — now
+    // breathes too (was frozen at 0); update() layers its heartbeat + sway on top.
     const ba = VIEW_CONFIG.symbols.idleBreatheAmp;
-    this.idleAmp = id === SYMBOLS.WILD ? 0 : id <= 4 ? ba.high : ba.low;
+    this.idleAmp = id === SYMBOLS.WILD ? ba.wild : id <= 4 ? ba.high : ba.low;
 
     this.artBaseScale = FULL_SIZE_IDS.has(id) ? 1 : SYMBOL_SHRINK;
-    if (this.art) this.art.setScale(this.artBaseScale, this.artBaseScale, 1);
+    if (this.art) {
+      this.art.setScale(this.artBaseScale, this.artBaseScale, 1);
+      this.art.setRotationFromEuler(0, 0, 0); // clear any prior Wild idle-sway
+    }
   }
 
   update(dt: number): void {
     if (!this.idleOn || !this.art) return;
     this.idleT += dt;
-    const sc = (1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp) * this.artBaseScale;
+    let extra = 0;
+    if (this._currentId === SYMBOLS.WILD) {
+      // Cardioid "lub-DUB" heartbeat (two Gaussian bumps over ~2.4s) + a whisper sway so the hero
+      // Wild reads as the most-alive symbol at rest. Only runs while idle — reduced-motion (and
+      // spinning) call setIdle(false) which early-returns above, so it's WCAG-safe automatically.
+      // All on this.art -> win tweens on this.node stay independent.
+      const p = (this.idleT % 2.4) / 2.4;
+      const g = (c: number, w: number) => Math.exp(-((p - c) ** 2) / (2 * w * w));
+      extra = 0.022 * (g(0, 0.045) + 0.7 * g(0.16, 0.05));
+      this.art.setRotationFromEuler(0, 0, 1.4 * Math.sin(this.idleT * 5.0 + 0.6));
+    }
+    const sc =
+      (1 + Math.sin(this.idleT * 1.9 + this.idlePhase) * this.idleAmp + extra) * this.artBaseScale;
+    if (!Number.isFinite(sc)) return;
     this.art.setScale(sc, sc, 1);
   }
 

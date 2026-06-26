@@ -426,9 +426,9 @@ export const VIEW_CONFIG = {
       base: { amp: 1.0, freq: 1.9 },
     } as Record<string, { amp: number; freq: number }>,
     /** Idle-breathe scale amplitude per symbol weight (sine on the `art` child): a
-     *  whisper so symbols settle but the board still reads alive. Wild uses 0 (its
-     *  FX carry it). high = ids 0..4 (wild+H1..H4), low = the rest. */
-    idleBreatheAmp: { high: 0.008, low: 0.005 },
+     *  whisper so symbols settle but the board still reads alive. wild = the hero
+     *  (update() also layers its heartbeat + sway). high = ids 1..4, low = the rest. */
+    idleBreatheAmp: { high: 0.008, low: 0.005, wild: 0.01 },
   },
 
   decor: {
