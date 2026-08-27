@@ -8515,6 +8515,26 @@
     await delay(ms);
   }
 
+  // Win-ceremony juice: a brief, tier-scaled additive "impact" flash at the
+  // start of a big win (BIG/MEGA/EPIC). Purely additive — a full-screen overlay
+  // that fades in fast and out slow; never changes game state, gated on reduced
+  // motion by its caller.
+  let _cerFlash = null;
+  function ceremonyFlash(tier){
+    if(!window.gsap) return;
+    const W = app.screen.width, H = app.screen.height;
+    if(!_cerFlash){ _cerFlash = new PIXI.Graphics(); _cerFlash.eventMode = 'none'; stage.addChild(_cerFlash); }
+    stage.addChild(_cerFlash);   // keep it on top for the flash
+    const col = tier >= 5 ? 0xffe6a8 : 0xffd0ec;   // warm gold for mega/epic, candy pink for big
+    _cerFlash.clear(); _cerFlash.rect(0, 0, W, H).fill({ color: col, alpha: 1 });
+    _cerFlash.alpha = 0; _cerFlash.blendMode = 'add';
+    const peak = tier >= 5 ? 0.42 : 0.26;
+    window.gsap.killTweensOf(_cerFlash);
+    window.gsap.timeline()
+      .to(_cerFlash, { alpha: peak, duration: 0.08, ease: 'power2.out' })
+      .to(_cerFlash, { alpha: 0, duration: 0.52, ease: 'power2.in' });
+  }
+
   function celebrate(mx100,amountX6,labelOverride){
     const tier=winTier(mx100);
 
@@ -8564,7 +8584,7 @@
     if(tier>=2 && !isReduced()){ try { Sound.winAnticipate(tier); Sound.tallyStart(mx100/100); } catch(e){} }   
 
     if(tier>=2 && !isReduced()) spawnParticles(app.screen.width/2, GY+GH*0.42, tier*4, tier);
-    if(tier>=4 && !isReduced()){ shakeAmount=tier*3; shakeT0=performance.now(); }
+    if(tier>=4 && !isReduced()){ shakeAmount=tier*3; shakeT0=performance.now(); ceremonyFlash(tier); }
     
     if(tier>=5 && !isReduced() && !STAKE.replay){ _camPushT0 = performance.now(); }
 
