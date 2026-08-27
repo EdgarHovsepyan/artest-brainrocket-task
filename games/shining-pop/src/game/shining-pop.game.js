@@ -3868,7 +3868,23 @@
     const lbl = new PIXI.Text({ text: 'BUY\nBONUS', style: { fontFamily: THEME.type.familyDisplay, fontSize: 30, fill: 0xffe24a, align: 'center', lineHeight: 30, stroke: { color: 0xd1356f, width: 5, join: 'round' } } });
     lbl.anchor.set(0.5); buyFabPress.addChild(lbl);
   }
-  const _buyBaseW = Math.max(1, (buyArt || buyFabPress).width);   
+  const _buyBaseW = Math.max(1, (buyArt || buyFabPress).width);
+  // Premium juice: a few candy sparkle-shines that twinkle over the badge to
+  // draw the eye to the buy-bonus button (additive; leaves the art untouched).
+  if (buyArt && window.gsap) {
+    const bw = buyArt.width, bh = buyArt.height;
+    const mkSpark = (fx, fy, r) => {
+      const n = new PIXI.Graphics();
+      n.poly([0, -r, r * 0.26, -r * 0.26, r, 0, r * 0.26, r * 0.26, 0, r, -r * 0.26, r * 0.26, -r, 0, -r * 0.26, -r * 0.26]).fill(0xffffff);
+      n.blendMode = 'add'; n.alpha = 0; n.position.set(fx * bw, fy * bh); n.scale.set(0.5);
+      buyFabPress.addChild(n); return n;
+    };
+    [[0.28, -0.26, bw * 0.055], [-0.33, 0.20, bw * 0.038], [0.34, 0.30, bw * 0.032]].forEach(([fx, fy, r], i) => {
+      const n = mkSpark(fx, fy, r); const d = i * 0.8, rd = 1.3 + i * 0.35;
+      window.gsap.to(n, { alpha: 1, duration: 0.45, ease: 'sine.inOut', repeat: -1, yoyo: true, repeatDelay: rd, delay: d });
+      window.gsap.to(n.scale, { x: 1.35, y: 1.35, duration: 0.45, ease: 'sine.inOut', repeat: -1, yoyo: true, repeatDelay: rd, delay: d });
+    });
+  }
   buyFab.on('pointertap', () => { try { Sound.click(); } catch (e) {} showBuyBonusModal(); });
   
   buyFab.on('pointerdown', () => { try { window.gsap && window.gsap.to(buyFabPress.scale, { x: 0.94, y: 0.94, duration: 0.1, ease: 'power3.out' }); } catch (e) {} });
